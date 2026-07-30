@@ -23,9 +23,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-&j=9(7967aqfrh%wd91rjz185!#b^-h@pp2vbpx%fd%x$%d=8n'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "gestemg.alwaysdata.net",
+]
 
 
 # Application definition
@@ -93,13 +95,13 @@ DATABASES = {
 }
 """
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'bd_emg',
-        'USER': 'postgres',
-        'PASSWORD': 'Abdoul',
-        'HOST': 'localhost',
-        'PORT': '5432',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "gestemg_bd_emg",
+        "USER": "gestemg",
+        "PASSWORD": "Abdoul@alwaysdata1995",
+        "HOST": "postgresql-gestemg.alwaysdata.net",
+        "PORT": "5432",
     }
 }
 
@@ -142,6 +144,8 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 LOGIN_URL = 'login'
 
