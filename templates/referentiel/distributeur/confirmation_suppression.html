@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Suppression distributeur
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header bg-danger text-white">
+
+        Confirmation de suppression
+
+    </div>
+
+    <div class="card-body">
+
+        <p>
+            Voulez-vous vraiment supprimer ce distributeur ?
+        </p>
+
+        <div class="alert alert-warning">
+
+            Cette opération désactivera le distributeur.
+            Les données resteront conservées dans le système.
+
+        </div>
+
+        <p>
+
+            <strong>Code :</strong>
+
+            {{ distributeur.code }}
+
+        </p>
+
+        <p>
+
+            <strong>Nom :</strong>
+
+            {{ distributeur.nom }} {{ distributeur.prenom }}
+
+        </p>
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <button
+                type="submit"
+                class="btn btn-danger"
+            >
+                Confirmer
+            </button>
+
+            <a
+                href="{% url 'liste_distributeur' %}"
+                class="btn btn-secondary"
+            >
+                Annuler
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

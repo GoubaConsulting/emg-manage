@@ -1,0 +1,612 @@
+{% extends "base.html" %}
+
+{% block title %}
+Liste des commandes
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+
+        <h4 class="mb-0">
+
+            {{ titre }}
+
+        </h4>
+
+        {% if request.user.profil.role == "DIRECTEUR" %}
+
+        <a
+            href="{% url url_nouveau %}"
+            class="btn btn-success"
+        >
+            Nouveau
+        </a>
+
+        {% elif request.user.profil.role == "GERANT" %}
+
+        <a
+            href="{% url 'ajouter_commande_gerant' %}"
+            class="btn btn-success"
+        >
+            Nouvelle commande
+        </a>
+
+        {% endif %}
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="get" class="row g-3 mb-4">
+
+            <div class="col-md-4">
+
+                <label class="form-label">
+
+                    Numéro
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    name="numero"
+                    value="{{ numero }}"
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label">
+
+                    Date
+
+                </label>
+
+                <input
+                    type="date"
+                    class="form-control"
+                    name="date_commande"
+                    value="{{ date_commande }}"
+                >
+
+            </div>
+
+            <div class="col-md-2 align-self-end">
+
+                <button
+                    type="submit"
+                    class="btn btn-primary w-100"
+                >
+
+                    Rechercher
+
+                </button>
+
+            </div>
+
+        </form>
+
+
+        <div class="row mb-4">
+
+            <div class="col-md-4">
+
+                <div class="card border-primary shadow-sm">
+
+                    <div class="card-header bg-primary text-white">
+
+                        <strong>
+
+                            Nombre de commandes
+
+                        </strong>
+
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        <h3 class="mb-0">
+
+                            {{ commandes.paginator.count }}
+
+                        </h3>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <div class="card border-warning shadow-sm">
+
+                    <div class="card-header bg-warning">
+
+                        <strong>
+
+                            Montant brut
+
+                        </strong>
+
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        <h3 class="mb-0">
+
+                            {{ total_brut }} FCFA
+
+                        </h3>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <div class="card border-success shadow-sm">
+
+                    <div class="card-header bg-success text-white">
+
+                        <strong>
+
+                            Montant net
+
+                        </strong>
+
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        <h3 class="mb-0">
+
+                            {{ total_net }} FCFA
+
+                        </h3>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover align-middle">
+
+                <thead class="table-dark">
+
+                    <tr>
+
+                        <th width="50"></th>
+
+                        <th>Numéro</th>
+
+                        <th>Date</th>
+
+                        <th class="text-end">
+
+                            Montant brut
+
+                        </th>
+
+                        <th class="text-end">
+
+                            Montant net
+
+                        </th>
+
+                        <th width="120">
+
+                            Actions
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for commande in commandes %}
+
+                    <tr>
+
+                        <td class="text-center">
+
+                            <button
+
+                                class="btn btn-sm btn-outline-secondary"
+
+                                type="button"
+
+                                data-bs-toggle="collapse"
+
+                                data-bs-target="#cmd{{ commande.idcommande }}"
+
+                            >
+
+                                ▼
+
+                            </button>
+
+                        </td>
+
+                        <td>
+
+                            {{ commande.numero }}
+
+                        </td>
+
+                        <td>
+
+                            {{ commande.date_commande|date:"d/m/Y" }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ commande.montant_brut }} FCFA
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ commande.montant_net }} FCFA
+
+                        </td>
+
+                        <td>
+
+                            <a
+
+                                href="{% url 'modifier_commande_stock_tampon' commande.idcommande %}"
+
+                                class="btn btn-warning btn-sm"
+
+                            >
+
+                                Modifier
+
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    <tr class="collapse" id="cmd{{ commande.idcommande }}">
+
+                        <td></td>
+
+                        <td colspan="5">
+
+                            <div class="p-3 bg-light rounded">
+
+                                <div class="row mb-3">
+
+                                    <div class="col-md-4">
+
+                                        <strong>
+
+                                            Point de vente :
+
+                                        </strong>
+
+                                        {{ commande.point_vente.designation }}
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <strong>
+
+                                            Utilisateur :
+
+                                        </strong>
+
+                                        {{ commande.utilisateur.get_full_name|default:commande.utilisateur.username }}
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <strong>
+
+                                            Date :
+
+                                        </strong>
+
+                                        {{ commande.date_commande|date:"d/m/Y" }}
+
+                                    </div>
+
+                                </div>
+
+                                <table class="table table-sm table-bordered">
+
+                                    <thead class="table-secondary">
+
+                                        <tr>
+
+                                            <th>
+
+                                                Produit
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                Prix
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                Montant
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                Quantité
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                Remise %
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                Montant remise
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                Net
+
+                                            </th>
+
+                                        </tr>
+
+                                    </thead>
+
+                                    <tbody>
+
+                                    {% if commande.groupes_compagnies %}
+
+                                        {% for groupe in commande.groupes_compagnies %}
+
+                                            <tr class="table-primary">
+
+                                                <td colspan="7">
+
+                                                    <strong>
+
+                                                        {{ groupe.compagnie.designation }}
+
+                                                    </strong>
+
+                                                </td>
+
+                                            </tr>
+
+                                            {% for ligne in groupe.lignes %}
+
+                                            <tr>
+
+                                                <td>
+
+                                                    {{ ligne.produit.designation }}
+
+                                                </td>
+
+                                                <td class="text-end">
+
+                                                    {{ ligne.prix_unitaire }}
+
+                                                </td>
+
+                                                <td class="text-end">
+
+                                                    {{ ligne.montant }}
+
+                                                </td>
+
+                                                <td class="text-end">
+
+                                                    {{ ligne.quantite }}
+
+                                                </td>
+
+                                                <td class="text-end">
+
+                                                    {{ ligne.taux_remise }} %
+
+                                                </td>
+
+                                                <td class="text-end">
+
+                                                    {{ ligne.montant_remise }}
+
+                                                </td>
+
+                                                <td class="text-end">
+
+                                                    {{ ligne.montant_net }}
+
+                                                </td>
+
+                                            </tr>
+
+                                            {% endfor %}
+
+                                            <tr class="table-warning">
+
+                                                <td colspan="6" class="text-end">
+
+                                                    <strong>
+
+                                                        Sous-total {{ groupe.compagnie.designation }}
+
+                                                    </strong>
+
+                                                </td>
+
+                                                <td class="text-end">
+
+                                                    <strong>
+
+                                                        {{ groupe.sous_total_net }} FCFA
+
+                                                    </strong>
+
+                                                </td>
+
+                                            </tr>
+
+                                        {% endfor %}
+
+                                        <tr class="table-success">
+
+                                            <td colspan="6" class="text-end">
+
+                                                <strong>
+
+                                                    TOTAL COMMANDE
+
+                                                </strong>
+
+                                            </td>
+
+                                            <td class="text-end">
+
+                                                <strong>
+
+                                                    {{ commande.montant_net }} FCFA
+
+                                                </strong>
+
+                                            </td>
+
+                                        </tr>
+
+                                    {% else %}
+
+                                        <tr>
+
+                                            <td colspan="7" class="text-center">
+
+                                                Aucun produit.
+
+                                            </td>
+
+                                        </tr>
+
+                                    {% endif %}
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td colspan="6" class="text-center">
+
+                            Aucune commande trouvée.
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% if commandes.has_other_pages %}
+
+        <nav>
+
+            <ul class="pagination justify-content-center">
+
+                {% if commandes.has_previous %}
+
+                <li class="page-item">
+
+                    <a
+                        class="page-link"
+                        href="?page={{ commandes.previous_page_number }}"
+                    >
+
+                        Précédent
+
+                    </a>
+
+                </li>
+
+                {% endif %}
+
+                <li class="page-item active">
+
+                    <span class="page-link">
+
+                        {{ commandes.number }}
+
+                    </span>
+
+                </li>
+
+                {% if commandes.has_next %}
+
+                <li class="page-item">
+
+                    <a
+                        class="page-link"
+                        href="?page={{ commandes.next_page_number }}"
+                    >
+
+                        Suivant
+
+                    </a>
+
+                </li>
+
+                {% endif %}
+
+            </ul>
+
+        </nav>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

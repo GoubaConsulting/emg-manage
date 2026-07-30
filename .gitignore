@@ -1,0 +1,35 @@
+# Environnement virtuel
+env/
+venv/
+.env/
+env_emg/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django
+db.sqlite3
+
+# Variables d'environnement
+.env
+
+# Logs
+*.log
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Fichiers PythonAnywhere
+staticfiles/
+
+# Migrations compilées
+*.pyc

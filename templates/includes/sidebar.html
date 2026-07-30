@@ -1,0 +1,285 @@
+<div class="col-md-2 bg-light border-end min-vh-100">
+
+    <div class="pt-3">
+
+        <ul class="nav flex-column">
+
+            <li class="nav-item">
+                <a class="nav-link menu-item"
+                   href="{% url 'dashboard' %}">
+                    Tableau de bord
+                </a>
+                
+            </li>
+
+            {% if request.user.profil.role == 'ADMIN' %}
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Administration
+                    </a>
+                </li>
+
+                <li class="nav-item mt-2">
+                    <span class="nav-link fw-bold text-primary">
+                        Référentiel
+                    </span>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_pointvente' %}">
+                        Points de vente
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_compagnie' %}">
+                        Compagnies
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_produit' %}">
+                        Produits
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_distributeur' %}">
+                        Distributeurs
+                    </a>
+                </li>
+
+            {% endif %}
+
+            {% if request.user.profil.role == 'DIRECTEUR' %}
+                <li class="nav-item mt-2">
+                    <span class="nav-link fw-bold text-primary">
+                        Référentiel
+                    </span>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_pointvente' %}">
+                        Points de vente
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_compagnie' %}">
+                        Compagnies
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_produit' %}">
+                        Produits
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_distributeur' %}">
+                        Distributeurs
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+
+                    <li class="nav-item mt-2">
+
+                        <span class="nav-link fw-bold text-primary">
+
+                            Commandes
+
+                        </span>
+
+                    </li>
+
+                    <li class="nav-item">
+
+                        <a
+                            class="nav-link menu-item"
+                            href="{% url 'liste_commandes' %}"
+                        >
+
+                            Commandes normales
+
+                        </a>
+
+                    </li>
+
+                    <li class="nav-item">
+
+                        <a
+                            class="nav-link menu-item"
+                            href="{% url 'liste_commandes_stock_tampon' %}"
+                        >
+
+                            Commandes Stock Tampon
+
+                        </a>
+
+                    </li>
+
+                    <li class="nav-item">
+
+                        <a
+                            href="{% url 'liste_reglement_stock' %}"
+                            class="nav-link menu-item"
+                        >
+
+                            <i class="bi bi-arrow-left-right"></i>
+
+                            <span>
+
+                                Règlement Stock Tampon
+
+                            </span>
+
+                        </a>
+
+                    </li>
+
+                    <li class="nav-item">
+
+                        <a
+                            href="{% url 'liste_commandes_caution' %}"
+                             class="nav-link menu-item"
+                        >
+
+                            <i class="bi bi-bank"></i>
+
+                            <span>
+
+                                Caution bancaire
+
+                            </span>
+
+                        </a>
+
+                    </li>
+
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Stocks
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'distributions:liste_distributions' %}" class="nav-link">
+                        <i class="..."></i>
+                        <span>Distributions</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link menu-item"
+                        href="{% url 'liste_validation_commandes' %}"
+                    >
+
+                        Validation commandes Gérant
+
+                    </a>
+
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Situations
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Manquants
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Versements
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_objectif' %}">
+                        Objectifs
+                    </a>
+                </li>
+
+            {% endif %}
+
+            {% if request.user.profil.role == 'GERANT' %}
+                <li class="nav-item">
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_objectif' %}">
+                        Objectifs
+                    </a>
+                </li>
+                <li class="nav-item">
+
+                    <a
+                        href="{% url 'liste_commandes' %}"
+                        class="nav-link {% if '/commandes/' in request.path %}active{% endif %}"
+                    >
+
+                        <i class="bi bi-cart-check"></i>
+
+                        <span>
+
+                            Commandes
+
+                        </span>
+
+                    </a>
+
+                </li>
+                
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="{% url 'liste_distributeur' %}">
+                        Distributeurs
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Distribution Journalière
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Situation Journalière
+                    </a>
+                </li>
+
+            {% endif %}
+
+            <li class="nav-item mt-4">
+
+                <a
+                    class="btn btn-danger w-100"
+                    href="{% url 'logout' %}"
+                >
+                    Déconnexion
+                </a>
+
+            </li>
+
+        </ul>
+
+    </div>
+
+</div>

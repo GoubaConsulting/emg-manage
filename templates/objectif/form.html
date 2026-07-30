@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}
+{{ titre }}
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header">
+
+        <h5 class="mb-0">
+
+            {{ titre }}
+
+        </h5>
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+
+                <div class="alert alert-danger">
+
+                    {{ form.non_field_errors }}
+
+                </div>
+
+            {% endif %}
+
+            <div class="row">
+
+                <!-- Compagnie -->
+
+                <div class="col-md-6 mb-3">
+
+                    <label class="form-label">
+
+                        Compagnie
+
+                    </label>
+
+                    {{ form.compagnie }}
+
+                    {{ form.compagnie.errors }}
+
+                </div>
+<!--
+                <div class="col-md-2 mb-3 d-flex align-items-end">
+
+                    <button
+                        type="submit"
+                        name="charger_produits"
+                        class="btn btn-primary w-100"
+                    >
+
+                        Charger
+
+                    </button>
+
+                </div>
+-->
+                <!-- Mois -->
+
+                <div class="col-md-3 mb-3">
+
+                    <label class="form-label">
+
+                        Mois
+
+                    </label>
+
+                    {{ form.mois }}
+
+                    {{ form.mois.errors }}
+
+                </div>
+
+                <!-- Année -->
+
+                <div class="col-md-3 mb-3">
+
+                    <label class="form-label">
+
+                        Année
+
+                    </label>
+
+                    {{ form.annee }}
+
+                    {{ form.annee.errors }}
+
+                </div>
+
+            </div>
+
+
+            <div class="row">
+
+                <!-- Montant -->
+
+                <div class="col-md-4 mb-3">
+
+                    <label class="form-label">
+
+                        Montant cible (F CFA)
+
+                    </label>
+
+                    {{ form.montant_cible }}
+
+                    {{ form.montant_cible.errors }}
+
+                </div>
+
+            </div>
+
+
+            <hr>
+
+            <h5>
+
+                Produits concernés
+
+            </h5>
+
+            <div
+                id="produits-container"
+                class="border rounded p-3 mb-3"
+            >
+
+                {% if form.fields.produits.queryset %}
+
+                    {% for checkbox in form.produits %}
+
+                        <div class="form-check">
+
+                            {{ checkbox.tag }}
+
+                            <label class="form-check-label">
+
+                                {{ checkbox.choice_label }}
+
+                            </label>
+
+                        </div>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <div class="alert alert-info mb-0">
+
+                        Sélectionnez une compagnie puis cliquez sur
+                        <strong>Charger</strong>.
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+
+            <div class="text-end">
+
+                <a
+                    href="{% url 'liste_objectif' %}"
+                    class="btn btn-secondary"
+                >
+
+                    Retour
+
+                </a>
+
+                <button
+                    type="submit"
+                    class="btn btn-success"
+                >
+
+                    Enregistrer
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const compagnie = document.getElementById("id_compagnie");
+
+    if (compagnie) {
+
+        compagnie.addEventListener("change", function () {
+
+            let champ = document.createElement("input");
+
+            champ.type = "hidden";
+
+            champ.name = "action";
+
+            champ.value = "charger";
+
+            this.form.appendChild(champ);
+
+            this.form.submit();
+
+        });
+
+    }
+
+});
+
+</script>
+
+{% endblock %}

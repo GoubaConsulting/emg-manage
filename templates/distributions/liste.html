@@ -1,0 +1,1767 @@
+{% extends "base.html" %}
+
+{% block title %}
+Liste des distributions
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+
+        <h4 class="mb-0">
+
+            {{ titre }}
+
+        </h4>
+
+        <a
+            href="{% url url_nouveau %}"
+            class="btn btn-success"
+        >
+
+            Nouvelle distribution
+
+        </a>
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="get" class="row g-3 mb-4">
+
+            <div class="col-md-2">
+
+                <label class="form-label">
+
+                    Du
+
+                </label>
+
+                <input
+                    type="date"
+                    class="form-control"
+                    name="date_debut"
+                    value="{{ date_debut }}"
+                >
+
+            </div>
+
+            <div class="col-md-2">
+
+                <label class="form-label">
+
+                    Au
+
+                </label>
+
+                <input
+                    type="date"
+                    class="form-control"
+                    name="date_fin"
+                    value="{{ date_fin }}"
+                >
+
+            </div>
+
+            <div class="col-md-2">
+
+                <label class="form-label">
+
+                    Date
+
+                </label>
+
+                <input
+                    type="date"
+                    class="form-control"
+                    name="date_distribution"
+                    value="{{ date_distribution }}"
+                >
+
+            </div>
+
+            <div class="col-md-3">
+
+                <label class="form-label">
+
+                    Distribution
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    name="numero"
+                    value="{{ numero }}"
+                    placeholder="Numéro"
+                >
+
+            </div>
+
+            {% if est_directeur %}
+
+            <div class="col-md-3">
+
+                <label class="form-label">
+
+                    Point de vente
+
+                </label>
+
+                <select
+                    name="point_vente"
+                    class="form-select"
+                >
+
+                    <option value="">
+
+                        Tous les points de vente
+
+                    </option>
+
+                    {% for point in points_vente %}
+
+                    <option
+                        value="{{ point.idpointvente }}"
+                        {% if point_selectionne == point.idpointvente %}
+                        selected
+                        {% endif %}
+                    >
+
+                        {{ point.designation }}
+
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            {% endif %}
+
+            {% if est_gerant %}
+
+            <div class="col-md-3">
+
+                <label class="form-label">
+
+                    Sous-distributeur
+
+                </label>
+
+                <select
+                    name="distributeur"
+                    class="form-select"
+                >
+
+                    <option value="">
+
+                        Tous les sous-distributeurs
+
+                    </option>
+
+                    {% for distributeur in distributeurs %}
+
+                    <option
+                        value="{{ distributeur.iddistributeur }}"
+                        {% if distributeur_selectionne == distributeur.iddistributeur %}
+                        selected
+                        {% endif %}
+                    >
+
+                        {{ distributeur.nom }} {{ distributeur.prenom }}
+
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            {% endif %}
+
+           
+
+            <div class="col-12 d-flex gap-2">
+
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    <i class="bi bi-search"></i>
+                    Rechercher
+                </button>
+
+                <a
+                    href="{% url 'distributions:liste_distributions' %}"
+                    class="btn btn-secondary"
+                >
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Réinitialiser
+                </a>
+
+            </div>
+
+        </form>
+
+        {% if est_directeur %}
+
+        <div class="row mb-4">
+
+            <div class="col-md-4">
+
+                <div class="card border-primary shadow-sm">
+
+                    <div class="card-header bg-primary text-white">
+
+                        <strong>
+
+                            Nombre de distributions
+
+                        </strong>
+
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        <h3 class="mb-0">
+
+                            {{ distributions.paginator.count }}
+
+                        </h3>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <div class="card border-warning shadow-sm">
+
+                    <div class="card-header bg-warning">
+
+                        <strong>
+
+                            Montant brut
+
+                        </strong>
+
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        <h3 class="mb-0">
+
+                            {{ total_brut }} FCFA
+
+                        </h3>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <div class="card border-success shadow-sm">
+
+                    <div class="card-header bg-success text-white">
+
+                        <strong>
+
+                            Montant net
+
+                        </strong>
+
+                    </div>
+
+                    <div class="card-body text-center">
+
+                        <h3 class="mb-0">
+
+                            {{ total_net }} FCFA
+
+                        </h3>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover align-middle">
+
+                <thead class="table-dark">
+
+                    <tr>
+
+                        <th width="50"></th>
+
+                        <th>Numéro</th>
+
+                        <th>Date</th>
+
+                        <th>Commande</th>
+
+                        <th>Point de vente</th>
+
+                        <th>Distributeur</th>
+
+                        <th class="text-end">
+
+                            Montant brut
+
+                        </th>
+
+                        <th class="text-end">
+
+                            Montant net
+
+                        </th>
+
+                        <th width="120">
+
+                            Actions
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for distribution in distributions %}
+
+                    <tr>
+
+                        <td class="text-center">
+
+                            <button
+                                class="btn btn-sm btn-outline-secondary"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#dist{{ distribution.iddistribution }}"
+                            >
+
+                                ▼
+
+                            </button>
+
+                        </td>
+
+                        <td>
+
+                            {{ distribution.numero }}
+
+                        </td>
+
+                        <td>
+
+                            {{ distribution.date_distribution|date:"d/m/Y" }}
+
+                        </td>
+
+                        <td>
+
+                            {% if distribution.commande %}
+
+                                {{ distribution.commande.numero }}
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            {{ distribution.point_vente_destination.designation }}
+
+                        </td>
+
+                        <td>
+
+                            {{ distribution.distributeur.nom }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ distribution.montant_brut }} FCFA
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ distribution.montant_net }} FCFA
+
+                        </td>
+
+                        <td>
+
+                            <a
+                                href="#"
+                                class="btn btn-info btn-sm"
+                            >
+
+                                Consulter
+
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    <!-- Le début du collapse -->
+                    <tr class="collapse bg-light" id="dist{{ distribution.iddistribution }}">
+
+                        <td colspan="9">
+
+                            <div class="p-3">
+
+                                <div class="row mb-3">
+
+                                    <div class="col-md-4">
+
+                                        <strong>Numéro :</strong><br>
+
+                                        {{ distribution.numero }}
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <strong>Date :</strong><br>
+
+                                        {{ distribution.date_distribution|date:"d/m/Y" }}
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <strong>Utilisateur :</strong><br>
+
+                                        {{ distribution.utilisateur }}
+
+                                    </div>
+
+                                </div>
+
+                                <div class="row mb-4">
+
+                                    <div class="col-md-4">
+
+                                        <strong>Point de vente source :</strong><br>
+
+                                        {{ distribution.point_vente_source.designation }}
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        <strong>Point de vente destination :</strong><br>
+
+                                        {{ distribution.point_vente_destination.designation }}
+
+                                    </div>
+
+                                    <div class="col-md-4">
+
+                                        {% if distribution.commande %}
+
+                                            <strong>Commande :</strong><br>
+
+                                            {{ distribution.commande.numero }}
+
+                                        {% else %}
+
+                                            <strong>Commande :</strong><br>
+
+                                            —
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+                                <div class="row mb-4">
+
+                                    <div class="col-md-6">
+
+                                        <strong>
+                                            {% if distribution.type_distribution == "GERANT_DISTRIBUTEUR" %}
+                                                Sous-distributeur
+                                            {% elif distribution.type_distribution == "GERANT_CLIENT" %}
+                                                Client direct
+                                            {% else %}
+                                                Distributeur
+                                            {% endif %}
+                                            :
+                                        </strong>
+
+                                        <br>
+
+                                        {{ distribution.distributeur.nom }}
+
+                                    </div>
+
+                                </div>
+
+                                <div class="table-responsive">
+
+                                    {% for groupe in distribution.groupes_compagnies %}
+
+                                    <div class="card mb-3 border-secondary">
+
+                                        <div class="card-header bg-secondary text-white d-flex justify-content-between">
+
+                                            <strong>
+
+                                                {{ groupe.compagnie.designation }}
+
+                                            </strong>
+
+                                            <span>
+
+                                                {{ groupe.lignes|length }} produit{{ groupe.lignes|length|pluralize }}
+
+                                            </span>
+
+                                        </div>
+
+                                        <table class="table table-sm table-bordered table-hover mb-0">
+
+                                            <thead class="table-light">
+
+                                                <tr>
+
+                                                    <th>Produit</th>
+
+                                                    <th class="text-end">
+
+                                                        Prix unitaire
+
+                                                    </th>
+
+                                                    <th class="text-end">
+
+                                                        Quantité
+
+                                                    </th>
+
+                                                    <th class="text-end">
+
+                                                        Montant
+
+                                                    </th>
+
+                                                    <th class="text-end">
+
+                                                        Remise %
+
+                                                    </th>
+
+                                                    <th class="text-end">
+
+                                                        Montant remise
+
+                                                    </th>
+
+                                                    <th class="text-end">
+
+                                                        Montant net
+
+                                                    </th>
+
+                                                </tr>
+
+                                            </thead>
+
+                                            <tbody>
+
+                                                {% for ligne in groupe.lignes %}
+
+                                                <tr>
+
+                                                    <td>
+
+                                                        {{ ligne.produit.designation }}
+
+                                                    </td>
+
+                                                    <td class="text-end">
+
+                                                        {{ ligne.prix_unitaire }}
+
+                                                    </td>
+
+                                                    <td class="text-end">
+
+                                                        {{ ligne.quantite }}
+
+                                                    </td>
+
+                                                    <td class="text-end">
+
+                                                        {{ ligne.montant }}
+
+                                                    </td>
+
+                                                    <td class="text-end">
+
+                                                        {{ ligne.taux_remise }}
+
+                                                    </td>
+
+                                                    <td class="text-end">
+
+                                                        {{ ligne.montant_remise }}
+
+                                                    </td>
+
+                                                    <td class="text-end fw-bold">
+
+                                                        {{ ligne.montant_net }}
+
+                                                    </td>
+
+                                                </tr>
+
+                                                {% endfor %}
+
+                                            </tbody>
+
+                                            <tfoot class="table-light">
+
+                                                <tr>
+
+                                                    <th colspan="6" class="text-end">
+
+                                                        Sous-total {{ groupe.compagnie.designation }}
+
+                                                    </th>
+
+                                                    <th class="text-end text-success">
+
+                                                        {{ groupe.total_net }}
+
+                                                    </th>
+
+                                                </tr>
+
+                                            </tfoot>
+
+                                        </table>
+
+                                    </div>
+
+                                    {% empty %}
+
+                                    <div class="alert alert-warning mb-0">
+
+                                        Cette distribution ne contient aucune ligne.
+
+                                    </div>
+
+                                    {% endfor %}
+
+                                </div>
+
+                                <div class="row mt-3">
+
+                                    <div class="col-md-4 ms-auto">
+
+                                        <table class="table table-bordered">
+
+                                            <tr class="table-success">
+
+                                                <th>
+
+                                                    TOTAL DISTRIBUTION
+
+                                                </th>
+
+                                                <th class="text-end">
+
+                                                    {{ distribution.montant_net }} FCFA
+
+                                                </th>
+
+                                            </tr>
+
+                                        </table>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+                    <!-- La fin du collapse -->
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td colspan="9" class="text-center">
+
+                            Aucune distribution trouvée.
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% if distributions.has_other_pages %}
+
+        <nav>
+
+            <ul class="pagination justify-content-center">
+
+                {% if distributions.has_previous %}
+
+                <li class="page-item">
+
+                    <a
+                        class="page-link"
+                        href="?page={{ distributions.previous_page_number }}"
+                    >
+
+                        Précédent
+
+                    </a>
+
+                </li>
+
+                {% endif %}
+
+                <li class="page-item active">
+
+                    <span class="page-link">
+
+                        {{ distributions.number }}
+
+                    </span>
+
+                </li>
+
+                {% if distributions.has_next %}
+
+                <li class="page-item">
+
+                    <a
+                        class="page-link"
+                        href="?page={{ distributions.next_page_number }}"
+                    >
+
+                        Suivant
+
+                    </a>
+
+                </li>
+
+                {% endif %}
+
+            </ul>
+
+        </nav>
+
+        {% endif %}
+
+        {% endif %}
+
+        {% if est_gerant %}
+
+            <h4 class="mb-3">
+
+                Distributions aux sous-distributeurs
+
+            </h4>
+
+            <div class="row mb-4">
+
+                <div class="col-md-4">
+
+                    <div class="card border-primary shadow-sm">
+
+                        <div class="card-header bg-primary text-white">
+
+                            <strong>
+
+                                Nombre de distributions
+
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <h3 class="mb-0">
+
+                                {{ distributions_sous.paginator.count }}
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <div class="card border-warning shadow-sm">
+
+                        <div class="card-header bg-warning">
+
+                            <strong>
+
+                                Montant brut
+
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <h3 class="mb-0">
+
+                                {{ total_brut_sous }} FCFA
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <div class="card border-success shadow-sm">
+
+                        <div class="card-header bg-success text-white">
+
+                            <strong>
+
+                                Montant net
+
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <h3 class="mb-0">
+
+                                {{ total_net_sous }} FCFA
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="table-responsive">
+
+                <table class="table table-bordered table-hover align-middle">
+
+                    <thead class="table-dark">
+
+                        <tr>
+
+                            <th width="50"></th>
+
+                            <th>Distribution</th>
+
+                            <th>Date</th>
+
+                            <th>Sous-distributeur</th>
+                            <th class="text-end">Montant brut</th>
+                            <th class="text-end">Montant net</th>
+
+                            <th width="110">
+
+                                Actions
+
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for distribution in distributions_sous %}
+
+                        <tr>
+
+                            <td class="text-center">
+
+                                <button
+
+                                    class="btn btn-sm btn-outline-secondary"
+
+                                    type="button"
+
+                                    data-bs-toggle="collapse"
+
+                                    data-bs-target="#sous{{ distribution.iddistribution }}"
+
+                                >
+
+                                    ▼
+
+                                </button>
+
+                            </td>
+
+                            <td>
+
+                                {{ distribution.numero }}
+
+                            </td>
+
+                            <td>
+
+                                {{ distribution.date_distribution|date:"d/m/Y" }}
+
+                            </td>
+
+                            <td>
+
+                                {{ distribution.distributeur.nom }}
+
+                            </td>
+
+                            <td class="text-end">
+
+                                {{ distribution.montant_brut }}
+
+                            </td>
+
+                            <td class="text-end fw-bold">
+
+                                {{ distribution.montant_net }}
+
+                            </td>
+
+                            <td class="text-center">
+
+                                <button
+
+                                    class="btn btn-outline-primary btn-sm"
+
+                                    type="button"
+
+                                    data-bs-toggle="collapse"
+
+                                    data-bs-target="#sous{{ distribution.iddistribution }}"
+
+                                >
+
+                                    <i class="bi bi-eye"></i>
+
+                                </button>
+
+                            </td>
+
+                        </tr>
+
+                        <tr
+
+                            class="collapse"
+
+                            id="sous{{ distribution.iddistribution }}"
+
+                        >
+
+                            <td colspan="7">
+
+                                <div class="p-3">
+
+                                    <div class="row mb-3">
+
+                                        <div class="col-md-4">
+
+                                            <strong>Distribution :</strong><br>
+
+                                            {{ distribution.numero }}
+
+                                        </div>
+
+                                        <div class="col-md-4">
+
+                                            <strong>Date :</strong><br>
+
+                                            {{ distribution.date_distribution|date:"d/m/Y" }}
+
+                                        </div>
+
+                                        <div class="col-md-4">
+
+                                            <strong>Sous-distributeur :</strong><br>
+
+                                            {{ distribution.distributeur.nom }}
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="row mb-4">
+
+                                        <div class="col-md-6">
+
+                                            <strong>Point de vente :</strong><br>
+
+                                            {{ distribution.point_vente_source.designation }}
+
+                                        </div>
+
+                                        <div class="col-md-6">
+
+                                            <strong>Utilisateur :</strong><br>
+
+                                            {{ distribution.utilisateur }}
+
+                                        </div>
+
+                                    </div>
+
+                                    {% for groupe in distribution.groupes_compagnies %}
+
+                                    <div class="card mb-3">
+
+                                        <div class="card-header bg-secondary text-white">
+
+                                            <strong>
+
+                                                {{ groupe.compagnie.designation }}
+
+                                            </strong>
+
+                                        </div>
+
+                                        <div class="card-body p-0">
+
+                                            <table class="table table-sm table-bordered mb-0">
+
+                                                <thead class="table-light">
+
+                                                    <tr>
+
+                                                        <th>Produit</th>
+                                                        <th class="text-end">Prix unitaire</th>
+                                                        <th class="text-end">Quantité</th>
+                                                        <th class="text-end">Montant</th>
+                                                        <th class="text-end">Remise (%)</th>
+                                                        <th class="text-end">Montant remise</th>
+                                                        <th class="text-end">Montant net</th>
+
+                                                    </tr>
+
+                                                </thead>
+
+                                                <tbody>
+
+                                                    {% for ligne in groupe.lignes %}
+
+                                                    <tr>
+
+                                                        <td>{{ ligne.produit.designation }}</td>
+
+                                                        <td class="text-end">{{ ligne.prix_unitaire }}</td>
+
+                                                        <td class="text-end">{{ ligne.quantite }}</td>
+
+                                                        <td class="text-end">{{ ligne.montant }}</td>
+
+                                                        <td class="text-end">{{ ligne.taux_remise }}</td>
+
+                                                        <td class="text-end">{{ ligne.montant_remise }}</td>
+
+                                                        <td class="text-end fw-bold">{{ ligne.montant_net }}</td>
+
+                                                    </tr>
+
+                                                    {% endfor %}
+
+                                                </tbody>
+
+                                                <tfoot>
+
+                                                    <tr class="table-light">
+
+                                                        <th colspan="6" class="text-end">
+
+                                                            Sous-total {{ groupe.compagnie.designation }}
+
+                                                        </th>
+
+                                                        <th class="text-end">
+
+                                                            {{ groupe.total_net }}
+
+                                                        </th>
+
+                                                    </tr>
+
+                                                </tfoot>
+
+                                            </table>
+
+                                        </div>
+
+                                    </div>
+
+                                    {% endfor %}
+
+                                    <table class="table table-bordered mt-3">
+
+                                        <tr class="table-success">
+
+                                            <th>
+
+                                                TOTAL DISTRIBUTION
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                {{ distribution.montant_net }}
+
+                                            </th>
+
+                                        </tr>
+
+                                    </table>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                        {% empty %}
+
+                        <tr>
+
+                            <td colspan="7" class="text-center">
+
+                                Aucune distribution vers un sous-distributeur.
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            {% if distributions_sous.has_other_pages %}
+
+            <nav>
+
+                <ul class="pagination justify-content-center">
+
+                    {% if distributions_sous.has_previous %}
+
+                    <li class="page-item">
+
+                        <a class="page-link" href="?page_sous={{ distributions_sous.previous_page_number }}">
+
+                            Précédent
+
+                        </a>
+
+                    </li>
+
+                    {% endif %}
+
+                    <li class="page-item active">
+
+                        <span class="page-link">
+
+                            {{ distributions_sous.number }}
+
+                        </span>
+
+                    </li>
+
+                    {% if distributions_sous.has_next %}
+
+                    <li class="page-item">
+
+                        <a class="page-link" href="?page_sous={{ distributions_sous.next_page_number }}">
+
+                            Suivant
+
+                        </a>
+
+                    </li>
+
+                    {% endif %}
+
+                </ul>
+
+            </nav>
+
+            {% endif %}
+
+            <hr class="my-5">
+
+            <h4 class="mb-3">
+
+                Distributions aux clients directs
+
+            </h4>
+
+            <div class="row mb-4">
+
+                <div class="col-md-4">
+
+                    <div class="card border-primary shadow-sm">
+
+                        <div class="card-header bg-primary text-white">
+
+                            <strong>
+
+                                Nombre de distributions
+
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <h3 class="mb-0">
+
+                                {{ distributions_clients.paginator.count }}
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <div class="card border-warning shadow-sm">
+
+                        <div class="card-header bg-warning">
+
+                            <strong>
+
+                                Montant brut
+
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <h3 class="mb-0">
+
+                                {{ total_brut_clients }} FCFA
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <div class="card border-success shadow-sm">
+
+                        <div class="card-header bg-success text-white">
+
+                            <strong>
+
+                                Montant net
+
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            <h3 class="mb-0">
+
+                                {{ total_net_clients }} FCFA
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="table-responsive">
+
+                <table class="table table-bordered table-hover align-middle">
+
+                    <thead class="table-dark">
+
+                        <tr>
+
+                            <th width="50"></th>
+
+                            <th>Distribution</th>
+
+                            <th>Date</th>
+
+                            <th>Client direct</th>
+
+                            <th class="text-end">
+
+                                Montant brut
+
+                            </th>
+
+                            <th class="text-end">
+
+                                Montant net
+
+                            </th>
+
+                            <th width="110">
+
+                                Actions
+
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for distribution in distributions_clients %}
+
+                        <tr>
+
+                            <td class="text-center">
+
+                                <button
+
+                                    class="btn btn-sm btn-outline-secondary"
+
+                                    type="button"
+
+                                    data-bs-toggle="collapse"
+
+                                    data-bs-target="#client{{ distribution.iddistribution }}"
+
+                                >
+
+                                    ▼
+
+                                </button>
+
+                            </td>
+
+                            <td>
+
+                                {{ distribution.numero }}
+
+                            </td>
+
+                            <td>
+
+                                {{ distribution.date_distribution|date:"d/m/Y" }}
+
+                            </td>
+
+                            <td>
+
+                                {{ distribution.distributeur.nom }}
+
+                            </td>
+
+                            <td class="text-end">
+
+                                {{ distribution.montant_brut }}
+
+                            </td>
+
+                            <td class="text-end fw-bold">
+
+                                {{ distribution.montant_net }}
+
+                            </td>
+
+                            <td class="text-center">
+
+                                <button
+
+                                    class="btn btn-outline-primary btn-sm"
+
+                                    type="button"
+
+                                    data-bs-toggle="collapse"
+
+                                    data-bs-target="#client{{ distribution.iddistribution }}"
+
+                                >
+
+                                    <i class="bi bi-eye"></i>
+
+                                </button>
+
+                            </td>
+
+                        </tr>
+
+                        <tr
+
+                            class="collapse"
+
+                            id="client{{ distribution.iddistribution }}"
+
+                        >
+
+                            <td colspan="7">
+
+                                <div class="p-3">
+
+                                    <div class="row mb-3">
+
+                                        <div class="col-md-4">
+
+                                            <strong>Distribution :</strong><br>
+
+                                            {{ distribution.numero }}
+
+                                        </div>
+
+                                        <div class="col-md-4">
+
+                                            <strong>Date :</strong><br>
+
+                                            {{ distribution.date_distribution|date:"d/m/Y" }}
+
+                                        </div>
+
+                                        <div class="col-md-4">
+
+                                            <strong>Client direct :</strong><br>
+
+                                            {{ distribution.distributeur.nom }}
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="row mb-4">
+
+                                        <div class="col-md-6">
+
+                                            <strong>Point de vente :</strong><br>
+
+                                            {{ distribution.point_vente_source.designation }}
+
+                                        </div>
+
+                                        <div class="col-md-6">
+
+                                            <strong>Utilisateur :</strong><br>
+
+                                            {{ distribution.utilisateur }}
+
+                                        </div>
+
+                                    </div>
+
+                                    {% for groupe in distribution.groupes_compagnies %}
+
+                                    <div class="card mb-3">
+
+                                        <div class="card-header bg-secondary text-white">
+
+                                            <strong>
+
+                                                {{ groupe.compagnie.designation }}
+
+                                            </strong>
+
+                                        </div>
+
+                                        <div class="card-body p-0">
+
+                                            <table class="table table-sm table-bordered mb-0">
+
+                                                <thead class="table-light">
+
+                                                    <tr>
+
+                                                        <th>Produit</th>
+
+                                                        <th class="text-end">
+
+                                                            Prix unitaire
+
+                                                        </th>
+
+                                                        <th class="text-end">
+
+                                                            Quantité
+
+                                                        </th>
+
+                                                        <th class="text-end">
+
+                                                            Montant
+
+                                                        </th>
+
+                                                        <th class="text-end">
+
+                                                            Remise (%)</th>
+
+                                                        <th class="text-end">
+
+                                                            Montant remise
+
+                                                        </th>
+
+                                                        <th class="text-end">
+
+                                                            Montant net
+
+                                                        </th>
+
+                                                    </tr>
+
+                                                </thead>
+
+                                                <tbody>
+
+                                                    {% for ligne in groupe.lignes %}
+
+                                                    <tr>
+
+                                                        <td>
+
+                                                            {{ ligne.produit.designation }}
+
+                                                        </td>
+
+                                                        <td class="text-end">
+
+                                                            {{ ligne.prix_unitaire }}
+
+                                                        </td>
+
+                                                        <td class="text-end">
+
+                                                            {{ ligne.quantite }}
+
+                                                        </td>
+
+                                                        <td class="text-end">
+
+                                                            {{ ligne.montant }}
+
+                                                        </td>
+
+                                                        <td class="text-end">
+
+                                                            {{ ligne.taux_remise }}
+
+                                                        </td>
+
+                                                        <td class="text-end">
+
+                                                            {{ ligne.montant_remise }}
+
+                                                        </td>
+
+                                                        <td class="text-end fw-bold">
+
+                                                            {{ ligne.montant_net }}
+
+                                                        </td>
+
+                                                    </tr>
+
+                                                    {% endfor %}
+
+                                                </tbody>
+
+                                                <tfoot>
+
+                                                    <tr class="table-light">
+
+                                                        <th colspan="6" class="text-end">
+
+                                                            Sous-total {{ groupe.compagnie.designation }}
+
+                                                        </th>
+
+                                                        <th class="text-end">
+
+                                                            {{ groupe.total_net }}
+
+                                                        </th>
+
+                                                    </tr>
+
+                                                </tfoot>
+
+                                            </table>
+
+                                        </div>
+
+                                    </div>
+
+                                    {% endfor %}
+
+                                    <table class="table table-bordered mt-3">
+
+                                        <tr class="table-success">
+
+                                            <th>
+
+                                                TOTAL DISTRIBUTION
+
+                                            </th>
+
+                                            <th class="text-end">
+
+                                                {{ distribution.montant_net }}
+
+                                            </th>
+
+                                        </tr>
+
+                                    </table>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                        {% empty %}
+
+                        <tr>
+
+                            <td colspan="7" class="text-center">
+
+                                Aucune distribution à un client direct.
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            {% if distributions_clients.has_other_pages %}
+
+            <nav>
+
+                <ul class="pagination justify-content-center">
+
+                    {% if distributions_clients.has_previous %}
+
+                    <li class="page-item">
+
+                        <a
+                            class="page-link"
+                            href="?page_client={{ distributions_clients.previous_page_number }}">
+
+                            Précédent
+
+                        </a>
+
+                    </li>
+
+                    {% endif %}
+
+                    <li class="page-item active">
+
+                        <span class="page-link">
+
+                            {{ distributions_clients.number }}
+
+                        </span>
+
+                    </li>
+
+                    {% if distributions_clients.has_next %}
+
+                    <li class="page-item">
+
+                        <a
+                            class="page-link"
+                            href="?page_client={{ distributions_clients.next_page_number }}">
+
+                            Suivant
+
+                        </a>
+
+                    </li>
+
+                    {% endif %}
+
+                </ul>
+
+            </nav>
+
+            {% endif %}
+            <!-- Fin Tableau Clients directs -->
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

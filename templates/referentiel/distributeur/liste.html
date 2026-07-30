@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Distributeurs
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+
+    <div>
+
+        <h3>Distributeurs</h3>
+
+        <small class="text-muted">
+
+            {{ page_obj.paginator.count }}
+            enregistrement(s)
+
+        </small>
+
+    </div>
+
+    <a
+        href="{% url 'ajouter_distributeur' %}"
+        class="btn btn-primary"
+    >
+        Ajouter
+    </a>
+
+</div>
+
+<form method="get" class="mb-3">
+
+    <div class="row">
+
+        <div class="col-md-6">
+
+            <input
+                type="text"
+                name="recherche"
+                class="form-control"
+                placeholder="Code, nom, prénom ou point de vente..."
+                value="{{ recherche }}"
+            >
+
+        </div>
+
+        <div class="col-md-2">
+
+            <button
+                type="submit"
+                class="btn btn-primary w-100"
+            >
+                Rechercher
+            </button>
+
+        </div>
+
+        <div class="col-md-2">
+
+            <a
+                href="{% url 'liste_distributeur' %}"
+                class="btn btn-secondary w-100"
+            >
+                Réinitialiser
+            </a>
+
+        </div>
+
+    </div>
+
+</form>
+
+<table class="table table-striped table-hover table-bordered">
+
+    <thead class="table-header-emg">
+
+        <tr>
+
+            <th>#</th>
+
+            <th>Code</th>
+
+            <th>Nom</th>
+
+            <th>Prénom</th>
+
+            <th>Téléphone</th>
+
+            <th>Catégorie</th>
+
+            <th>Point de vente</th>
+
+            <th>Actions</th>
+
+        </tr>
+
+    </thead>
+
+    <tbody>
+
+        {% for distributeur in page_obj %}
+
+        <tr>
+
+            <td>{{ forloop.counter }}</td>
+
+            <td>{{ distributeur.code }}</td>
+
+            <td>{{ distributeur.nom }}</td>
+
+            <td>{{ distributeur.prenom }}</td>
+
+            <td>{{ distributeur.telephone }}</td>
+
+            <td>{{ distributeur.get_categorie_display }}</td>
+
+            <td>{{ distributeur.point_vente.designation }}</td>
+
+            <td>
+
+                <a
+                    href="{% url 'modifier_distributeur' distributeur.pk %}"
+                    class="btn btn-warning btn-sm"
+                >
+                    Modifier
+                </a>
+
+                <a
+                    href="{% url 'supprimer_distributeur' distributeur.pk %}"
+                    class="btn btn-danger btn-sm"
+                >
+                    Supprimer
+                </a>
+
+            </td>
+
+        </tr>
+
+        {% empty %}
+
+        <tr>
+
+            <td colspan="8" class="text-center">
+
+                Aucun distributeur trouvé.
+
+            </td>
+
+        </tr>
+
+        {% endfor %}
+
+    </tbody>
+
+</table>
+
+<nav>
+
+    <ul class="pagination justify-content-center">
+
+        {% if page_obj.has_previous %}
+
+        <li class="page-item">
+
+            <a
+                class="page-link"
+                href="?page=1&recherche={{ recherche }}"
+            >
+                Première
+            </a>
+
+        </li>
+
+        <li class="page-item">
+
+            <a
+                class="page-link"
+                href="?page={{ page_obj.previous_page_number }}&recherche={{ recherche }}"
+            >
+                Précédente
+            </a>
+
+        </li>
+
+        {% endif %}
+
+        <li class="page-item active">
+
+            <span class="page-link">
+
+                Page {{ page_obj.number }}
+
+                sur
+
+                {{ page_obj.paginator.num_pages }}
+
+            </span>
+
+        </li>
+
+        {% if page_obj.has_next %}
+
+        <li class="page-item">
+
+            <a
+                class="page-link"
+                href="?page={{ page_obj.next_page_number }}&recherche={{ recherche }}"
+            >
+                Suivante
+            </a>
+
+        </li>
+
+        <li class="page-item">
+
+            <a
+                class="page-link"
+                href="?page={{ page_obj.paginator.num_pages }}&recherche={{ recherche }}"
+            >
+                Dernière
+            </a>
+
+        </li>
+
+        {% endif %}
+
+    </ul>
+
+</nav>
+
+{% endblock %}

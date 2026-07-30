@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Suppression produit
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header bg-danger text-white">
+
+        Confirmation de suppression
+
+    </div>
+
+    <div class="card-body">
+
+        <p>
+
+            Voulez-vous vraiment supprimer ce produit ?
+
+        </p>
+
+        <div class="alert alert-warning">
+
+            Cette opération désactivera le produit.
+            Les données resteront conservées dans le système.
+
+        </div>
+
+        <p>
+
+            <strong>Désignation :</strong>
+
+            {{ produit.designation }}
+
+        </p>
+
+        <p>
+
+            <strong>Compagnie :</strong>
+
+            {{ produit.compagnie.designation }}
+
+        </p>
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <button
+                type="submit"
+                class="btn btn-danger"
+            >
+                Confirmer
+            </button>
+
+            <a
+                href="{% url 'liste_produit' %}"
+                class="btn btn-secondary"
+            >
+                Annuler
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

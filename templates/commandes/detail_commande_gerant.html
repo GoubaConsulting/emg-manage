@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ titre }}
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header">
+
+        <h4>{{ titre }}</h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <!-- Informations générales -->
+
+        <div class="row mb-4">
+
+            <div class="col-md-3">
+                <strong>Numéro</strong><br>
+                {{ commande.numero }}
+            </div>
+
+            <div class="col-md-3">
+                <strong>Date</strong><br>
+                {{ commande.date_commande|date:"d/m/Y" }}
+            </div>
+
+            <div class="col-md-3">
+                <strong>Point de vente</strong><br>
+                {{ commande.point_vente.designation }}
+            </div>
+
+            <div class="col-md-3">
+                <strong>Gérant</strong><br>
+                {{ commande.utilisateur.get_full_name|default:commande.utilisateur.username }}
+            </div>
+
+        </div>
+
+        <!-- Tableau des produits -->
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover">
+
+                <thead class="table-dark">
+
+                    <tr>
+
+                        <th>Produit</th>
+                        <th class="text-end">Prix</th>
+                        <th class="text-end">Montant</th>
+                        <th class="text-end">Qté</th>
+                        <th class="text-end">Remise %</th>
+                        <th class="text-end">Montant remise</th>
+                        <th class="text-end">Net</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for groupe in commande.groupes_compagnies %}
+
+                        <tr class="table-primary">
+
+                            <td colspan="7">
+
+                                <strong>{{ groupe.compagnie.designation }}</strong>
+
+                            </td>
+
+                        </tr>
+
+                        {% for ligne in groupe.lignes %}
+
+                        <tr>
+
+                            <td>{{ ligne.produit.designation }}</td>
+                            <td class="text-end">{{ ligne.prix_unitaire }}</td>
+                            <td class="text-end">{{ ligne.montant }}</td>
+                            <td class="text-end">{{ ligne.quantite }}</td>
+                            <td class="text-end">{{ ligne.taux_remise }} %</td>
+                            <td class="text-end">{{ ligne.montant_remise }}</td>
+                            <td class="text-end">{{ ligne.montant_net }}</td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                        <tr class="table-warning">
+
+                            <td colspan="6" class="text-end">
+
+                                <strong>
+
+                                    Sous-total {{ groupe.compagnie.designation }}
+
+                                </strong>
+
+                            </td>
+
+                            <td class="text-end">
+
+                                <strong>
+
+                                    {{ groupe.sous_total_net }} FCFA
+
+                                </strong>
+
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+                <tfoot>
+
+                    <tr class="table-success">
+
+                        <td colspan="6" class="text-end">
+
+                            <strong>TOTAL</strong>
+
+                        </td>
+
+                        <td class="text-end">
+
+                            <strong>
+
+                                {{ commande.montant_net }} FCFA
+
+                            </strong>
+
+                        </td>
+
+                    </tr>
+
+                </tfoot>
+
+            </table>
+
+        </div>
+
+        <!-- Boutons -->
+
+        <div class="text-end mt-4">
+
+            <a
+                href="{% url 'rejeter_commande_gerant' commande.idcommande %}"
+                class="btn btn-danger"
+                onclick="return confirm('Rejeter cette commande ?');"
+            >
+                Rejeter
+            </a>
+
+            <a
+                href="{% url 'valider_commande_gerant' commande.idcommande %}"
+                class="btn btn-success"
+                onclick="return confirm('Valider cette commande ?');"
+            >
+                Valider
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,78 @@
+/* ===========================
+   EMG MANAGE
+=========================== */
+
+body{
+    background-color: #f8f9fa;
+}
+
+/* ===========================
+   MENU LATERAL
+=========================== */
+.menu-item{
+    padding: 12px;
+    border-radius: 8px;
+    color: #212529;
+    margin-bottom: 3px;
+}
+
+.menu-item:hover{
+    background-color: #e9ecef;
+}
+
+.menu-item.active{
+    background-color: #0d6efd;
+    color: white;
+}
+
+/* ===========================
+   CARDS
+=========================== */
+
+.card{
+    border-radius: 10px;
+}
+
+/* ===========================
+   TABLEAUX
+=========================== */
+
+.table th{
+    background-color: #f1f3f5;
+}
+
+.table td,
+.table th{
+    vertical-align: middle;
+}
+
+.card{
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
+}
+/* ===================================
+   TABLEAUX
+=================================== */
+
+.table th{
+    vertical-align: middle;
+}
+
+.table td{
+    vertical-align: middle;
+}
+
+/* ===================================
+   FORMULAIRES
+=================================== */
+
+.card{
+    border-radius: 10px;
+}
+
+/* ===================================
+   PAGINATION
+=================================== */
+
+.pagination{
+    margin-top: 20px;
+}

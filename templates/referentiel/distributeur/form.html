@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Distributeur
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header">
+
+        {{ titre }}
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Nom
+                </label>
+
+                {{ form.nom }}
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Prénom
+                </label>
+
+                {{ form.prenom }}
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Téléphone
+                </label>
+
+                {{ form.telephone }}
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Catégorie
+                </label>
+
+                {{ form.categorie }}
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Point de vente
+                </label>
+
+                {{ form.point_vente }}
+
+            </div>
+
+            <button
+                type="submit"
+                class="btn btn-success"
+            >
+                Enregistrer
+            </button>
+
+            <a
+                href="{% url 'liste_distributeur' %}"
+                class="btn btn-secondary"
+            >
+                Retour
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

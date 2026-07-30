@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Connexion - EMG Manage</title>
+
+    {% load static %}
+
+    <link
+        rel="stylesheet"
+        href="{% static 'bootstrap/css/bootstrap.min.css' %}"
+    >
+
+</head>
+<script>
+
+function togglePassword() {
+
+    let champ = document.getElementById("password");
+
+    if (champ.type === "password") {
+        champ.type = "text";
+    } else {
+        champ.type = "password";
+    }
+
+}
+
+</script>
+<body>
+
+<div class="container">
+
+    <div class="row justify-content-center mt-5">
+
+        <div class="col-md-4">
+
+            <div class="card shadow">
+
+                <div class="card-header text-center">
+
+                    <h4>EMG Manage</h4>
+
+                </div>
+
+                <div class="card-body">
+
+                    {% if message %}
+                        <div class="alert alert-danger">
+                            {{ message }}
+                        </div>
+                    {% endif %}
+
+                    <form method="post">
+
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+
+                            <label>
+                                Nom d'utilisateur
+                            </label>
+
+                            <input
+                                type="text"
+                                name="username"
+                                class="form-control"
+                                required
+                            >
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label class="form-label">
+                                Mot de passe
+                            </label>
+
+                            <div class="input-group">
+
+                                <input
+                                    type="password"
+                                    name="password"
+                                    id="password"
+                                    class="form-control"
+                                    required
+                                >
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary"
+                                    onclick="togglePassword()"
+                                >
+                                    👁
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary w-100"
+                        >
+                            Se connecter
+                        </button>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+
+</body>
+
+</html>

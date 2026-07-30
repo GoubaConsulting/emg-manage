@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header bg-primary text-white">
+
+        <h4>
+
+            Consultation du stock
+
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover">
+
+                <thead class="table-light">
+
+                    <tr>
+
+                        <th>Compagnie</th>
+
+                        <th>Produit</th>
+
+                        <th>Point de vente</th>
+
+                        <th>Type</th>
+
+                        <th class="text-end">
+
+                            Quantité
+
+                        </th>
+
+                        <th class="text-end">
+
+                            Seuil
+
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for stock in stocks %}
+
+                    <tr>
+
+                        <td>
+
+                            {{ stock.produit.compagnie.designation }}
+
+                        </td>
+
+                        <td>
+
+                            {{ stock.produit.designation }}
+
+                        </td>
+
+                        <td>
+
+                            {{ stock.point_vente.designation }}
+
+                        </td>
+
+                        <td>
+
+                            {{ stock.get_type_stock_display }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ stock.quantite }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ stock.seuil_alerte }}
+
+                        </td>
+
+                    </tr>
+
+                {% empty %}
+
+                    <tr>
+
+                        <td colspan="6" class="text-center">
+
+                            Aucun stock disponible.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

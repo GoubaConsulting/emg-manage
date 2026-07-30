@@ -1,0 +1,257 @@
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover align-middle">
+
+                <thead class="table-dark">
+
+                    <tr>
+
+                        <th style="width: 70px;">
+                            ID
+                        </th>
+
+                        <th>
+                            Désignation
+                        </th>
+
+                        <th style="width: 120px;">
+                            Période
+                        </th>
+
+                        <th class="text-end">
+                            Montant cible
+                        </th>
+
+                        <th class="text-end">
+                            Montant réalisé
+                        </th>
+
+                        <th class="text-center">
+                            Taux
+                        </th>
+
+                        {% if request.user.profil.role != "GERANT" %}
+
+                            <th>
+                                Point de vente
+                            </th>
+
+                        {% endif %}
+
+                        <th style="width:150px;" class="text-center">
+                            Actions
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for objectif in objectifs %}
+
+                        <tr>
+
+                            <td>
+
+                                {{ objectif.idobjectif }}
+
+                            </td>
+
+                            <td>
+
+                                {{ objectif.designation }}
+
+                            </td>
+
+                            <td>
+
+                                {{ objectif.periode }}
+
+                            </td>
+
+                            <td class="text-end">
+
+                                {{ objectif.montant_cible|floatformat:2 }}
+
+                            </td>
+
+                            <td class="text-end">
+
+                                {{ objectif.montant_realise|floatformat:2 }}
+
+                            </td>
+
+                            <td class="text-center">
+
+                                {% if objectif.taux_realise >= 100 %}
+
+                                    <span class="badge bg-success">
+
+                                        {{ objectif.taux_realise }} %
+
+                                    </span>
+
+                                {% elif objectif.taux_realise >= 75 %}
+
+                                    <span class="badge bg-warning text-dark">
+
+                                        {{ objectif.taux_realise }} %
+
+                                    </span>
+
+                                {% else %}
+
+                                    <span class="badge bg-danger">
+
+                                        {{ objectif.taux_realise }} %
+
+                                    </span>
+
+                                {% endif %}
+
+                            </td>
+
+                            {% if request.user.profil.role != "GERANT" %}
+
+                                <td>
+
+                                    {{ objectif.point_vente.designation }}
+
+                                </td>
+
+                            {% endif %}
+
+                            <td class="text-center">
+
+                                <a
+
+                                    href="{% url 'modifier_objectif' objectif.idobjectif %}"
+
+                                    class="btn btn-sm btn-warning"
+
+                                >
+
+                                    Modifier
+
+                                </a>
+
+                                <a
+
+                                    href="{% url 'supprimer_objectif' objectif.idobjectif %}"
+
+                                    class="btn btn-sm btn-danger"
+
+                                >
+
+                                    Supprimer
+
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+                    {% empty %}
+
+                        <tr>
+
+                            <td colspan="8" class="text-center text-muted">
+
+                                Aucun objectif trouvé.
+
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    {% if objectifs.has_other_pages %}
+
+        <div class="card-footer">
+
+            <nav>
+
+                <ul class="pagination justify-content-center mb-0">
+
+                    {% if objectifs.has_previous %}
+
+                        <li class="page-item">
+
+                            <a
+
+                                class="page-link"
+
+                                href="?page={{ objectifs.previous_page_number }}"
+
+                            >
+
+                                Précédent
+
+                            </a>
+
+                        </li>
+
+                    {% endif %}
+
+                    {% for page in objectifs.paginator.page_range %}
+
+                        <li class="page-item {% if page == objectifs.number %}active{% endif %}">
+
+                            <a
+
+                                class="page-link"
+
+                                href="?page={{ page }}"
+
+                            >
+
+                                {{ page }}
+
+                            </a>
+
+                        </li>
+
+                    {% endfor %}
+
+                    {% if objectifs.has_next %}
+
+                        <li class="page-item">
+
+                            <a
+
+                                class="page-link"
+
+                                href="?page={{ objectifs.next_page_number }}"
+
+                            >
+
+                                Suivant
+
+                            </a>
+
+                        </li>
+
+                    {% endif %}
+
+                </ul>
+
+            </nav>
+
+        </div>
+
+    {% endif %}
+
+</div>

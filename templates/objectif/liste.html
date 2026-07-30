@@ -1,0 +1,380 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Gestion des objectifs
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <h3>
+        Gestion des objectifs
+    </h3>
+
+    {% if request.user.profil.role != "ADMIN" %}
+
+        <a
+            href="{% url 'ajouter_objectif' %}"
+            class="btn btn-primary"
+        >
+            Nouvel objectif
+        </a>
+
+    {% endif %}
+
+</div>
+
+
+<div class="card shadow mb-4">
+
+    <div class="card-header">
+
+        Recherche
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="get">
+
+            <div class="row g-3">
+
+                <div class="col-md-4">
+
+                    <label class="form-label">
+
+                        Désignation
+
+                    </label>
+
+                    <input
+
+                        type="text"
+
+                        name="designation"
+
+                        value="{{ designation }}"
+
+                        class="form-control"
+
+                    >
+
+                </div>
+
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Mois
+
+                    </label>
+
+                    <select
+                        name="mois"
+                        class="form-select"
+                    >
+
+                        <option value="">
+                            Tous
+                        </option>
+
+                        {% for numero, libelle in mois_liste %}
+
+                            <option
+
+                                value="{{ numero }}"
+
+                                {% if mois == numero|stringformat:"s" %}
+
+                                    selected
+
+                                {% endif %}
+
+                            >
+
+                                {{ libelle }}
+
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+
+                        Année
+
+                    </label>
+
+                    <input
+
+                        type="number"
+
+                        name="annee"
+
+                        value="{{ annee }}"
+
+                        class="form-control"
+
+                    >
+
+                </div>
+
+
+                {% if request.user.profil.role != "GERANT" %}
+
+                <div class="col-md-4">
+
+                    <label class="form-label">
+
+                        Point de vente
+
+                    </label>
+
+                    <select
+
+                        name="point_vente"
+
+                        class="form-select"
+
+                    >
+
+                        <option value="">
+
+                            Tous
+
+                        </option>
+
+                        {% for pv in point_ventes %}
+
+                            <option
+
+                                value="{{ pv.idpointvente }}"
+
+                                {% if point_vente_selectionne == pv.idpointvente|stringformat:"s" %}
+
+                                    selected
+
+                                {% endif %}
+
+                            >
+
+                                {{ pv.designation }}
+
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+
+            <div class="mt-3">
+
+                <button
+
+                    type="submit"
+
+                    class="btn btn-success"
+
+                >
+
+                    Rechercher
+
+                </button>
+
+                <a
+
+                    href="{% url 'liste_objectif' %}"
+
+                    class="btn btn-secondary"
+
+                >
+
+                    Réinitialiser
+
+                </a>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+
+<div class="card shadow">
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover">
+
+                <thead class="table-dark">
+
+                    <tr>
+
+                        <th>ID</th>
+
+                        <th>Désignation</th>
+
+                        <th>Période</th>
+
+                        <th class="text-end">
+                            Cible
+                        </th>
+
+                        <th class="text-end">
+                            Réalisé
+                        </th>
+
+                        <th class="text-center">
+                            Taux
+                        </th>
+
+                        {% if request.user.profil.role != "GERANT" %}
+
+                            <th>
+                                Point de vente
+                            </th>
+
+                        {% endif %}
+
+                        <th class="text-center">
+                            Actions
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for objectif in objectifs %}
+
+                    <tr>
+
+                        <td>
+
+                            {{ objectif.idobjectif }}
+
+                        </td>
+
+                        <td>
+
+                            {{ objectif.designation }}
+
+                        </td>
+
+                        <td>
+
+                            {{ objectif.periode }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ objectif.montant_cible|floatformat:2 }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ objectif.montant_realise|floatformat:2 }}
+
+                        </td>
+
+                        <td class="text-center">
+
+                            {{ objectif.taux_realise|floatformat:2 }} %
+
+                        </td>
+
+                        {% if request.user.profil.role != "GERANT" %}
+
+                            <td>
+
+                                {{ objectif.point_vente.designation }}
+
+                            </td>
+
+                        {% endif %}
+
+                        <td class="text-center">
+
+                            <a
+
+                                href="{% url 'modifier_objectif' objectif.idobjectif %}"
+
+                                class="btn btn-warning btn-sm"
+
+                            >
+
+                                Modifier
+
+                            </a>
+
+                            <a
+
+                                href="{% url 'supprimer_objectif' objectif.idobjectif %}"
+
+                                class="btn btn-danger btn-sm"
+
+                            >
+
+                                Supprimer
+
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        {% if request.user.profil.role == "GERANT" %}
+
+                            <td colspan="7" class="text-center">
+
+                        {% else %}
+
+                            <td colspan="8" class="text-center">
+
+                        {% endif %}
+
+                                Aucun objectif trouvé.
+
+                            </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

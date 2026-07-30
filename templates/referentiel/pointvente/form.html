@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Point de vente
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header">
+
+        {{ titre }}
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Désignation
+                </label>
+
+                {{ form.designation }}
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Adresse
+                </label>
+
+                {{ form.adresse }}
+
+            </div>
+
+            <button
+                type="submit"
+                class="btn btn-success"
+            >
+                Enregistrer
+            </button>
+
+            <a
+                href="{% url 'liste_pointvente' %}"
+                class="btn btn-secondary"
+            >
+                Retour
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Dashboard
+{% endblock %}
+
+{% block content %}
+
+<h2>
+    Bienvenue {{ profil.nom }} {{ profil.prenom }}
+</h2>
+
+<hr>
+
+<div class="row">
+
+    <div class="col-md-4">
+
+        <div class="card">
+
+            <div class="card-body">
+
+                <h5>Profil</h5>
+
+                <p>
+                    Rôle :
+                    {{ profil.get_role_display }}
+                </p>
+
+                <p>
+                    Point de vente :
+                    {% if profil.point_vente %}
+                        {{ profil.point_vente.designation }}
+                    {% else %}
+                        Aucun
+                    {% endif %}
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
