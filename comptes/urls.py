@@ -1,24 +1,30 @@
 from django.urls import path
+from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
 
     path(
-        'login/',
+        "",
+        RedirectView.as_view(pattern_name="login", permanent=False),
+    ),
+
+    path(
+        "login/",
         views.connexion,
-        name='login'
+        name="login"
     ),
 
     path(
-        'logout/',
+        "logout/",
         views.deconnexion,
-        name='logout'
+        name="logout"
     ),
 
     path(
-        'dashboard/',
+        "dashboard/",
         views.dashboard,
-        name='dashboard'
+        name="dashboard"
     ),
 
 ]
