@@ -70,46 +70,62 @@ from objectif.services import recalculer_objectif
 # CONSTRUCTION DES LIGNES
 # ==========================================================
 
-def construire_lignes_depuis_formulaire(
-    donnees,
-    produits
-):
+def construire_lignes_depuis_formulaire(donnees):
+    """
+    Construit les lignes de distribution
+    à partir du formulaire Directeur.
+    """
 
     lignes = []
 
-    for produit in produits:
+    for cle in donnees:
 
-        if f"produit_{produit.idproduit}" not in donnees:
+        if not cle.startswith("produit_"):
 
             continue
 
-        montant = Decimal(
+        idproduit = int(cle.split("_")[1])
 
-            donnees.get(
-
-                f"montant_{produit.idproduit}",
-
-                "0"
-
-            )
-
+        produit = Produit.objects.get(
+            pk=idproduit
         )
+
+        montant = Decimal(
+            donnees.get(
+                f"montant_{idproduit}",
+                "0"
+            )
+        )
+
+        # Produit non distribué
+        if montant <= 0:
+
+            continue
 
         taux = Decimal(
-
             donnees.get(
-
-                f"taux_{produit.idproduit}",
-
+                f"taux_{idproduit}",
                 "0"
+            )
+        )
+
+        prix = Decimal(str(produit.prix))
+
+        if montant % prix != 0:
+
+            raise Exception(
+
+                f"Le montant du produit "
+
+                f"{produit.designation} "
+
+                f"doit être un multiple de "
+
+                f"{prix} FCFA."
 
             )
 
-        )
-
-        prix = produit.prix
-
-        quantite = montant / prix if prix else Decimal("0")
+        quantite = montant / prix
 
         lignes.append({
 
@@ -121,7 +137,7 @@ def construire_lignes_depuis_formulaire(
 
             "quantite": quantite,
 
-            "taux": taux
+            "taux": taux,
 
         })
 
@@ -338,13 +354,13 @@ def creer_lignes_distribution(
 
                 produit=produit,
 
-                quantite=quantite,
-
                 prix_unitaire=prix_unitaire,
 
-                taux=taux,
+                montant=montant_brut,
 
-                montant_brut=montant_brut,
+                quantite=quantite,
+
+                taux_remise=taux,
 
                 montant_remise=montant_remise,
 
@@ -372,7 +388,7 @@ def recalculer_totaux_distribution(distribution):
         distribution.lignes.aggregate(
 
             montant_brut=Sum(
-                "montant_brut"
+                "montant"
             ),
 
             montant_remise=Sum(
@@ -391,11 +407,6 @@ def recalculer_totaux_distribution(distribution):
         or Decimal("0.00")
     )
 
-    distribution.montant_remise = (
-        totaux["montant_remise"]
-        or Decimal("0.00")
-    )
-
     distribution.montant_net = (
         totaux["montant_net"]
         or Decimal("0.00")
@@ -404,7 +415,6 @@ def recalculer_totaux_distribution(distribution):
     distribution.save(
         update_fields=[
             "montant_brut",
-            "montant_remise",
             "montant_net",
             "date_modification",
         ]
@@ -480,8 +490,6 @@ def traiter_distribution_apres_creation(
                 update_fields=[
 
                     "quantite_distribuee",
-
-                    "date_modification",
 
                 ]
 

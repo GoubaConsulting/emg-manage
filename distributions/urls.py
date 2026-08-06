@@ -18,4 +18,10 @@ urlpatterns = [
         name="ajouter_distribution",
     ),
 
+    path(
+        "directeur/ajouter/",
+        views.ajouter_distribution_directeur,
+        name="ajouter_distribution_directeur",
+    ),
+
 ]

@@ -22,7 +22,7 @@ Commandes en attente
 
         <table class="table table-bordered table-hover">
 
-            <thead class="table-dark">
+            <thead class="table-header-emg">
 
                 <tr>
 
@@ -311,90 +311,90 @@ Commandes en attente
 
         <div class="modal-content">
 
-            <div class="modal-header bg-success text-white">
+            <form
+                method="post"
+                id="formValidationCommande"
+            >
 
-                <h5 class="modal-title">
+                {% csrf_token %}
 
-                    Validation d'une commande
+                <div class="modal-header bg-success text-white">
 
-                </h5>
+                    <h5 class="modal-title">
 
-                <button
-                    type="button"
-                    class="btn-close btn-close-white"
-                    data-bs-dismiss="modal"
-                ></button>
+                        Validation d'une commande
 
-            </div>
+                    </h5>
 
-            <div class="modal-body">
-
-                <p>
-
-                    Êtes-vous sûr de vouloir valider la commande
-
-                    <strong id="numeroCommande"></strong> ?
-
-                </p>
-
-                <div class="mb-3">
-
-                    <label
-                        for="gerant"
-                        class="form-label"
-                    >
-                        Gérant
-                    </label>
-
-                    <select
-                        name="gerant"
-                        id="gerant"
-                        class="form-select"
-                        required
-                    >
-
-                        <option value="">
-                            -------- Sélectionner un gérant --------
-                        </option>
-
-                        {% for gerant in gerants %}
-
-                            <option value="{{ gerant.iddistributeur }}">
-
-                                {{ gerant.nom }} {{ gerant.prenom }}
-
-                            </option>
-
-                        {% endfor %}
-
-                    </select>
+                    <button
+                        type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"
+                    ></button>
 
                 </div>
 
-                <p class="text-danger mb-0">
+                <div class="modal-body">
 
-                    Soyez sûr de disposer des quantités demandées par cette commande.
+                    <p>
 
-                </p>
+                        Êtes-vous sûr de vouloir valider la commande
 
-            </div>
+                        <strong id="numeroCommande"></strong> ?
 
-            <div class="modal-footer">
+                    </p>
 
-                <button
-                    type="button"
-                    class="btn btn-secondary"
-                    data-bs-dismiss="modal"
-                >
-                    Annuler
-                </button>
+                    <div class="mb-3">
 
-                <form
-                    method="post"
-                    id="formValidationCommande"
-                >
+                        <label
+                            for="gerant"
+                            class="form-label"
+                        >
+                            Gérant
+                        </label>
 
-                    {% csrf_token %}
+                        <select
+                            name="gerant"
+                            id="gerant"
+                            class="form-select"
+                            required
+                        >
+
+                            <option value="">
+                                -------- Sélectionner un gérant --------
+                            </option>
+
+                            {% for gerant in gerants %}
+
+                                <option value="{{ gerant.iddistributeur }}">
+
+                                    {{ gerant.nom }} {{ gerant.prenom }}
+
+                                </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+
+                    <p class="text-danger mb-0">
+
+                        Soyez sûr de disposer des quantités demandées par cette commande.
+
+                    </p>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+                        Annuler
+                    </button>
 
                     <button
                         type="submit"
@@ -403,9 +403,9 @@ Commandes en attente
                         Oui, valider
                     </button>
 
-                </form>
+                </div>
 
-            </div>
+            </form>
 
         </div>
 

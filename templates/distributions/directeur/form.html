@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block title %}
+Distribution Directeur
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow mb-4">
+
+    <div class="card-header">
+
+        <h4 class="mb-0">
+
+            {{ titre }}
+
+        </h4>
+
+    </div>
+
+</div>
+
+<div class="card shadow mb-4">
+
+    <div class="card-header">
+
+        <h5 class="mb-0">
+
+            Commandes en attente
+
+        </h5>
+
+    </div>
+
+    <div class="card-body">
+
+        <table class="table table-bordered table-hover">
+
+            <thead class="table-header-emg">
+
+                <tr>
+
+                    <th width="40"></th>
+
+                    <th width="60">
+
+                        Sélection
+
+                    </th>
+
+                    <th>Numéro</th>
+
+                    <th>Date</th>
+
+                    <th>Point de vente</th>
+
+                    <th>Gérant</th>
+
+                    <th class="text-end">
+
+                        Montant net
+
+                    </th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            {% for commande in commandes %}
+
+                <tr>
+
+                    <td class="text-center">
+
+                        <button
+
+                            class="btn btn-sm btn-outline-secondary"
+
+                            type="button"
+
+                            data-bs-toggle="collapse"
+
+                            data-bs-target="#cmd{{ commande.idcommande }}"
+
+                        >
+
+                            ▼
+
+                        </button>
+
+                    </td>
+
+                    <td class="text-center">
+
+                        <input
+
+                            type="radio"
+
+                            name="commande"
+
+                            value="{{ commande.idcommande }}"
+
+                        >
+
+                    </td>
+
+                    <td>
+
+                        {{ commande.numero }}
+
+                    </td>
+
+                    <td>
+
+                        {{ commande.date_commande|date:"d/m/Y" }}
+
+                    </td>
+
+                    <td>
+
+                        {{ commande.point_vente.designation }}
+
+                    </td>
+
+                    <td>
+
+                        {{ commande.utilisateur.get_full_name|default:commande.utilisateur.username }}
+
+                    </td>
+
+                    <td class="text-end">
+
+                        {{ commande.montant_net }} FCFA
+
+                    </td>
+
+                </tr>
+
+                <tr
+
+                    class="collapse"
+
+                    id="cmd{{ commande.idcommande }}"
+
+                >
+
+                    <td></td>
+
+                    <td colspan="6">
+
+                        <div class="p-3 bg-light rounded">
+
+                            <table class="table table-sm table-bordered">
+
+                                <thead class="table-secondary">
+
+                                    <tr>
+
+                                        <th>
+
+                                            Produit
+
+                                        </th>
+
+                                        <th class="text-end">
+
+                                            Prix
+
+                                        </th>
+
+                                        <th class="text-end">
+
+                                            Quantité
+
+                                        </th>
+
+                                        <th class="text-end">
+
+                                            Remise %
+
+                                        </th>
+
+                                        <th class="text-end">
+
+                                            Net
+
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                {% for groupe in commande.groupes_compagnies %}
+
+                                    <tr class="table-primary">
+
+                                        <td colspan="5">
+
+                                            <strong>
+
+                                                {{ groupe.compagnie.designation }}
+
+                                            </strong>
+
+                                        </td>
+
+                                    </tr>
+
+                                    {% for ligne in groupe.lignes %}
+
+                                    <tr>
+
+                                        <td>
+
+                                            {{ ligne.produit.designation }}
+
+                                        </td>
+
+                                        <td class="text-end">
+
+                                            {{ ligne.prix_unitaire }}
+
+                                        </td>
+
+                                        <td class="text-end">
+
+                                            {{ ligne.quantite }}
+
+                                        </td>
+
+                                        <td class="text-end">
+
+                                            {{ ligne.taux_remise }} %
+
+                                        </td>
+
+                                        <td class="text-end">
+
+                                            {{ ligne.montant_net }}
+
+                                        </td>
+
+                                    </tr>
+
+                                    {% endfor %}
+
+                                {% endfor %}
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+            {% empty %}
+
+                <tr>
+
+                    <td colspan="7" class="text-center">
+
+                        Aucune commande en attente.
+
+                    </td>
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<div class="card shadow">
+
+    <div class="card-header">
+
+        <h5 class="mb-0">
+
+            Produits à distribuer
+
+        </h5>
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="post" id="form-distribution">
+
+            {% csrf_token %}
+
+            <input
+                type="hidden"
+                name="commande"
+                id="commande-selectionnee"
+            >
+
+            <div class="table-responsive">
+
+                <table class="table table-bordered table-hover">
+
+                    <thead class="table-header-emg">
+
+                        <tr>
+
+                            <th>Produit</th>
+
+                            <th class="text-end">
+
+                                Prix unitaire
+
+                            </th>
+
+                            <th width="170">
+
+                                Montant
+
+                            </th>
+
+                            <th width="120">
+
+                                Quantité
+
+                            </th>
+
+                            <th width="120">
+
+                                Remise %
+
+                            </th>
+
+                            <th>
+                                
+                                Montant remise
+                            
+                            </th>
+
+                            <th width="170">
+
+                                Montant net
+
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="lignes-distribution">
+
+                        <tr>
+
+                            <td colspan="6" class="text-center">
+
+                                Sélectionnez une commande.
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+                <hr>
+
+                <div class="row mt-4">
+
+                    <div class="col-md-6">
+
+                        <div class="card border-primary">
+
+                            <div class="card-header bg-primary text-white">
+
+                                Montant brut
+
+                            </div>
+
+                            <div class="card-body text-center">
+
+                                <h3 id="total-brut">
+
+                                    0 FCFA
+
+                                </h3>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-6">
+
+                        <div class="card border-success">
+
+                            <div class="card-header bg-success text-white">
+
+                                Montant net
+
+                            </div>
+
+                            <div class="card-body text-center">
+
+                                <h3 id="total-net">
+
+                                    0 FCFA
+
+                                </h3>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <hr>
+
+            <div class="text-end">
+
+                <a
+
+                    href="{% url 'distributions:liste_distributions' %}"
+
+                    class="btn btn-secondary"
+
+                >
+
+                    Retour
+
+                </a>
+
+                <button
+
+                    type="submit"
+
+                    class="btn btn-success"
+
+                >
+
+                    Enregistrer
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+{% load static %}
+
+<script>
+
+const commandes = {{ context_commandes|safe }};
+
+</script>
+
+<script src="{% static 'js/distributions_directeur.js' %}"></script>
+
+{% endblock %}

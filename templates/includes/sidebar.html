@@ -57,12 +57,6 @@
             {% endif %}
 
             {% if request.user.profil.role == 'DIRECTEUR' %}
-                <li class="nav-item mt-2">
-                    <span class="nav-link fw-bold text-primary">
-                        Référentiel
-                    </span>
-                </li>
-
                 <li class="nav-item">
                     <a class="nav-link menu-item"
                     href="{% url 'liste_pointvente' %}">
@@ -92,92 +86,9 @@
                 </li>
                 
                 <li class="nav-item">
-
-                    <li class="nav-item mt-2">
-
-                        <span class="nav-link fw-bold text-primary">
-
-                            Commandes
-
-                        </span>
-
-                    </li>
-
-                    <li class="nav-item">
-
-                        <a
-                            class="nav-link menu-item"
-                            href="{% url 'liste_commandes' %}"
-                        >
-
-                            Commandes normales
-
-                        </a>
-
-                    </li>
-
-                    <li class="nav-item">
-
-                        <a
-                            class="nav-link menu-item"
-                            href="{% url 'liste_commandes_stock_tampon' %}"
-                        >
-
-                            Commandes Stock Tampon
-
-                        </a>
-
-                    </li>
-
-                    <li class="nav-item">
-
-                        <a
-                            href="{% url 'liste_reglement_stock' %}"
-                            class="nav-link menu-item"
-                        >
-
-                            <i class="bi bi-arrow-left-right"></i>
-
-                            <span>
-
-                                Règlement Stock Tampon
-
-                            </span>
-
-                        </a>
-
-                    </li>
-
-                    <li class="nav-item">
-
-                        <a
-                            href="{% url 'liste_commandes_caution' %}"
-                             class="nav-link menu-item"
-                        >
-
-                            <i class="bi bi-bank"></i>
-
-                            <span>
-
-                                Caution bancaire
-
-                            </span>
-
-                        </a>
-
-                    </li>
-
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Stocks
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{% url 'distributions:liste_distributions' %}" class="nav-link">
-                        <i class="..."></i>
-                        <span>Distributions</span>
+                    <a class="nav-link menu-item"
+                    href="{% url 'liste_objectif' %}">
+                        Objectifs
                     </a>
                 </li>
 
@@ -185,13 +96,80 @@
 
                     <a
                         class="nav-link menu-item"
-                        href="{% url 'liste_validation_commandes' %}"
+                        href="{% url 'liste_commandes' %}"
                     >
 
-                        Validation commandes Gérant
+                        Commandes normales
 
                     </a>
 
+                </li>
+
+                <li class="nav-item">
+
+                    <a
+                        class="nav-link menu-item"
+                        href="{% url 'liste_commandes_stock_tampon' %}"
+                    >
+
+                        Commandes Stock Tampon
+
+                    </a>
+
+                </li>
+
+                <li class="nav-item">
+
+                    <a
+                        href="{% url 'liste_reglement_stock' %}"
+                        class="nav-link menu-item"
+                    >
+
+                        <i class="bi bi-arrow-left-right"></i>
+
+                        <span>
+
+                            Règlement Stock Tampon
+
+                        </span>
+
+                    </a>
+
+                </li>
+
+                <li class="nav-item">
+
+                    <a
+                        href="{% url 'liste_commandes_caution' %}"
+                            class="nav-link menu-item"
+                    >
+
+                        <i class="bi bi-bank"></i>
+
+                        <span>
+
+                            Caution bancaire
+
+                        </span>
+
+                    </a>
+
+                </li>
+
+
+                <li class="nav-item">
+                    <a
+                        class="nav-link menu-item"
+                        href="{% url 'liste_stock' %}"
+                    >
+                        Stocks
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'distributions:liste_distributions' %}" class="nav-link">
+                        Distributions
+                    </a>
                 </li>
 
                 <li class="nav-item">
@@ -212,40 +190,38 @@
                     </a>
                 </li>
 
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_objectif' %}">
-                        Objectifs
-                    </a>
-                </li>
+                
 
             {% endif %}
 
             {% if request.user.profil.role == 'GERANT' %}
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_objectif' %}">
-                        Objectifs
-                    </a>
-                </li>
+                
                 <li class="nav-item">
 
                     <a
                         href="{% url 'liste_commandes' %}"
                         class="nav-link {% if '/commandes/' in request.path %}active{% endif %}"
                     >
-
-                        <i class="bi bi-cart-check"></i>
-
-                        <span>
-
-                            Commandes
-
-                        </span>
-
+                        Commandes
                     </a>
 
                 </li>
+            
+                <li class="nav-item">
+                    <a
+                        class="nav-link menu-item"
+                        href="{% url 'liste_stock' %}"
+                    >
+                        Stocks
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="{% url 'distributions:liste_distributions' %}" class="nav-link">
+                        Distributions
+                    </a>
+                </li>
+                
                 
                 <li class="nav-item">
                     <a class="nav-link menu-item" href="{% url 'liste_distributeur' %}">
@@ -255,13 +231,19 @@
 
                 <li class="nav-item">
                     <a class="nav-link menu-item" href="#">
-                        Distribution Journalière
+                        Situations
                     </a>
                 </li>
 
                 <li class="nav-item">
                     <a class="nav-link menu-item" href="#">
-                        Situation Journalière
+                        Manquants
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link menu-item" href="#">
+                        Versements
                     </a>
                 </li>
 

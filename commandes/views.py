@@ -1635,7 +1635,7 @@ def valider_commande_directeur(request, commande_id):
     gerant_id = request.POST.get("gerant")
 
     try:
-
+        
         valider_commande_directeur_service(
             commande_id=commande_id,
             utilisateur=request.user,

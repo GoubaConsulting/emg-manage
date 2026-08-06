@@ -302,7 +302,7 @@ Liste des distributions
 
             <table class="table table-bordered table-hover align-middle">
 
-                <thead class="table-dark">
+                <thead class="table-header-emg">
 
                     <tr>
 
@@ -327,12 +327,6 @@ Liste des distributions
                         <th class="text-end">
 
                             Montant net
-
-                        </th>
-
-                        <th width="120">
-
-                            Actions
 
                         </th>
 
@@ -395,7 +389,7 @@ Liste des distributions
 
                         <td>
 
-                            {{ distribution.distributeur.nom }}
+                            {{ distribution.distributeur.nom }} {{ distribution.distributeur.prenom }}
 
                         </td>
 
@@ -408,19 +402,6 @@ Liste des distributions
                         <td class="text-end">
 
                             {{ distribution.montant_net }} FCFA
-
-                        </td>
-
-                        <td>
-
-                            <a
-                                href="#"
-                                class="btn btn-info btn-sm"
-                            >
-
-                                Consulter
-
-                            </a>
 
                         </td>
 
@@ -516,7 +497,7 @@ Liste des distributions
 
                                         <br>
 
-                                        {{ distribution.distributeur.nom }}
+                                        {{ distribution.distributeur.nom }} {{ distribution.distributeur.prenom }}
 
                                     </div>
 
@@ -895,7 +876,7 @@ Liste des distributions
 
                 <table class="table table-bordered table-hover align-middle">
 
-                    <thead class="table-dark">
+                    <thead class="table-header-emg">
 
                         <tr>
 
@@ -959,7 +940,7 @@ Liste des distributions
 
                             <td>
 
-                                {{ distribution.distributeur.nom }}
+                                {{ distribution.distributeur.nom }} {{ distribution.distributeur.prenom }}
 
                             </td>
 
@@ -1031,7 +1012,7 @@ Liste des distributions
 
                                             <strong>Sous-distributeur :</strong><br>
 
-                                            {{ distribution.distributeur.nom }}
+                                            {{ distribution.distributeur.nom }} {{ distribution.distributeur.prenom }}
 
                                         </div>
 
@@ -1341,7 +1322,7 @@ Liste des distributions
 
                 <table class="table table-bordered table-hover align-middle">
 
-                    <thead class="table-dark">
+                    <thead class="table-header-emg">
 
                         <tr>
 
@@ -1415,7 +1396,7 @@ Liste des distributions
 
                             <td>
 
-                                {{ distribution.distributeur.nom }}
+                                {{ distribution.distributeur.nom }} {{ distribution.distributeur.prenom }}
 
                             </td>
 
@@ -1487,7 +1468,7 @@ Liste des distributions
 
                                             <strong>Client direct :</strong><br>
 
-                                            {{ distribution.distributeur.nom }}
+                                            {{ distribution.distributeur.nom }} {{ distribution.distributeur.prenom }}
 
                                         </div>
 

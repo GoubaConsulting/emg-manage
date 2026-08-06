@@ -1,6 +1,54 @@
+
 {% extends 'base.html' %}
 
 {% block content %}
+
+{% if est_directeur %}
+
+<form method="get" class="row mb-3">
+
+    <div class="col-md-4">
+
+        <label class="form-label">
+
+            Type de stock
+
+        </label>
+
+        <select
+            name="type_stock"
+            class="form-select"
+            onchange="this.form.submit()"
+        >
+
+            <option value="">
+
+                Tous les stocks
+
+            </option>
+
+            <option
+                value="NORMAL"
+                {% if type_stock == "NORMAL" %}selected{% endif %}
+            >
+                Stock normal
+            </option>
+
+            <option
+                value="TAMPON"
+                {% if type_stock == "TAMPON" %}selected{% endif %}
+            >
+                Stock tampon
+            </option>
+
+        </select>
+
+    </div>
+
+</form>
+
+{% endif %}
+
 
 <div class="card shadow">
 
@@ -20,11 +68,9 @@
 
             <table class="table table-bordered table-hover">
 
-                <thead class="table-light">
+                <thead class="table-header-emg">
 
                     <tr>
-
-                        <th>Compagnie</th>
 
                         <th>Produit</th>
 
@@ -38,65 +84,61 @@
 
                         </th>
 
-                        <th class="text-end">
-
-                            Seuil
-
-                        </th>
-
                     </tr>
 
                 </thead>
 
                 <tbody>
 
-                {% for stock in stocks %}
+                {% for groupe in groupes_compagnies %}
 
-                    <tr>
+                    <tr class="table-secondary">
 
-                        <td>
+                        <th colspan="4">
 
-                            {{ stock.produit.compagnie.designation }}
+                            {{ groupe.compagnie.designation }}
 
-                        </td>
-
-                        <td>
-
-                            {{ stock.produit.designation }}
-
-                        </td>
-
-                        <td>
-
-                            {{ stock.point_vente.designation }}
-
-                        </td>
-
-                        <td>
-
-                            {{ stock.get_type_stock_display }}
-
-                        </td>
-
-                        <td class="text-end">
-
-                            {{ stock.quantite }}
-
-                        </td>
-
-                        <td class="text-end">
-
-                            {{ stock.seuil_alerte }}
-
-                        </td>
+                        </th>
 
                     </tr>
+
+                    {% for stock in groupe.stocks %}
+
+                        <tr>
+
+                            <td>
+
+                                {{ stock.produit.designation }}
+
+                            </td>
+
+                            <td>
+
+                                {{ stock.point_vente.designation }}
+
+                            </td>
+
+                            <td>
+
+                                {{ stock.get_type_stock_display }}
+
+                            </td>
+
+                            <td class="text-end">
+
+                                {{ stock.quantite }}
+
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
 
                 {% empty %}
 
                     <tr>
 
-                        <td colspan="6" class="text-center">
+                        <td colspan="5" class="text-center">
 
                             Aucun stock disponible.
 
@@ -107,7 +149,6 @@
                 {% endfor %}
 
                 </tbody>
-
             </table>
 
         </div>

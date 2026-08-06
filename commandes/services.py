@@ -1477,7 +1477,7 @@ def valider_commande_directeur_service(
 
         commande=commande,
 
-        point_vente_source=utilisateur.profilutilisateur.point_vente,
+        point_vente_source=utilisateur.profil.point_vente,
 
         point_vente_destination=commande.point_vente,
 

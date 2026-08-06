@@ -34,6 +34,7 @@ from django.db.models import Sum
 
 from comptes.models import ProfilUtilisateur
 
+from stocks.models import Stock
 
 
 @login_required
@@ -50,12 +51,45 @@ def ajouter_distribution(request):
     est_gerant = profil.role == "GERANT"
 
 
-    produits = (
-        Produit.objects
-        .filter(actif=True)
-        .select_related("compagnie")
-        .order_by("compagnie__designation", "designation")
+    stocks = (
+
+        Stock.objects
+
+        .filter(
+
+            point_vente=profil.point_vente,
+
+            produit__actif=True,
+
+            quantite__gt=0,
+
+        )
+
+        .select_related(
+
+            "produit",
+
+            "produit__compagnie",
+
+        )
+
+        .order_by(
+
+            "produit__compagnie__designation",
+
+            "produit__designation",
+
+        )
+
     )
+
+    produits = []
+
+    for stock in stocks:
+
+        stock.produit.stock_disponible = stock.quantite
+
+        produits.append(stock.produit)
 
     commandes = commandes_en_attente(request.user)
 
@@ -157,7 +191,7 @@ def ajouter_distribution(request):
                     "Distribution enregistrée avec succès."
                 )
 
-                return redirect("liste_distributions")
+                return redirect("distributions:liste_distributions")
 
             except Exception as e:
 
@@ -190,7 +224,7 @@ def ajouter_distribution(request):
 
         request,
 
-        "distributions/form.html",
+        "distributions/gerant/form.html",
 
         {
 
@@ -281,8 +315,10 @@ def liste_distributions(request):
             actif=True,
             date_distribution__month=mois,
             date_distribution__year=annee,
+            utilisateur=request.user,
         )
     )
+    
 
     # ==========================================
     # Directeur
@@ -557,13 +593,24 @@ def liste_distributions(request):
         .order_by("nom", "prenom")
     )
 
+    profil = request.user.profil
+
+    if profil.role == "DIRECTEUR":
+
+        url_nouveau = "distributions:ajouter_distribution_directeur"
+
+    else:
+
+        url_nouveau = "distributions:ajouter_distribution"
+
+
     # ==========================================
     # Contexte
     # ==========================================
 
     contexte = {
 
-        "url_nouveau": "distributions:ajouter_distribution",
+        "url_nouveau": url_nouveau,
 
         "titre": "Liste des distributions",
 
@@ -610,5 +657,176 @@ def liste_distributions(request):
         "distributions/liste.html",
 
         contexte
+
+    )
+
+@login_required
+def ajouter_distribution_directeur(request):
+
+    profil = request.user.profil
+
+    produits = (
+
+        Produit.objects
+        .filter(actif=True)
+        .select_related("compagnie")
+        .order_by(
+            "compagnie__designation",
+            "designation"
+        )
+
+    )
+
+    commandes = commandes_en_attente(request.user)
+
+    for commande in commandes:
+
+        commande.groupes_compagnies = (
+
+            preparer_affichage_commande(
+                commande
+            )
+
+        )
+
+    import json
+
+    commandes_json = {}
+
+    for commande in commandes:
+
+        lignes = {}
+
+        for ligne in commande.lignes.select_related(
+
+            "produit__compagnie"
+
+        ):
+
+            lignes[str(ligne.produit.idproduit)] = {
+
+                "id": ligne.produit.idproduit,
+
+                "designation": ligne.produit.designation,
+
+                "compagnie": ligne.produit.compagnie.designation,
+
+                "compagnie_id": ligne.produit.compagnie.idcompagnie,
+
+                "prix": float(ligne.prix_unitaire),
+
+                "montant": float(ligne.montant),
+
+                "quantite": float(ligne.quantite),
+
+                "taux": float(ligne.taux_remise),
+
+                "montant_remise": float(
+
+                    ligne.montant_remise
+
+                ),
+
+                "net": float(
+
+                    ligne.montant_net
+
+                ),
+
+            }
+
+        commandes_json[str(commande.idcommande)] = lignes
+
+    if request.method == "POST":
+
+        try:
+
+            commande = Commande.objects.get(
+
+                pk=request.POST.get(
+
+                    "commande"
+
+                )
+
+            )
+
+            lignes = construire_lignes_depuis_formulaire(
+
+                request.POST
+
+            )
+
+            distributeur = Distributeur.objects.get(
+            
+                point_vente=commande.point_vente,
+
+                categorie=Distributeur.CATEGORIE_GERANT,
+
+                actif=True,
+
+            )
+
+            creer_distribution(
+
+                utilisateur=request.user,
+
+                type_distribution=Distribution.TYPE_COMMANDE_GERANT,
+
+                commande=commande,
+
+                point_vente_destination=commande.point_vente,
+
+                distributeur=distributeur,
+
+                date_distribution=date.today(),
+
+                lignes=lignes,
+
+            )
+
+            messages.success(
+
+                request,
+
+                "Distribution enregistrée avec succès."
+
+            )
+
+            return redirect(
+
+                "distributions:liste_distributions"
+
+            )
+
+        except Exception as e:
+
+            messages.error(
+
+                request,
+
+                str(e)
+
+            ) 
+
+    return render(
+
+        request,
+
+        "distributions/directeur/form.html",
+
+        {
+
+            "titre": "Distribution Directeur → Gérant",
+
+            "commandes": commandes,
+
+            "context_commandes": json.dumps(
+
+                commandes_json
+
+            ),
+
+        }
 
     )
