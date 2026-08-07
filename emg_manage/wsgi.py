@@ -11,9 +11,14 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
+import os
+
 os.environ.setdefault(
     "DJANGO_SETTINGS_MODULE",
-    "emg_manage.settings_production"
+    os.getenv(
+        "DJANGO_SETTINGS_MODULE",
+        "emg_manage.settings_production"
+    )
 )
 
 application = get_wsgi_application()

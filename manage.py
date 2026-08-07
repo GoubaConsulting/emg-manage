@@ -6,9 +6,14 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    import os
+
     os.environ.setdefault(
         "DJANGO_SETTINGS_MODULE",
-        "emg_manage.settings_local"
+        os.getenv(
+            "DJANGO_SETTINGS_MODULE",
+            "emg_manage.settings_local"
+        )
     )
     try:
         from django.core.management import execute_from_command_line
