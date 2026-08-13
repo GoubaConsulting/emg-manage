@@ -66,6 +66,8 @@ from objectif.models import Objectif
 
 from objectif.services import recalculer_objectif
 
+
+
 # ==========================================================
 # CONSTRUCTION DES LIGNES
 # ==========================================================
@@ -157,6 +159,13 @@ def creer_distribution(
     date_distribution,
     lignes,
 ):
+    print("===== ENTREE creer_distribution =====")
+    print("Type :", type_distribution)
+    print("Commande :", commande)
+    print("Distributeur :", distributeur)
+    print("Nombre de lignes :", len(lignes))
+    print("====================================")
+    
     # ======================================================
     # VALIDATIONS
     # ======================================================
@@ -285,6 +294,135 @@ def creer_distribution(
     )
 
     return distribution
+
+# ==========================================================
+# CREATION D'UNE DISTRIBUTION GERANT
+# ==========================================================
+
+@transaction.atomic
+def creer_distribution_gerant(
+    utilisateur,
+    type_distribution,
+    distributeur,
+    date_distribution,
+    lignes,
+):
+    """
+    Création d'une distribution réalisée
+    par un gérant vers un distributeur
+    ou un client direct.
+    """
+
+    # ======================================================
+    # VALIDATIONS
+    # ======================================================
+
+    verifier_date_distribution(
+        date_distribution
+    )
+
+    verifier_presence_ligne(
+        lignes
+    )
+
+    verifier_stock_distribution(
+        utilisateur.profil.point_vente,
+        lignes
+    )
+
+    # ======================================================
+    # CREATION DE LA DISTRIBUTION
+    # ======================================================
+
+    distribution = Distribution.objects.create(
+
+        numero=generer_numero_distribution(),
+
+        type_distribution=type_distribution,
+
+        commande=None,
+
+        date_distribution=date_distribution,
+
+        point_vente_source=utilisateur.profil.point_vente,
+
+        point_vente_destination=utilisateur.profil.point_vente,
+
+        distributeur=distributeur,
+
+        utilisateur=utilisateur,
+
+    )
+    
+    # ======================================================
+    # CREATION DES LIGNES
+    # ======================================================
+
+    creer_lignes_distribution(
+
+        distribution,
+
+        lignes,
+
+    )
+
+    # ======================================================
+    # RECALCUL DES TOTAUX
+    # ======================================================
+
+    recalculer_totaux_distribution(
+
+        distribution
+
+    )
+
+    # ======================================================
+    # TRAITEMENT METIER
+    # ======================================================
+
+    traiter_distribution_gerant(
+
+        distribution
+
+    )
+
+    return distribution
+
+# ==========================================================
+# TRAITEMENT APRES DISTRIBUTION GERANT
+# ==========================================================
+
+@transaction.atomic
+def traiter_distribution_gerant(
+    distribution
+):
+    """
+    Traitement métier des distributions
+    réalisées par un gérant.
+    """
+
+    for ligne in distribution.lignes.select_related(
+
+        "produit"
+
+    ):
+
+        retirer_stock(
+
+            point_vente=distribution.point_vente_source,
+
+            produit=ligne.produit,
+
+            quantite=ligne.quantite,
+
+        )
+
+    mettre_a_jour_objectifs_distribution(
+
+        distribution
+
+    )
+
 
 # ==========================================================
 # CREATION DES LIGNES DE DISTRIBUTION

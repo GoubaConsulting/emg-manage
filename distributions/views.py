@@ -19,6 +19,7 @@ from referentiel.models import (
 from .services import (
     construire_lignes_depuis_formulaire,
     creer_distribution,
+    creer_distribution_gerant,
 )
 from django.contrib import messages
 
@@ -91,6 +92,24 @@ def ajouter_distribution(request):
 
         produits.append(stock.produit)
 
+    compagnies = []
+
+    for compagnie, liste in groupby(
+
+        produits,
+
+        key=lambda produit: produit.compagnie
+
+    ):
+
+        compagnies.append({
+
+            "grouper": compagnie,
+
+            "list": list(liste),
+
+        })
+
     commandes = commandes_en_attente(request.user)
 
     for commande in commandes:
@@ -126,20 +145,6 @@ def ajouter_distribution(request):
 
         post_data = request.POST.copy()
 
-        if est_directeur:
-
-            if post_data.get("commande"):
-
-                commande = Commande.objects.get(
-                    pk=post_data["commande"]
-                )
-
-                post_data["distributeur"] = commande.distributeur.pk
-
-                post_data["type_distribution"] = Distribution.TYPE_COMMANDE_GERANT
-
-                post_data["point_vente_destination"] = commande.point_vente.pk
-
         form = DistributionForm(post_data)
         #if not form.is_valid():
          #   print(form.errors.as_json())
@@ -148,54 +153,52 @@ def ajouter_distribution(request):
             try:
 
                 lignes = construire_lignes_depuis_formulaire(
-                    request.POST,
-                    produits
+
+                    request.POST
+
                 )
 
-                commande = form.cleaned_data["commande"]
+                distributeur = form.cleaned_data["distributeur"]
 
-                if est_directeur:
+                type_distribution = Distribution.TYPE_DISTRIBUTEUR
 
-                    type_distribution = Distribution.TYPE_COMMANDE_GERANT
+                creer_distribution_gerant(
 
-                    distributeur = commande.distributeur
-
-                    point_vente_destination = commande.point_vente
-
-                else:
-
-                    distributeur = form.cleaned_data["distributeur"]
-
-                    point_vente_destination = form.cleaned_data["point_vente_destination"]
-
-                    if form.cleaned_data["type_operation"] == "DIST":
-
-                        type_distribution = Distribution.TYPE_DISTRIBUTEUR
-
-                    else:
-
-                        type_distribution = Distribution.TYPE_CLIENT_DIRECT
-
-                creer_distribution(
                     utilisateur=request.user,
+
                     type_distribution=type_distribution,
-                    commande=commande,
-                    point_vente_destination=point_vente_destination,
+
                     distributeur=distributeur,
+
                     date_distribution=form.cleaned_data["date_distribution"],
+
                     lignes=lignes,
+
                 )
 
                 messages.success(
+
                     request,
+
                     "Distribution enregistrée avec succès."
+
                 )
 
-                return redirect("distributions:liste_distributions")
+                return redirect(
+
+                    "distributions:liste_distributions"
+
+                )
 
             except Exception as e:
 
-                form.add_error(None, str(e))
+                form.add_error(
+
+                    None,
+
+                    str(e)
+
+                )
 
     else:
 
@@ -232,6 +235,8 @@ def ajouter_distribution(request):
 
             "produits": produits,
 
+            "compagnies": compagnies,
+
             "commandes": commandes,
 
             "titre": "Nouvelle distribution",
@@ -245,6 +250,15 @@ def ajouter_distribution(request):
         }
 
     )
+
+
+@login_required
+def ajouter_distribution_client(request):
+    """
+    Distribution du gérant vers
+    un client direct.
+    """
+    pass
 
 
 @login_required

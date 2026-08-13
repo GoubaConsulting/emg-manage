@@ -244,6 +244,13 @@ class Distributeur(models.Model):
         auto_now=True
     )
 
+    fond = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Fond"
+    )
+
     class Meta:
 
         db_table = "distributeur"

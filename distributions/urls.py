@@ -13,7 +13,7 @@ urlpatterns = [
     ),
 
     path(
-        "ajouter/",
+        "gerant/ajouter/",
         views.ajouter_distribution,
         name="ajouter_distribution",
     ),
@@ -22,6 +22,11 @@ urlpatterns = [
         "directeur/ajouter/",
         views.ajouter_distribution_directeur,
         name="ajouter_distribution_directeur",
+    ),
+    path(
+        "gerant/client/ajouter/",
+        views.ajouter_distribution_client,
+        name="ajouter_distribution_client",
     ),
 
 ]

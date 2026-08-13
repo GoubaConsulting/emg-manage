@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid mt-4">
+
+    <div class="card">
+
+        <div class="card-header">
+
+            <h4 class="mb-0">
+                {{ titre }}
+            </h4>
+
+        </div>
+
+        <div class="card-body">
+
+            <!-- ==========================================
+                 INFORMATIONS GENERALES
+            =========================================== -->
+
+            <div class="row mb-4">
+
+                <div class="col-md-3">
+
+                    <strong>
+                        Numéro :
+                    </strong>
+
+                    {{ situation.numero }}
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <strong>
+                        Date :
+                    </strong>
+
+                    {{ situation.date_situation|date:"d/m/Y" }}
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <strong>
+                        Point de vente :
+                    </strong>
+
+                    {{ situation.point_vente.designation }}
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <strong>
+                        Distributeur :
+                    </strong>
+
+                    {{ situation.distributeur.nom }}
+                    {{ situation.distributeur.prenom }}
+
+                </div>
+
+            </div>
+
+
+            <!-- ==========================================
+                 RESUME FINANCIER
+            =========================================== -->
+
+            <div class="row mb-4">
+
+                <div class="col-md-3">
+
+                    <div class="border rounded p-3">
+
+                        <small>
+                            Fond
+                        </small>
+
+                        <h5>
+
+                            {{ situation.fond }}
+                            FCFA
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <div class="border rounded p-3">
+
+                        <small>
+                            Total distribué
+                        </small>
+
+                        <h5>
+
+                            {{ situation.montant_total_distribue }}
+                            FCFA
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <div class="border rounded p-3">
+
+                        <small>
+                            Crédit
+                        </small>
+
+                        <h5>
+
+                            {{ situation.montant_credit }}
+                            FCFA
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <div class="border rounded p-3">
+
+                        <small>
+                            État
+                        </small>
+
+                        <h5>
+
+                            {{ situation.etat }}
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ==========================================
+                 FORMULAIRE
+            =========================================== -->
+
+            <form method="post">
+
+                {% csrf_token %}
+
+
+                <!-- ======================================
+                     PRODUITS
+                ======================================= -->
+
+                <div class="table-responsive">
+
+                    <table class="table table-bordered align-middle">
+
+                        <thead class="table-light">
+
+                            <tr>
+
+                                <th>
+                                    Produit
+                                </th>
+
+                                <th class="text-end">
+                                    Prix unitaire
+                                </th>
+
+                                <th class="text-end">
+                                    Quantité distribuée
+                                </th>
+
+                                <th width="180">
+                                    Quantité vendue
+                                </th>
+
+                                <th width="180">
+                                    Quantité restante
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            {% for ligne in lignes %}
+
+                            <tr>
+
+                                <td>
+
+                                    {{ ligne.produit.designation }}
+
+                                </td>
+
+                                <td class="text-end">
+
+                                    {{ ligne.prix_unitaire }}
+                                    FCFA
+
+                                </td>
+
+                                <td class="text-end">
+
+                                    {{ ligne.quantite_distribuee }}
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        class="form-control"
+                                        name="vendue_{{ ligne.idlignesituation }}"
+                                        value="0"
+                                    >
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        class="form-control"
+                                        name="restante_{{ ligne.idlignesituation }}"
+                                        value="0"
+                                    >
+
+                                </td>
+
+                            </tr>
+
+                            {% empty %}
+
+                            <tr>
+
+                                <td
+                                    colspan="5"
+                                    class="text-center"
+                                >
+
+                                    Aucune ligne de produit.
+
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+                <!-- ======================================
+                     PAIEMENTS
+                ======================================= -->
+
+                <div class="row mt-4">
+
+                    <div class="col-md-4">
+
+                        <label class="form-label">
+
+                            Crédit à verser
+
+                        </label>
+
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="form-control"
+                            name="montant_credit_verse"
+                            value="{{ situation.montant_credit }}"
+                        >
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <label class="form-label">
+
+                            Montant des ventes versé
+
+                        </label>
+
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="form-control"
+                            name="montant_vente_verse"
+                            value="0"
+                        >
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <label class="form-label">
+
+                            Coupures
+
+                        </label>
+
+                        <textarea
+                            class="form-control"
+                            name="coupures"
+                            rows="4"
+                            placeholder="10000 x 5&#10;5000 x 3&#10;2000 x 4&#10;1000 x 2&#10;500 x 1"
+                        ></textarea>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ======================================
+                     BOUTONS
+                ======================================= -->
+
+                <div class="mt-4">
+
+                    <button
+                        type="submit"
+                        class="btn btn-success"
+                    >
+
+                        Clôturer la situation
+
+                    </button>
+
+                    <a
+                        href="{% url 'situations:ajouter_situation' %}"
+                        class="btn btn-secondary"
+                    >
+
+                        Annuler
+
+                    </a>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}                                      é

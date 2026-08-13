@@ -1,5 +1,9 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.urls import (
+    include,
+    path,
+)
 
 
 urlpatterns = [
@@ -42,6 +46,11 @@ urlpatterns = [
         "distributions/",
         
         include("distributions.urls"),
+    ),
+
+    path(
+        "situations/",
+        include("situations.urls"),
     ),
 
 ]
