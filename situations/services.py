@@ -21,6 +21,7 @@ from .models import (
     SituationJournaliere,
     LigneSituationJournaliere,
     Manquant,
+    ReglementManquant,
 )
 
 from .calculs import (
@@ -33,6 +34,7 @@ from .calculs import (
 from .numerotation import (
     generer_numero_situation,
     generer_numero_manquant,
+    generer_numero_reglement,
 )
 
 
@@ -810,3 +812,84 @@ def cloturer_situation(
     situation.save()
 
     return situation
+
+
+# ==========================================================
+# REGLEMENT D'UN MANQUANT
+# ==========================================================
+
+@transaction.atomic
+def regler_manquant(
+    manquant,
+    date_reglement,
+    montant,
+    utilisateur,
+):
+    """
+    Enregistre un règlement partiel ou total
+    d'un manquant.
+    """
+
+    if manquant.statut == Manquant.STATUT_SOLDE:
+
+        raise ValueError(
+            "Ce manquant est déjà soldé."
+        )
+
+    montant = Decimal(
+        str(montant or "0")
+    )
+
+    if montant <= 0:
+
+        raise ValueError(
+            "Le montant du règlement doit être supérieur à zéro."
+        )
+
+    if montant > manquant.reste_a_payer:
+
+        raise ValueError(
+            "Le montant du règlement dépasse le reste à payer."
+        )
+
+    reglement = ReglementManquant.objects.create(
+
+        numero=generer_numero_reglement(),
+
+        manquant=manquant,
+
+        date_reglement=date_reglement,
+
+        montant=montant,
+
+        utilisateur=utilisateur,
+
+    )
+
+    manquant.reste_a_payer = (
+        manquant.reste_a_payer
+        -
+        montant
+    )
+
+    if manquant.reste_a_payer <= 0:
+
+        manquant.reste_a_payer = Decimal(
+            "0.00"
+        )
+
+        manquant.statut = Manquant.STATUT_SOLDE
+
+    else:
+
+        manquant.statut = Manquant.STATUT_EN_COURS
+
+    manquant.save(
+        update_fields=[
+            "reste_a_payer",
+            "statut",
+            "date_modification",
+        ]
+    )
+
+    return reglement

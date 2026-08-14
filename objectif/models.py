@@ -131,20 +131,6 @@ class Objectif(models.Model):
             "designation"
         ]
 
-        constraints = [
-
-            models.UniqueConstraint(
-                fields=[
-                    "compagnie",
-                    "point_vente",
-                    "mois",
-                    "annee"
-                ],
-                name="objectif_unique"
-            )
-
-        ]
-
     # -----------------------------
     # Affichage
     # -----------------------------

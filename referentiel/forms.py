@@ -115,6 +115,7 @@ class DistributeurForm(forms.ModelForm):
             'nom',
             'prenom',
             'telephone',
+            'fond',
             'categorie',
             'point_vente'
         ]
@@ -140,6 +141,15 @@ class DistributeurForm(forms.ModelForm):
                 }
             ),
 
+            'fond': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'min': '0',
+                    'step': '0.01',
+                    'placeholder': 'Fond'
+                }
+            ),
+
             'categorie': forms.Select(
                 attrs={
                     'class': 'form-select'
@@ -153,3 +163,17 @@ class DistributeurForm(forms.ModelForm):
             )
 
         }
+
+    def clean_fond(self):
+
+        fond = self.cleaned_data.get(
+            'fond'
+        )
+
+        if fond is not None and fond < 0:
+
+            raise forms.ValidationError(
+                "Le fond ne peut pas être négatif."
+            )
+
+        return fond

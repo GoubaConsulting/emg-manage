@@ -62,10 +62,102 @@ from django.shortcuts import get_object_or_404
 from .models import Commande
 from .presentation import preparer_affichage_commande
 from decimal import Decimal
+from calendar import monthrange
+from datetime import date
 
 from .services import valider_commande_directeur_service
 
 type_commande=Commande.TYPE_DIRECTEUR,
+
+
+# ==========================================================
+# FILTRES DE DATES
+# ==========================================================
+
+def filtres_dates_recherche(
+    request,
+    champ_date
+):
+    """
+    Retourne une date exacte ou un intervalle.
+    Par defaut, l'intervalle couvre le mois courant.
+    """
+
+    date_exacte = request.GET.get(
+        champ_date,
+        ""
+    )
+
+    date_debut = request.GET.get(
+        "date_debut",
+        ""
+    )
+
+    date_fin = request.GET.get(
+        "date_fin",
+        ""
+    )
+
+    if date_debut or date_fin:
+
+        date_exacte = ""
+
+    if not date_exacte and not date_debut and not date_fin:
+
+        aujourd_hui = date.today()
+
+        date_debut = aujourd_hui.replace(
+            day=1
+        ).isoformat()
+
+        date_fin = aujourd_hui.replace(
+            day=monthrange(
+                aujourd_hui.year,
+                aujourd_hui.month
+            )[1]
+        ).isoformat()
+
+    return (
+        date_exacte,
+        date_debut,
+        date_fin,
+    )
+
+
+def querystring_pagination(request):
+    """
+    Conserve les filtres lors du changement de page.
+    """
+
+    params = request.GET.copy()
+
+    params.pop(
+        "page",
+        None
+    )
+
+    return params.urlencode()
+
+
+def filtre_texte(request, nom):
+    """
+    Retourne un filtre texte propre pour l'affichage.
+    """
+
+    valeur = str(
+        request.GET.get(
+            nom,
+            ""
+        )
+        or
+        ""
+    ).strip()
+
+    if valeur.lower() == "none":
+
+        return ""
+
+    return valeur
 
 
 # ==========================================================
@@ -109,11 +201,17 @@ def liste_commandes(request):
 
         return HttpResponseForbidden()
 
-    numero = request.GET.get(
+    numero = filtre_texte(
+        request,
         "numero"
     )
 
-    date_commande = request.GET.get(
+    (
+        date_commande,
+        date_debut,
+        date_fin,
+    ) = filtres_dates_recherche(
+        request,
         "date_commande"
     )
 
@@ -125,7 +223,11 @@ def liste_commandes(request):
 
         numero=numero,
 
-        date_commande=date_commande
+        date_commande=date_commande,
+
+        date_debut=date_debut,
+
+        date_fin=date_fin
 
     )
 
@@ -168,6 +270,12 @@ def liste_commandes(request):
 
             "date_commande": date_commande,
 
+            "date_debut": date_debut,
+
+            "date_fin": date_fin,
+
+            "pagination_querystring": querystring_pagination(request),
+
             "titre": "Commandes normales",
 
             "url_nouveau": "ajouter_commande",
@@ -195,11 +303,17 @@ def liste_commandes_stock_tampon(request):
 
         return HttpResponseForbidden()
 
-    numero = request.GET.get(
+    numero = filtre_texte(
+        request,
         "numero"
     )
 
-    date_commande = request.GET.get(
+    (
+        date_commande,
+        date_debut,
+        date_fin,
+    ) = filtres_dates_recherche(
+        request,
         "date_commande"
     )
 
@@ -211,7 +325,11 @@ def liste_commandes_stock_tampon(request):
 
         numero=numero,
 
-        date_commande=date_commande
+        date_commande=date_commande,
+
+        date_debut=date_debut,
+
+        date_fin=date_fin
 
     )
 
@@ -252,6 +370,12 @@ def liste_commandes_stock_tampon(request):
 
             "date_commande": date_commande,
 
+            "date_debut": date_debut,
+
+            "date_fin": date_fin,
+
+            "pagination_querystring": querystring_pagination(request),
+
             "titre": "Commandes Stock Tampon",
 
             "url_nouveau": "ajouter_commande_stock_tampon",
@@ -278,11 +402,17 @@ def liste_reglement_stock(request):
 
         return HttpResponseForbidden()
 
-    numero = request.GET.get(
+    numero = filtre_texte(
+        request,
         "numero"
     )
 
-    date_commande = request.GET.get(
+    (
+        date_commande,
+        date_debut,
+        date_fin,
+    ) = filtres_dates_recherche(
+        request,
         "date_commande"
     )
 
@@ -294,7 +424,11 @@ def liste_reglement_stock(request):
 
         numero=numero,
 
-        date_commande=date_commande
+        date_commande=date_commande,
+
+        date_debut=date_debut,
+
+        date_fin=date_fin
 
     )
 
@@ -337,6 +471,12 @@ def liste_reglement_stock(request):
 
             "titre": "Règlement Stock Tampon",
 
+            "date_debut": date_debut,
+
+            "date_fin": date_fin,
+
+            "pagination_querystring": querystring_pagination(request),
+
             "url_nouveau": "ajouter_reglement_stock",
 
             "url_retour": "liste_reglement_stock",
@@ -363,11 +503,17 @@ def liste_commandes_caution(request):
 
         return HttpResponseForbidden()
 
-    numero = request.GET.get(
+    numero = filtre_texte(
+        request,
         "numero"
     )
 
-    date_commande = request.GET.get(
+    (
+        date_commande,
+        date_debut,
+        date_fin,
+    ) = filtres_dates_recherche(
+        request,
         "date_commande"
     )
 
@@ -379,7 +525,11 @@ def liste_commandes_caution(request):
 
         numero=numero,
 
-        date_commande=date_commande
+        date_commande=date_commande,
+
+        date_debut=date_debut,
+
+        date_fin=date_fin
 
     )
 
@@ -421,6 +571,12 @@ def liste_commandes_caution(request):
             "date_commande": date_commande,
 
             "titre": "Commandes Caution Bancaire",
+
+            "date_debut": date_debut,
+
+            "date_fin": date_fin,
+
+            "pagination_querystring": querystring_pagination(request),
 
             "url_nouveau": "ajouter_commande_caution",
 
@@ -1478,11 +1634,17 @@ def liste_validation_commandes(request):
 
         return HttpResponseForbidden()
 
-    numero = request.GET.get(
+    numero = filtre_texte(
+        request,
         "numero"
     )
 
-    date_commande = request.GET.get(
+    (
+        date_commande,
+        date_debut,
+        date_fin,
+    ) = filtres_dates_recherche(
+        request,
         "date_commande"
     )
 
@@ -1495,6 +1657,10 @@ def liste_validation_commandes(request):
         numero=numero,
 
         date_commande=date_commande,
+
+        date_debut=date_debut,
+
+        date_fin=date_fin,
 
         etat=Commande.EN_ATTENTE
 
@@ -1535,6 +1701,9 @@ def liste_validation_commandes(request):
             "titre": "Validation des commandes Gérant",
             "total_brut": total_brut,
             "total_net": total_net,
+            "date_debut": date_debut,
+            "date_fin": date_fin,
+            "pagination_querystring": querystring_pagination(request),
             "mode_validation": True,
             "url_nouveau": "liste_validation_commandes",
         }

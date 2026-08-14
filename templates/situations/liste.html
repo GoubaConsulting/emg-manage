@@ -1,0 +1,372 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Situations clôturées
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <h3>
+        Situations clôturées
+    </h3>
+
+    <a
+        href="{% url 'situations:ajouter_situation' %}"
+        class="btn btn-primary"
+    >
+        Nouveau versement
+    </a>
+
+</div>
+
+<div class="card shadow mb-4">
+
+    <div class="card-header">
+        Recherche
+    </div>
+
+    <div class="card-body">
+
+        <form method="get">
+
+            <div class="row g-3">
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Numéro
+                    </label>
+
+                    <input
+                        type="text"
+                        name="numero"
+                        value="{{ numero }}"
+                        class="form-control"
+                    >
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+                        Du
+                    </label>
+
+                    <input
+                        type="date"
+                        name="date_debut"
+                        value="{{ date_debut }}"
+                        class="form-control"
+                    >
+
+                </div>
+
+                <div class="col-md-2">
+
+                    <label class="form-label">
+                        Au
+                    </label>
+
+                    <input
+                        type="date"
+                        name="date_fin"
+                        value="{{ date_fin }}"
+                        class="form-control"
+                    >
+
+                </div>
+
+                <div class="col-md-3">
+
+                    <label class="form-label">
+                        Gérant / Distributeur
+                    </label>
+
+                    <select
+                        name="distributeur"
+                        class="form-select"
+                    >
+                        <option value="">
+                            Tous
+                        </option>
+
+                        {% for distributeur in distributeurs %}
+
+                            <option
+                                value="{{ distributeur.pk }}"
+                                {% if distributeur_selectionne == distributeur.pk|stringformat:"s" %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ distributeur.nom }} {{ distributeur.prenom }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-2 align-self-end">
+
+                    <button
+                        type="submit"
+                        class="btn btn-success w-100"
+                    >
+                        Rechercher
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="mt-3">
+
+                <a
+                    href="{% url 'situations:liste_situations' %}"
+                    class="btn btn-secondary"
+                >
+                    Réinitialiser
+                </a>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<div class="row mb-4">
+
+    <div class="col-md-4">
+        <div class="card border-primary shadow-sm">
+            <div class="card-header bg-primary text-white">
+                Montant distribué
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_distribue|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-success shadow-sm">
+            <div class="card-header bg-success text-white">
+                Montant versé
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_verse|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white">
+                Manquants
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_manquant|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="card shadow">
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover align-middle">
+
+                <thead class="table-dark">
+
+                    <tr>
+                        <th width="50"></th>
+                        <th>Numéro</th>
+                        <th>Date</th>
+                        <th>Gérant / Distributeur</th>
+                        <th class="text-end">Distribué</th>
+                        <th class="text-end">Crédit versé</th>
+                        <th class="text-end">Ventes versées</th>
+                        <th class="text-end">Manquant</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for situation in situations %}
+
+                    <tr>
+                        <td class="text-center">
+                            <button
+                                class="btn btn-sm btn-outline-secondary"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#situation{{ situation.idsituation }}"
+                            >
+                                ▼
+                            </button>
+                        </td>
+                        <td>{{ situation.numero }}</td>
+                        <td>{{ situation.date_situation|date:"d/m/Y" }}</td>
+                        <td>
+                            {{ situation.distributeur.nom }}
+                            {{ situation.distributeur.prenom }}
+                        </td>
+                        <td class="text-end">
+                            {{ situation.montant_total_distribue|floatformat:2 }}
+                        </td>
+                        <td class="text-end">
+                            {{ situation.montant_credit_verse|floatformat:2 }}
+                        </td>
+                        <td class="text-end">
+                            {{ situation.montant_vente_verse|floatformat:2 }}
+                        </td>
+                        <td class="text-end">
+                            {{ situation.montant_manquant|floatformat:2 }}
+                        </td>
+                    </tr>
+
+                    <tr class="collapse" id="situation{{ situation.idsituation }}">
+                        <td colspan="8">
+
+                            <div class="p-3 bg-light">
+
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <strong>Point de vente :</strong>
+                                        {{ situation.point_vente.designation }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Fond :</strong>
+                                        {{ situation.fond|floatformat:2 }} FCFA
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Crédit :</strong>
+                                        {{ situation.montant_credit|floatformat:2 }} FCFA
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Total versé :</strong>
+                                        {{ situation.montant_total_verse|floatformat:2 }} FCFA
+                                    </div>
+                                </div>
+
+                                {% for groupe in situation.groupes_compagnies %}
+
+                                    <h6 class="mt-3">
+                                        {{ groupe.compagnie.designation }}
+                                    </h6>
+
+                                    <table class="table table-sm table-bordered">
+                                        <thead class="table-secondary">
+                                            <tr>
+                                                <th>Produit</th>
+                                                <th class="text-end">Prix</th>
+                                                <th class="text-end">Distribuée</th>
+                                                <th class="text-end">Vendue</th>
+                                                <th class="text-end">Restante</th>
+                                                <th class="text-end">Montant vendu</th>
+                                                <th class="text-end">Valeur restante</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for ligne in groupe.lignes %}
+                                            <tr>
+                                                <td>{{ ligne.produit.designation }}</td>
+                                                <td class="text-end">{{ ligne.prix_unitaire|floatformat:2 }}</td>
+                                                <td class="text-end">{{ ligne.quantite_distribuee|floatformat:2 }}</td>
+                                                <td class="text-end">{{ ligne.quantite_vendue|floatformat:2 }}</td>
+                                                <td class="text-end">{{ ligne.quantite_restante|floatformat:2 }}</td>
+                                                <td class="text-end">{{ ligne.montant_vendu|floatformat:2 }}</td>
+                                                <td class="text-end">{{ ligne.montant_restant|floatformat:2 }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+
+                                {% endfor %}
+
+                                {% if situation.coupures %}
+                                    <div class="mt-3">
+                                        <strong>Coupures :</strong>
+                                        <pre class="mb-0">{{ situation.coupures }}</pre>
+                                    </div>
+                                {% endif %}
+
+                            </div>
+
+                        </td>
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            Aucune situation clôturée trouvée.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% if situations.has_other_pages %}
+
+        <nav>
+            <ul class="pagination justify-content-center">
+
+                {% if situations.has_previous %}
+                <li class="page-item">
+                    <a
+                        class="page-link"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ situations.previous_page_number }}"
+                    >
+                        Précédent
+                    </a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        {{ situations.number }}
+                    </span>
+                </li>
+
+                {% if situations.has_next %}
+                <li class="page-item">
+                    <a
+                        class="page-link"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ situations.next_page_number }}"
+                    >
+                        Suivant
+                    </a>
+                </li>
+                {% endif %}
+
+            </ul>
+        </nav>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -46,6 +46,20 @@ urlpatterns = [
     ),
 
     # ============================================
+    # Actualisation
+    # ============================================
+
+    path(
+
+        "actualiser/",
+
+        views.actualiser_objectifs_view,
+
+        name="actualiser_objectifs"
+
+    ),
+
+    # ============================================
     # Modification
     # ============================================
 

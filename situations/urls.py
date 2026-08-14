@@ -20,11 +20,41 @@ urlpatterns = [
 
     path(
 
+        "",
+
+        views.liste_situations,
+
+        name="liste_situations"
+
+    ),
+
+    path(
+
         "ajouter/",
 
         views.ajouter_situation,
 
         name="ajouter_situation"
+
+    ),
+
+    path(
+
+        "manquants/",
+
+        views.liste_manquants,
+
+        name="liste_manquants"
+
+    ),
+
+    path(
+
+        "manquants/<int:pk>/regler/",
+
+        views.regler_manquant_view,
+
+        name="regler_manquant"
 
     ),
 

@@ -88,6 +88,8 @@ Distributeurs
 
             <th>Téléphone</th>
 
+            <th>Fond</th>
+
             <th>Catégorie</th>
 
             <th>Point de vente</th>
@@ -113,6 +115,10 @@ Distributeurs
             <td>{{ distributeur.prenom }}</td>
 
             <td>{{ distributeur.telephone }}</td>
+
+            <td class="text-end">
+                {{ distributeur.fond }} FCFA
+            </td>
 
             <td>{{ distributeur.get_categorie_display }}</td>
 
@@ -142,7 +148,7 @@ Distributeurs
 
         <tr>
 
-            <td colspan="8" class="text-center">
+            <td colspan="9" class="text-center">
 
                 Aucun distributeur trouvé.
 

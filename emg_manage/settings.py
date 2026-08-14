@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     'stocks',
     'distributions',
     'situations',
+    'mouvements_stock',
     'manquants',
     'versements',
     'tableau_bord',

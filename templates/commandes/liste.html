@@ -42,7 +42,7 @@ Liste des commandes
 
         <form method="get" class="row g-3 mb-4">
 
-            <div class="col-md-4">
+            <div class="col-md-3">
 
                 <label class="form-label">
 
@@ -59,19 +59,36 @@ Liste des commandes
 
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
 
                 <label class="form-label">
 
-                    Date
+                    Du
 
                 </label>
 
                 <input
                     type="date"
                     class="form-control"
-                    name="date_commande"
-                    value="{{ date_commande }}"
+                    name="date_debut"
+                    value="{{ date_debut }}"
+                >
+
+            </div>
+
+            <div class="col-md-2">
+
+                <label class="form-label">
+
+                    Au
+
+                </label>
+
+                <input
+                    type="date"
+                    class="form-control"
+                    name="date_fin"
+                    value="{{ date_fin }}"
                 >
 
             </div>
@@ -86,6 +103,19 @@ Liste des commandes
                     Rechercher
 
                 </button>
+
+            </div>
+
+            <div class="col-md-2 align-self-end">
+
+                <a
+                    href="{{ request.path }}"
+                    class="btn btn-secondary w-100"
+                >
+
+                    Reinitialiser
+
+                </a>
 
             </div>
 
@@ -590,7 +620,7 @@ Liste des commandes
 
                     <a
                         class="page-link"
-                        href="?page={{ commandes.previous_page_number }}"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ commandes.previous_page_number }}"
                     >
 
                         Précédent
@@ -617,7 +647,7 @@ Liste des commandes
 
                     <a
                         class="page-link"
-                        href="?page={{ commandes.next_page_number }}"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ commandes.next_page_number }}"
                     >
 
                         Suivant

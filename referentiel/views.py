@@ -677,23 +677,23 @@ def modifier_distributeur(request, pk):
 
             distributeur = form.save()
 
-        # Génération automatique du code
-        distributeur.code = (
-            f"DIST"
-            f"{distributeur.iddistributeur:03d}"
-            f"{distributeur.point_vente.designation[:3].upper()}"
-        )
+            # Génération automatique du code
+            distributeur.code = (
+                f"DIST"
+                f"{distributeur.iddistributeur:03d}"
+                f"{distributeur.point_vente.designation[:3].upper()}"
+            )
 
-        distributeur.save(update_fields=["code"])
+            distributeur.save(update_fields=["code"])
 
-        messages.success(
-            request,
-            "Distributeur enregistré avec succès."
-        )
+            messages.success(
+                request,
+                "Distributeur enregistré avec succès."
+            )
 
-        return redirect(
-            'liste_distributeur'
-        )
+            return redirect(
+                'liste_distributeur'
+            )
 
     else:
 

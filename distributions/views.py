@@ -23,6 +23,7 @@ from .services import (
 )
 from django.contrib import messages
 
+from calendar import monthrange
 from datetime import date
 
 from decimal import Decimal
@@ -36,6 +37,96 @@ from django.db.models import Sum
 from comptes.models import ProfilUtilisateur
 
 from stocks.models import Stock
+
+
+def filtres_dates_recherche(
+    request,
+    champ_date
+):
+    """
+    Retourne une date exacte ou un intervalle.
+    Par defaut, l'intervalle couvre le mois courant.
+    """
+
+    date_exacte = request.GET.get(
+        champ_date,
+        ""
+    )
+
+    date_debut = request.GET.get(
+        "date_debut",
+        ""
+    )
+
+    date_fin = request.GET.get(
+        "date_fin",
+        ""
+    )
+
+    if not date_exacte and not date_debut and not date_fin:
+
+        aujourd_hui = date.today()
+
+        date_debut = aujourd_hui.replace(
+            day=1
+        ).isoformat()
+
+        date_fin = aujourd_hui.replace(
+            day=monthrange(
+                aujourd_hui.year,
+                aujourd_hui.month
+            )[1]
+        ).isoformat()
+
+    return (
+        date_exacte,
+        date_debut,
+        date_fin,
+    )
+
+
+def querystring_pagination(
+    request,
+    *pages
+):
+    """
+    Conserve les filtres lors du changement de page.
+    """
+
+    params = request.GET.copy()
+
+    for page in pages:
+
+        params.pop(
+            page,
+            None
+        )
+
+    return params.urlencode()
+
+
+def filtre_texte(
+    request,
+    nom
+):
+    """
+    Retourne un filtre texte propre pour l'affichage.
+    """
+
+    valeur = str(
+        request.GET.get(
+            nom,
+            ""
+        )
+        or
+        ""
+    ).strip()
+
+    if valeur.lower() == "none":
+
+        return ""
+
+    return valeur
 
 
 @login_required
@@ -288,26 +379,30 @@ def liste_distributions(request):
     # Mois courant par défaut
     # ==========================================
 
+    (
+        date_distribution,
+        date_debut,
+        date_fin,
+    ) = filtres_dates_recherche(
+        request,
+        "date_distribution"
+    )
+
     aujourd_hui = date.today()
 
-    mois = int(
-        request.GET.get(
-            "mois",
-            aujourd_hui.month
-        )
-    )
+    mois = aujourd_hui.month
 
-    annee = int(
-        request.GET.get(
-            "annee",
-            aujourd_hui.year
-        )
-    )
+    annee = aujourd_hui.year
 
 
     point_selectionne = request.GET.get("point_vente", "")
 
     distributeur_selectionne = request.GET.get("distributeur", "")
+
+    numero = filtre_texte(
+        request,
+        "numero"
+    )
 
     # ==========================================
     # Base des distributions
@@ -327,11 +422,35 @@ def liste_distributions(request):
         )
         .filter(
             actif=True,
-            date_distribution__month=mois,
-            date_distribution__year=annee,
             utilisateur=request.user,
         )
     )
+
+    if date_distribution:
+
+        distributions = distributions.filter(
+            date_distribution=date_distribution
+        )
+
+    else:
+
+        if date_debut:
+
+            distributions = distributions.filter(
+                date_distribution__gte=date_debut
+            )
+
+        if date_fin:
+
+            distributions = distributions.filter(
+                date_distribution__lte=date_fin
+            )
+
+    if numero:
+
+        distributions = distributions.filter(
+            numero__icontains=numero
+        )
     
 
     # ==========================================
@@ -635,6 +754,21 @@ def liste_distributions(request):
         "mois": mois,
 
         "annee": annee,
+
+        "date_distribution": date_distribution,
+
+        "date_debut": date_debut,
+
+        "date_fin": date_fin,
+
+        "numero": numero,
+
+        "pagination_querystring": querystring_pagination(
+            request,
+            "page",
+            "page_sous",
+            "page_client",
+        ),
 
         "distributions": distributions,
 

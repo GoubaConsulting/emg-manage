@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Règlement de manquant
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header">
+        <h5 class="mb-0">
+            Règlement de manquant
+        </h5>
+    </div>
+
+    <div class="card-body">
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <strong>Manquant :</strong>
+                {{ manquant.numero }}
+            </div>
+            <div class="col-md-3">
+                <strong>Situation :</strong>
+                {{ manquant.situation.numero }}
+            </div>
+            <div class="col-md-3">
+                <strong>Personne :</strong>
+                {{ manquant.distributeur.nom }} {{ manquant.distributeur.prenom }}
+            </div>
+            <div class="col-md-3">
+                <strong>Reste à payer :</strong>
+                {{ manquant.reste_a_payer|floatformat:2 }} FCFA
+            </div>
+        </div>
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div class="row">
+
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">
+                        {{ form.date_reglement.label }}
+                    </label>
+                    {{ form.date_reglement }}
+                    {{ form.date_reglement.errors }}
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">
+                        {{ form.montant.label }}
+                    </label>
+                    {{ form.montant }}
+                    {{ form.montant.errors }}
+                </div>
+
+            </div>
+
+            <div class="text-end">
+
+                <a
+                    href="{% url 'situations:liste_manquants' %}"
+                    class="btn btn-secondary"
+                >
+                    Retour
+                </a>
+
+                <button
+                    type="submit"
+                    class="btn btn-success"
+                >
+                    Enregistrer
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

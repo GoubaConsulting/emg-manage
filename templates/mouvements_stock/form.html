@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}
+Nouveau mouvement de stock
+{% endblock %}
+
+{% block content %}
+
+<form method="post">
+
+    {% csrf_token %}
+
+    <div class="card shadow mb-4">
+
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">
+                Nouveau mouvement de stock
+            </h4>
+            <a
+                href="{% url 'mouvements_stock:liste_mouvements' %}"
+                class="btn btn-secondary"
+            >
+                Retour
+            </a>
+        </div>
+
+        <div class="card-body">
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div class="alert alert-primary">
+                Point de vente :
+                <strong>
+                    {{ point_vente.designation }}
+                </strong>
+            </div>
+
+            <div class="row g-3">
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Type de mouvement
+                    </label>
+                    {{ form.type_mouvement }}
+                    {{ form.type_mouvement.errors }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Type de stock
+                    </label>
+                    {{ form.type_stock }}
+                    {{ form.type_stock.errors }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Date
+                    </label>
+                    {{ form.date_mouvement }}
+                    {{ form.date_mouvement.errors }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Motif
+                    </label>
+                    {{ form.motif }}
+                    {{ form.motif.errors }}
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">
+                        Observation
+                    </label>
+                    {{ form.observation }}
+                    {{ form.observation.errors }}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card shadow">
+
+        <div class="card-header">
+            <h5 class="mb-0">
+                Produits
+            </h5>
+        </div>
+
+        <div class="card-body">
+
+            {% for groupe in groupes_compagnies %}
+
+                <div class="card mb-3 border-secondary">
+
+                    <div class="card-header bg-secondary text-white">
+                        <strong>
+                            {{ groupe.compagnie.designation }}
+                        </strong>
+                    </div>
+
+                    <div class="card-body p-0">
+
+                        <div class="table-responsive">
+
+                            <table class="table table-bordered table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th class="text-end">Prix</th>
+                                        <th class="text-end">Stock normal</th>
+                                        <th class="text-end">Stock tampon</th>
+                                        <th width="180" class="text-end">
+                                            Quantité
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for produit in groupe.produits %}
+                                        <tr>
+                                            <td>
+                                                {{ produit.designation }}
+                                            </td>
+                                            <td class="text-end">
+                                                {{ produit.prix }}
+                                            </td>
+                                            <td class="text-end">
+                                                {{ produit.stock_normal }}
+                                            </td>
+                                            <td class="text-end">
+                                                {{ produit.stock_tampon }}
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="number"
+                                                    name="quantite_{{ produit.idproduit }}"
+                                                    min="0"
+                                                    step="0.01"
+                                                    class="form-control text-end"
+                                                    placeholder="0"
+                                                >
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            {% empty %}
+
+                <div class="alert alert-warning">
+                    Aucun produit actif disponible.
+                </div>
+
+            {% endfor %}
+
+            <div class="d-flex justify-content-end gap-2">
+                <a
+                    href="{% url 'mouvements_stock:liste_mouvements' %}"
+                    class="btn btn-secondary"
+                >
+                    Annuler
+                </a>
+                <button
+                    type="submit"
+                    class="btn btn-success"
+                >
+                    Enregistrer le mouvement
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+
+</form>
+
+{% endblock %}

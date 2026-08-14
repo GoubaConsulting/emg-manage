@@ -36,7 +36,10 @@ Gestion des objectifs
 
     <div class="card-body">
 
-        <form method="get">
+        <form
+            id="objectif-filtres-form"
+            method="get"
+        >
 
             <div class="row g-3">
 
@@ -221,6 +224,55 @@ Gestion des objectifs
 
     <div class="card-body">
 
+        {% if request.user.profil.role != "ADMIN" %}
+
+        <div class="d-flex justify-content-end mb-3">
+
+            <form
+                id="actualiser-objectifs-form"
+                method="post"
+                action="{% url 'actualiser_objectifs' %}"
+            >
+
+                {% csrf_token %}
+
+                <input
+                    type="hidden"
+                    name="designation"
+                    value="{{ designation }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="mois"
+                    value="{{ mois }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="annee"
+                    value="{{ annee }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="point_vente"
+                    value="{{ point_vente_selectionne|default:'' }}"
+                >
+
+                <button
+                    type="submit"
+                    class="btn btn-outline-primary"
+                >
+                    Actualiser
+                </button>
+
+            </form>
+
+        </div>
+
+        {% endif %}
+
         <div class="table-responsive">
 
             <table class="table table-bordered table-hover">
@@ -376,5 +428,31 @@ Gestion des objectifs
     </div>
 
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const filtreForm = document.getElementById("objectif-filtres-form");
+    const actualiserForm = document.getElementById("actualiser-objectifs-form");
+
+    if (!filtreForm || !actualiserForm) {
+        return;
+    }
+
+    actualiserForm.addEventListener("submit", function () {
+        ["designation", "mois", "annee", "point_vente"].forEach(function (nom) {
+            const source = filtreForm.querySelector('[name="' + nom + '"]');
+            const cible = actualiserForm.querySelector('[name="' + nom + '"]');
+
+            if (source && cible) {
+                cible.value = source.value;
+            }
+        });
+    });
+});
+</script>
 
 {% endblock %}

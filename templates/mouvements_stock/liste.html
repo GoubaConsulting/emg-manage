@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block title %}
+Mouvements de stock
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+
+        <h4 class="mb-0">
+            Entrées et sorties de stock
+        </h4>
+
+        {% if peut_creer %}
+            <a
+                href="{% url 'mouvements_stock:ajouter_mouvement' %}"
+                class="btn btn-success"
+            >
+                Nouveau mouvement
+            </a>
+        {% endif %}
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="get" class="row g-3 mb-4">
+
+            <div class="col-md-2">
+                <label class="form-label">
+                    Du
+                </label>
+                <input
+                    type="date"
+                    name="date_debut"
+                    value="{{ date_debut }}"
+                    class="form-control"
+                >
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">
+                    Au
+                </label>
+                <input
+                    type="date"
+                    name="date_fin"
+                    value="{{ date_fin }}"
+                    class="form-control"
+                >
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">
+                    Numéro
+                </label>
+                <input
+                    type="text"
+                    name="numero"
+                    value="{{ numero }}"
+                    class="form-control"
+                    placeholder="MST-000001"
+                >
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">
+                    Mouvement
+                </label>
+                <select
+                    name="type_mouvement"
+                    class="form-select"
+                >
+                    <option value="">
+                        Tous
+                    </option>
+                    {% for valeur, libelle in types_mouvement %}
+                        <option
+                            value="{{ valeur }}"
+                            {% if type_mouvement == valeur %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ libelle }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">
+                    Type de stock
+                </label>
+                <select
+                    name="type_stock"
+                    class="form-select"
+                >
+                    <option value="">
+                        Tous
+                    </option>
+                    {% for valeur, libelle in types_stock %}
+                        <option
+                            value="{{ valeur }}"
+                            {% if type_stock == valeur %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ libelle }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">
+                    Produit
+                </label>
+                <select
+                    name="produit"
+                    class="form-select"
+                >
+                    <option value="">
+                        Tous
+                    </option>
+                    {% for produit in produits %}
+                        <option
+                            value="{{ produit.idproduit }}"
+                            {% if produit_selectionne == produit.idproduit|stringformat:"s" %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ produit.designation }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    Rechercher
+                </button>
+
+                <a
+                    href="{% url 'mouvements_stock:liste_mouvements' %}"
+                    class="btn btn-secondary"
+                >
+                    Réinitialiser
+                </a>
+            </div>
+
+        </form>
+
+        <div class="row mb-4">
+
+            <div class="col-md-4">
+                <div class="card border-primary shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        Nombre de mouvements
+                    </div>
+                    <div class="card-body text-center">
+                        <h3 class="mb-0">
+                            {{ mouvements.paginator.count }}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-success shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        Total entrées
+                    </div>
+                    <div class="card-body text-center">
+                        <h3 class="mb-0">
+                            {{ total_entrees }}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-danger shadow-sm">
+                    <div class="card-header bg-danger text-white">
+                        Total sorties
+                    </div>
+                    <div class="card-body text-center">
+                        <h3 class="mb-0">
+                            {{ total_sorties }}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover align-middle">
+
+                <thead class="table-header-emg">
+                    <tr>
+                        <th width="50"></th>
+                        <th>Numéro</th>
+                        <th>Date</th>
+                        <th>Mouvement</th>
+                        <th>Stock</th>
+                        <th>Point de vente</th>
+                        <th>Motif</th>
+                        <th class="text-end">
+                            Quantité
+                        </th>
+                        <th>Utilisateur</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for mouvement in mouvements %}
+
+                        <tr>
+                            <td class="text-center">
+                                <button
+                                    class="btn btn-sm btn-outline-secondary"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#mvt{{ mouvement.idmouvementstock }}"
+                                >
+                                    Voir
+                                </button>
+                            </td>
+                            <td>{{ mouvement.numero }}</td>
+                            <td>{{ mouvement.date_mouvement|date:"d/m/Y" }}</td>
+                            <td>
+                                {% if mouvement.type_mouvement == "ENTREE" %}
+                                    <span class="badge text-bg-success">
+                                        {{ mouvement.get_type_mouvement_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge text-bg-danger">
+                                        {{ mouvement.get_type_mouvement_display }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>{{ mouvement.get_type_stock_display }}</td>
+                            <td>{{ mouvement.point_vente.designation }}</td>
+                            <td>{{ mouvement.get_motif_display }}</td>
+                            <td class="text-end fw-bold">
+                                {{ mouvement.total_quantite }}
+                            </td>
+                            <td>
+                                {{ mouvement.utilisateur.get_full_name|default:mouvement.utilisateur.username }}
+                            </td>
+                        </tr>
+
+                        <tr
+                            class="collapse bg-light"
+                            id="mvt{{ mouvement.idmouvementstock }}"
+                        >
+                            <td colspan="9">
+                                <div class="p-3">
+
+                                    <div class="row mb-3">
+                                        <div class="col-md-3">
+                                            <strong>Numéro :</strong><br>
+                                            {{ mouvement.numero }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Date :</strong><br>
+                                            {{ mouvement.date_mouvement|date:"d/m/Y" }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Type :</strong><br>
+                                            {{ mouvement.get_type_mouvement_display }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Stock :</strong><br>
+                                            {{ mouvement.get_type_stock_display }}
+                                        </div>
+                                    </div>
+
+                                    {% if mouvement.observation %}
+                                        <div class="alert alert-info py-2">
+                                            {{ mouvement.observation }}
+                                        </div>
+                                    {% endif %}
+
+                                    {% for groupe in mouvement.groupes_compagnies %}
+
+                                        <div class="card mb-3 border-secondary">
+                                            <div class="card-header bg-secondary text-white d-flex justify-content-between">
+                                                <strong>
+                                                    {{ groupe.compagnie.designation }}
+                                                </strong>
+                                                <span>
+                                                    {{ groupe.total_quantite }}
+                                                </span>
+                                            </div>
+
+                                            <div class="card-body p-0">
+                                                <table class="table table-sm table-bordered mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Produit</th>
+                                                            <th class="text-end">Quantité</th>
+                                                            <th class="text-end">Stock avant</th>
+                                                            <th class="text-end">Stock après</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for ligne in groupe.lignes %}
+                                                            <tr>
+                                                                <td>{{ ligne.produit.designation }}</td>
+                                                                <td class="text-end">{{ ligne.quantite }}</td>
+                                                                <td class="text-end">{{ ligne.stock_avant }}</td>
+                                                                <td class="text-end fw-bold">{{ ligne.stock_apres }}</td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                    {% empty %}
+
+                                        <div class="alert alert-warning mb-0">
+                                            Ce mouvement ne contient aucune ligne.
+                                        </div>
+
+                                    {% endfor %}
+
+                                </div>
+                            </td>
+                        </tr>
+
+                    {% empty %}
+
+                        <tr>
+                            <td colspan="9" class="text-center">
+                                Aucun mouvement de stock trouvé.
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% if mouvements.has_other_pages %}
+
+            <nav>
+                <ul class="pagination justify-content-center">
+
+                    {% if mouvements.has_previous %}
+                        <li class="page-item">
+                            <a
+                                class="page-link"
+                                href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ mouvements.previous_page_number }}"
+                            >
+                                Précédent
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            {{ mouvements.number }}
+                        </span>
+                    </li>
+
+                    {% if mouvements.has_next %}
+                        <li class="page-item">
+                            <a
+                                class="page-link"
+                                href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ mouvements.next_page_number }}"
+                            >
+                                Suivant
+                            </a>
+                        </li>
+                    {% endif %}
+
+                </ul>
+            </nav>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

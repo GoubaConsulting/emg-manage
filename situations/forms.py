@@ -11,6 +11,7 @@ Formulaires du module Situations.
 """
 
 from django import forms
+from django.utils import timezone
 
 from referentiel.models import Distributeur
 
@@ -187,3 +188,49 @@ class SelectionSituationForm(forms.Form):
                 )
 
             )
+
+
+# ==========================================================
+# FORMULAIRE : REGLEMENT D'UN MANQUANT
+# ==========================================================
+
+class ReglementManquantForm(forms.Form):
+    """
+    Permet d'enregistrer un règlement partiel ou total
+    d'un manquant.
+    """
+
+    date_reglement = forms.DateField(
+
+        label="Date de règlement",
+
+        initial=timezone.localdate,
+
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        )
+
+    )
+
+    montant = forms.DecimalField(
+
+        label="Montant versé",
+
+        max_digits=18,
+
+        decimal_places=2,
+
+        min_value=1,
+
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "1",
+                "step": "0.01",
+            }
+        )
+
+    )

@@ -1,267 +1,411 @@
-<div class="col-md-2 bg-light border-end min-vh-100">
+<aside class="col-12 col-md-3 col-xl-2 app-sidebar bg-body-tertiary border-end">
 
-    <div class="pt-3">
+    <div class="sidebar-sticky p-3">
 
-        <ul class="nav flex-column">
-
-            <li class="nav-item">
-                <a class="nav-link menu-item"
-                   href="{% url 'dashboard' %}">
-                    Tableau de bord
-                </a>
-                
-            </li>
-
-            {% if request.user.profil.role == 'ADMIN' %}
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Administration
-                    </a>
-                </li>
-
-                <li class="nav-item mt-2">
-                    <span class="nav-link fw-bold text-primary">
-                        Référentiel
+        <div class="card border-0 shadow-sm mb-3 sidebar-profile">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center justify-content-between gap-2">
+                    <div>
+                        <div class="text-uppercase small text-white-50 fw-semibold">
+                            Espace
+                        </div>
+                        <div class="fw-bold text-white lh-sm">
+                            {{ request.user.username }}
+                        </div>
+                    </div>
+                    <span class="badge rounded-pill text-bg-light text-primary">
+                        {{ request.user.profil.role }}
                     </span>
-                </li>
+                </div>
+            </div>
+        </div>
 
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_pointvente' %}">
-                        Points de vente
-                    </a>
-                </li>
+        <nav aria-label="Menu principal">
 
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_compagnie' %}">
-                        Compagnies
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_produit' %}">
-                        Produits
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_distributeur' %}">
-                        Distributeurs
-                    </a>
-                </li>
-
-            {% endif %}
-
-            {% if request.user.profil.role == 'DIRECTEUR' %}
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_pointvente' %}">
-                        Points de vente
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_compagnie' %}">
-                        Compagnies
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_produit' %}">
-                        Produits
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_distributeur' %}">
-                        Distributeurs
-                    </a>
-                </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link menu-item"
-                    href="{% url 'liste_objectif' %}">
-                        Objectifs
-                    </a>
-                </li>
-
-                <li class="nav-item">
-
-                    <a
-                        class="nav-link menu-item"
-                        href="{% url 'liste_commandes' %}"
-                    >
-
-                        Commandes normales
-
-                    </a>
-
-                </li>
-
-                <li class="nav-item">
-
-                    <a
-                        class="nav-link menu-item"
-                        href="{% url 'liste_commandes_stock_tampon' %}"
-                    >
-
-                        Commandes Stock Tampon
-
-                    </a>
-
-                </li>
-
-                <li class="nav-item">
-
-                    <a
-                        href="{% url 'liste_reglement_stock' %}"
-                        class="nav-link menu-item"
-                    >
-
-                        <i class="bi bi-arrow-left-right"></i>
-
-                        <span>
-
-                            Règlement Stock Tampon
-
-                        </span>
-
-                    </a>
-
-                </li>
-
-                <li class="nav-item">
-
-                    <a
-                        href="{% url 'liste_commandes_caution' %}"
-                            class="nav-link menu-item"
-                    >
-
-                        <i class="bi bi-bank"></i>
-
-                        <span>
-
-                            Caution bancaire
-
-                        </span>
-
-                    </a>
-
-                </li>
-
-
-                <li class="nav-item">
-                    <a
-                        class="nav-link menu-item"
-                        href="{% url 'liste_stock' %}"
-                    >
-                        Stocks
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{% url 'distributions:liste_distributions' %}" class="nav-link">
-                        Distributions
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Situations
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Manquants
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Versements
-                    </a>
-                </li>
-
-                
-
-            {% endif %}
-
-            {% if request.user.profil.role == 'GERANT' %}
-                
-                <li class="nav-item">
-
-                    <a
-                        href="{% url 'liste_commandes' %}"
-                        class="nav-link {% if '/commandes/' in request.path %}active{% endif %}"
-                    >
-                        Commandes
-                    </a>
-
-                </li>
-            
-                <li class="nav-item">
-                    <a
-                        class="nav-link menu-item"
-                        href="{% url 'liste_stock' %}"
-                    >
-                        Stocks
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{% url 'distributions:liste_distributions' %}" class="nav-link">
-                        Distributions
-                    </a>
-                </li>
-                
-                
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="{% url 'liste_distributeur' %}">
-                        Distributeurs
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Situations
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Manquants
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link menu-item" href="#">
-                        Versements
-                    </a>
-                </li>
-
-            {% endif %}
-
-            <li class="nav-item mt-4">
-
+            <div class="list-group list-group-flush shadow-sm rounded-3 overflow-hidden mb-3">
                 <a
-                    class="btn btn-danger w-100"
-                    href="{% url 'logout' %}"
+                    class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-3 {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+                    href="{% url 'dashboard' %}"
                 >
-                    Déconnexion
+                    <span class="fw-semibold">Tableau de bord</span>
+                    <span class="badge rounded-pill {% if request.resolver_match.url_name == 'dashboard' %}text-bg-light text-primary{% else %}text-bg-primary{% endif %}">
+                        Accueil
+                    </span>
                 </a>
+            </div>
 
-            </li>
+            <div class="accordion sidebar-accordion" id="sidebarMenu">
 
-        </ul>
+                {% if request.user.profil.role == 'ADMIN' %}
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuAdminReferentiel"
+                                aria-expanded="true"
+                                aria-controls="menuAdminReferentiel"
+                            >
+                                Administration
+                            </button>
+                        </h2>
+                        <div
+                            id="menuAdminReferentiel"
+                            class="accordion-collapse collapse show"
+                        >
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_pointvente' %}active{% endif %}"
+                                        href="{% url 'liste_pointvente' %}"
+                                    >
+                                        Points de vente
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_compagnie' %}active{% endif %}"
+                                        href="{% url 'liste_compagnie' %}"
+                                    >
+                                        Compagnies
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_produit' %}active{% endif %}"
+                                        href="{% url 'liste_produit' %}"
+                                    >
+                                        Produits
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_distributeur' %}active{% endif %}"
+                                        href="{% url 'liste_distributeur' %}"
+                                    >
+                                        Distributeurs
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                {% endif %}
+
+                {% if request.user.profil.role == 'DIRECTEUR' %}
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuReferentiel"
+                                aria-expanded="true"
+                                aria-controls="menuReferentiel"
+                            >
+                                Référentiel
+                            </button>
+                        </h2>
+                        <div id="menuReferentiel" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_pointvente' %}active{% endif %}"
+                                        href="{% url 'liste_pointvente' %}"
+                                    >
+                                        Points de vente
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_compagnie' %}active{% endif %}"
+                                        href="{% url 'liste_compagnie' %}"
+                                    >
+                                        Compagnies
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_produit' %}active{% endif %}"
+                                        href="{% url 'liste_produit' %}"
+                                    >
+                                        Produits
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_distributeur' %}active{% endif %}"
+                                        href="{% url 'liste_distributeur' %}"
+                                    >
+                                        Gérants et distributeurs
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuPilotage"
+                                aria-expanded="true"
+                                aria-controls="menuPilotage"
+                            >
+                                Pilotage commercial
+                            </button>
+                        </h2>
+                        <div id="menuPilotage" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'liste_objectif' %}active{% endif %}"
+                                        href="{% url 'liste_objectif' %}"
+                                    >
+                                        <span>Objectifs</span>
+                                        <span class="badge rounded-pill {% if request.resolver_match.url_name == 'liste_objectif' %}text-bg-light text-primary{% else %}text-bg-primary{% endif %}">
+                                            Mois
+                                        </span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuCommandes"
+                                aria-expanded="true"
+                                aria-controls="menuCommandes"
+                            >
+                                Commandes et règlements
+                            </button>
+                        </h2>
+                        <div id="menuCommandes" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_commandes' %}active{% endif %}"
+                                        href="{% url 'liste_commandes' %}"
+                                    >
+                                        Commandes normales
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_commandes_stock_tampon' %}active{% endif %}"
+                                        href="{% url 'liste_commandes_stock_tampon' %}"
+                                    >
+                                        Commandes stock tampon
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_reglement_stock' %}active{% endif %}"
+                                        href="{% url 'liste_reglement_stock' %}"
+                                    >
+                                        Règlements stock tampon
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_commandes_caution' %}active{% endif %}"
+                                        href="{% url 'liste_commandes_caution' %}"
+                                    >
+                                        Cautions bancaires
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuExploitation"
+                                aria-expanded="true"
+                                aria-controls="menuExploitation"
+                            >
+                                Stock et terrain
+                            </button>
+                        </h2>
+                        <div id="menuExploitation" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_stock' %}active{% endif %}"
+                                        href="{% url 'liste_stock' %}"
+                                    >
+                                        Stocks
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.app_name == 'distributions' %}active{% endif %}"
+                                        href="{% url 'distributions:liste_distributions' %}"
+                                    >
+                                        Distributions
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.app_name == 'mouvements_stock' %}active{% endif %}"
+                                        href="{% url 'mouvements_stock:liste_mouvements' %}"
+                                    >
+                                        Entrées / sorties de stock
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuCaisse"
+                                aria-expanded="true"
+                                aria-controls="menuCaisse"
+                            >
+                                Caisse et clôture
+                            </button>
+                        </h2>
+                        <div id="menuCaisse" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_situations' %}active{% endif %}"
+                                        href="{% url 'situations:liste_situations' %}"
+                                    >
+                                        Versements clôturés
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'liste_manquants' or request.resolver_match.url_name == 'regler_manquant' %}active{% endif %}"
+                                        href="{% url 'situations:liste_manquants' %}"
+                                    >
+                                        <span>Manquants</span>
+                                        <span class="badge rounded-pill {% if request.resolver_match.url_name == 'liste_manquants' or request.resolver_match.url_name == 'regler_manquant' %}text-bg-light text-primary{% else %}text-bg-danger{% endif %}">
+                                            Suivi
+                                        </span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                {% endif %}
+
+                {% if request.user.profil.role == 'GERANT' %}
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuGerantStock"
+                                aria-expanded="true"
+                                aria-controls="menuGerantStock"
+                            >
+                                Commandes et stock
+                            </button>
+                        </h2>
+                        <div id="menuGerantStock" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_commandes' %}active{% endif %}"
+                                        href="{% url 'liste_commandes' %}"
+                                    >
+                                        Commandes
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_stock' %}active{% endif %}"
+                                        href="{% url 'liste_stock' %}"
+                                    >
+                                        Stocks
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuGerantTerrain"
+                                aria-expanded="true"
+                                aria-controls="menuGerantTerrain"
+                            >
+                                Distribution terrain
+                            </button>
+                        </h2>
+                        <div id="menuGerantTerrain" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.app_name == 'distributions' %}active{% endif %}"
+                                        href="{% url 'distributions:liste_distributions' %}"
+                                    >
+                                        Distributions
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_distributeur' %}active{% endif %}"
+                                        href="{% url 'liste_distributeur' %}"
+                                    >
+                                        Distributeurs
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-0 shadow-sm mb-2 rounded-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button
+                                class="accordion-button py-2 fw-bold"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuGerantCaisse"
+                                aria-expanded="true"
+                                aria-controls="menuGerantCaisse"
+                            >
+                                Caisse et clôture
+                            </button>
+                        </h2>
+                        <div id="menuGerantCaisse" class="accordion-collapse collapse show">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_situations' %}active{% endif %}"
+                                        href="{% url 'situations:liste_situations' %}"
+                                    >
+                                        Versements clôturés
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'liste_manquants' or request.resolver_match.url_name == 'regler_manquant' %}active{% endif %}"
+                                        href="{% url 'situations:liste_manquants' %}"
+                                    >
+                                        <span>Manquants</span>
+                                        <span class="badge rounded-pill {% if request.resolver_match.url_name == 'liste_manquants' or request.resolver_match.url_name == 'regler_manquant' %}text-bg-light text-primary{% else %}text-bg-danger{% endif %}">
+                                            Suivi
+                                        </span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+        </nav>
+
+        <div class="d-grid mt-3 pt-3 border-top">
+            <a
+                class="btn btn-outline-danger fw-semibold"
+                href="{% url 'logout' %}"
+            >
+                Déconnexion
+            </a>
+        </div>
 
     </div>
 
-</div>
+</aside>

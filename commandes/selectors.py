@@ -12,6 +12,7 @@ Fonctions de consultation des commandes.
 
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
+from datetime import date
 
 from comptes.permissions import (
     est_directeur,
@@ -20,6 +21,49 @@ from comptes.permissions import (
 )
 
 from .models import Commande
+
+
+def date_iso_ou_none(valeur):
+    """
+    Convertit une valeur ISO issue des filtres GET.
+    """
+
+    if not valeur:
+
+        return None
+
+    if hasattr(
+        valeur,
+        "year"
+    ):
+
+        return valeur
+
+    try:
+
+        return date.fromisoformat(
+            str(valeur)
+        )
+
+    except ValueError:
+
+        return None
+
+
+def texte_recherche(valeur):
+    """
+    Nettoie une valeur texte issue des filtres GET.
+    """
+
+    valeur = str(
+        valeur or ""
+    ).strip()
+
+    if valeur.lower() == "none":
+
+        return ""
+
+    return valeur
 
 
 # ==========================================================
@@ -97,6 +141,8 @@ def rechercher_commandes(
     categorie_commande=None,
     numero=None,
     date_commande=None,
+    date_debut=None,
+    date_fin=None,
     etat=None
 ):
     """
@@ -105,6 +151,22 @@ def rechercher_commandes(
 
     queryset = commandes_visibles(
         utilisateur
+    )
+
+    numero = texte_recherche(
+        numero
+    )
+
+    date_commande = date_iso_ou_none(
+        date_commande
+    )
+
+    date_debut = date_iso_ou_none(
+        date_debut
+    )
+
+    date_fin = date_iso_ou_none(
+        date_fin
     )
 
     if categorie_commande:
@@ -124,6 +186,20 @@ def rechercher_commandes(
         queryset = queryset.filter(
             date_commande=date_commande
         )
+
+    else:
+
+        if date_debut:
+
+            queryset = queryset.filter(
+                date_commande__gte=date_debut
+            )
+
+        if date_fin:
+
+            queryset = queryset.filter(
+                date_commande__lte=date_fin
+            )
     
     if etat:
 
@@ -147,7 +223,9 @@ def rechercher_commandes(
 def rechercher_commandes_normales(
     utilisateur,
     numero=None,
-    date_commande=None
+    date_commande=None,
+    date_debut=None,
+    date_fin=None
 ):
     """
     Recherche uniquement les commandes normales.
@@ -157,6 +235,22 @@ def rechercher_commandes_normales(
         utilisateur
     ).filter(
         categorie_commande=Commande.CATEGORIE_NORMALE
+    )
+
+    numero = texte_recherche(
+        numero
+    )
+
+    date_commande = date_iso_ou_none(
+        date_commande
+    )
+
+    date_debut = date_iso_ou_none(
+        date_debut
+    )
+
+    date_fin = date_iso_ou_none(
+        date_fin
     )
 
     if numero:
@@ -170,6 +264,20 @@ def rechercher_commandes_normales(
         queryset = queryset.filter(
             date_commande=date_commande
         )
+
+    else:
+
+        if date_debut:
+
+            queryset = queryset.filter(
+                date_commande__gte=date_debut
+            )
+
+        if date_fin:
+
+            queryset = queryset.filter(
+                date_commande__lte=date_fin
+            )
 
     return queryset.order_by(
 

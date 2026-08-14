@@ -47,14 +47,22 @@ def verifier_objectif_unique(
     point_vente,
     mois,
     annee,
+    produits,
     objectif=None
 ):
     """
     Vérifie qu'il n'existe pas déjà
-    un objectif pour la même compagnie,
-    le même point de vente
-    et la même période.
+    un objectif de même portée.
     """
+
+    produit_ids = {
+        produit.pk
+        for produit in produits
+    }
+
+    objectif_compagnie = len(
+        produit_ids
+    ) > 1
 
     queryset = Objectif.objects.filter(
         compagnie=compagnie,
@@ -62,6 +70,8 @@ def verifier_objectif_unique(
         mois=mois,
         annee=annee,
         actif=True
+    ).prefetch_related(
+        "lignes"
     )
 
     # Cas modification
@@ -71,11 +81,36 @@ def verifier_objectif_unique(
             pk=objectif.pk
         )
 
-    if queryset.exists():
+    for objectif_existant in queryset:
 
-        raise ValidationError(
-            "Un objectif existe déjà pour cette compagnie, cette période et ce point de vente."
+        produits_existants = set(
+            objectif_existant.lignes.values_list(
+                "produit_id",
+                flat=True
+            )
         )
+
+        objectif_existant_compagnie = len(
+            produits_existants
+        ) > 1
+
+        if objectif_compagnie and objectif_existant_compagnie:
+
+            raise ValidationError(
+                "Un objectif compagnie existe déjà pour cette compagnie, cette période et ce point de vente."
+            )
+
+        if (
+            not objectif_compagnie
+            and
+            not objectif_existant_compagnie
+            and
+            produits_existants == produit_ids
+        ):
+
+            raise ValidationError(
+                "Un objectif existe déjà pour ce produit, cette période et ce point de vente."
+            )
 
 
 def verifier_montant(montant):

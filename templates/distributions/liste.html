@@ -730,7 +730,7 @@ Liste des distributions
 
                     <a
                         class="page-link"
-                        href="?page={{ distributions.previous_page_number }}"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ distributions.previous_page_number }}"
                     >
 
                         Précédent
@@ -757,7 +757,7 @@ Liste des distributions
 
                     <a
                         class="page-link"
-                        href="?page={{ distributions.next_page_number }}"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ distributions.next_page_number }}"
                     >
 
                         Suivant
@@ -1182,7 +1182,7 @@ Liste des distributions
 
                     <li class="page-item">
 
-                        <a class="page-link" href="?page_sous={{ distributions_sous.previous_page_number }}">
+                        <a class="page-link" href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page_sous={{ distributions_sous.previous_page_number }}">
 
                             Précédent
 
@@ -1206,7 +1206,7 @@ Liste des distributions
 
                     <li class="page-item">
 
-                        <a class="page-link" href="?page_sous={{ distributions_sous.next_page_number }}">
+                        <a class="page-link" href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page_sous={{ distributions_sous.next_page_number }}">
 
                             Suivant
 
@@ -1696,7 +1696,7 @@ Liste des distributions
 
                         <a
                             class="page-link"
-                            href="?page_client={{ distributions_clients.previous_page_number }}">
+                            href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page_client={{ distributions_clients.previous_page_number }}">
 
                             Précédent
 
@@ -1722,7 +1722,7 @@ Liste des distributions
 
                         <a
                             class="page-link"
-                            href="?page_client={{ distributions_clients.next_page_number }}">
+                            href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page_client={{ distributions_clients.next_page_number }}">
 
                             Suivant
 

@@ -53,4 +53,15 @@ urlpatterns = [
         include("situations.urls"),
     ),
 
+    path(
+        "mouvements-stock/",
+        include(
+            (
+                "mouvements_stock.urls",
+                "mouvements_stock",
+            ),
+            namespace="mouvements_stock",
+        ),
+    ),
+
 ]

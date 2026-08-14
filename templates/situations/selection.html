@@ -120,6 +120,18 @@
                     value="{{ situation.idsituation }}"
                 >
 
+                <input
+                    type="hidden"
+                    name="distributeur"
+                    value="{{ form.distributeur.value|default:'' }}"
+                >
+
+                <input
+                    type="hidden"
+                    name="date_situation"
+                    value="{{ form.date_situation.value|default:'' }}"
+                >
+
                 <!-- ======================================
                      INFORMATIONS GENERALES
                 ======================================= -->

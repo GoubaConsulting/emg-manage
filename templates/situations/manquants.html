@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Suivi des manquants
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <h3>
+        Suivi des manquants
+    </h3>
+
+    <a
+        href="{% url 'situations:liste_situations' %}"
+        class="btn btn-secondary"
+    >
+        Situations clôturées
+    </a>
+
+</div>
+
+<div class="card shadow mb-4">
+
+    <div class="card-header">
+        Recherche
+    </div>
+
+    <div class="card-body">
+
+        <form method="get">
+
+            <div class="row g-3">
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        Numéro
+                    </label>
+                    <input
+                        type="text"
+                        name="numero"
+                        value="{{ numero }}"
+                        class="form-control"
+                    >
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        Du
+                    </label>
+                    <input
+                        type="date"
+                        name="date_debut"
+                        value="{{ date_debut }}"
+                        class="form-control"
+                    >
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        Au
+                    </label>
+                    <input
+                        type="date"
+                        name="date_fin"
+                        value="{{ date_fin }}"
+                        class="form-control"
+                    >
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        Statut
+                    </label>
+                    <select
+                        name="statut"
+                        class="form-select"
+                    >
+                        <option value="">
+                            Tous
+                        </option>
+                        {% for valeur, libelle in statuts %}
+                            <option
+                                value="{{ valeur }}"
+                                {% if statut == valeur %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ libelle }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Gérant / Distributeur
+                    </label>
+                    <select
+                        name="distributeur"
+                        class="form-select"
+                    >
+                        <option value="">
+                            Tous
+                        </option>
+                        {% for distributeur in distributeurs %}
+                            <option
+                                value="{{ distributeur.pk }}"
+                                {% if distributeur_selectionne == distributeur.pk|stringformat:"s" %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ distributeur.nom }} {{ distributeur.prenom }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-1 align-self-end">
+                    <button
+                        type="submit"
+                        class="btn btn-success w-100"
+                    >
+                        OK
+                    </button>
+                </div>
+
+            </div>
+
+            <div class="mt-3">
+                <a
+                    href="{% url 'situations:liste_manquants' %}"
+                    class="btn btn-secondary"
+                >
+                    Réinitialiser
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<div class="row mb-4">
+
+    <div class="col-md-6">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white">
+                Total manquants
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_manquant|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card border-warning shadow-sm">
+            <div class="card-header bg-warning">
+                Reste à payer
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_reste|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="card shadow">
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover align-middle">
+
+                <thead class="table-dark">
+                    <tr>
+                        <th width="50"></th>
+                        <th>Numéro</th>
+                        <th>Date situation</th>
+                        <th>Gérant / Distributeur</th>
+                        <th class="text-end">Montant</th>
+                        <th class="text-end">Reste à payer</th>
+                        <th>Statut</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for manquant in manquants %}
+
+                    <tr>
+                        <td class="text-center">
+                            <button
+                                class="btn btn-sm btn-outline-secondary"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#manquant{{ manquant.idmanquant }}"
+                            >
+                                ▼
+                            </button>
+                        </td>
+                        <td>{{ manquant.numero }}</td>
+                        <td>{{ manquant.situation.date_situation|date:"d/m/Y" }}</td>
+                        <td>
+                            {{ manquant.distributeur.nom }}
+                            {{ manquant.distributeur.prenom }}
+                        </td>
+                        <td class="text-end">{{ manquant.montant|floatformat:2 }}</td>
+                        <td class="text-end">{{ manquant.reste_a_payer|floatformat:2 }}</td>
+                        <td>{{ manquant.get_statut_display }}</td>
+                        <td class="text-center">
+                            {% if manquant.statut == "EN_COURS" %}
+                                <a
+                                    href="{% url 'situations:regler_manquant' manquant.pk %}"
+                                    class="btn btn-success btn-sm"
+                                >
+                                    Régler
+                                </a>
+                            {% else %}
+                                <span class="text-muted">
+                                    Soldé
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr class="collapse" id="manquant{{ manquant.idmanquant }}">
+                        <td colspan="8">
+
+                            <div class="p-3 bg-light">
+
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <strong>Situation :</strong>
+                                        {{ manquant.situation.numero }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Total réglé :</strong>
+                                        {{ manquant.total_regle|floatformat:2 }} FCFA
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Créé le :</strong>
+                                        {{ manquant.date_creation|date:"d/m/Y H:i" }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Utilisateur :</strong>
+                                        {{ manquant.utilisateur.get_full_name|default:manquant.utilisateur.username }}
+                                    </div>
+                                </div>
+
+                                <h6>
+                                    Règlements
+                                </h6>
+
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-secondary">
+                                        <tr>
+                                            <th>Numéro</th>
+                                            <th>Date</th>
+                                            <th class="text-end">Montant</th>
+                                            <th>Utilisateur</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for reglement in manquant.reglements_liste %}
+                                        <tr>
+                                            <td>{{ reglement.numero }}</td>
+                                            <td>{{ reglement.date_reglement|date:"d/m/Y" }}</td>
+                                            <td class="text-end">{{ reglement.montant|floatformat:2 }}</td>
+                                            <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="text-center">
+                                                Aucun règlement enregistré.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+
+                            </div>
+
+                        </td>
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            Aucun manquant trouvé.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% if manquants.has_other_pages %}
+
+        <nav>
+            <ul class="pagination justify-content-center">
+
+                {% if manquants.has_previous %}
+                <li class="page-item">
+                    <a
+                        class="page-link"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ manquants.previous_page_number }}"
+                    >
+                        Précédent
+                    </a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        {{ manquants.number }}
+                    </span>
+                </li>
+
+                {% if manquants.has_next %}
+                <li class="page-item">
+                    <a
+                        class="page-link"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ manquants.next_page_number }}"
+                    >
+                        Suivant
+                    </a>
+                </li>
+                {% endif %}
+
+            </ul>
+        </nav>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

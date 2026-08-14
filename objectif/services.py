@@ -188,7 +188,9 @@ def creer_objectif(utilisateur, donnees):
 
         mois,
 
-        annee
+        annee,
+
+        produits
 
     )
 
@@ -283,6 +285,8 @@ def modifier_objectif(
         mois,
 
         annee,
+
+        produits,
 
         objectif
 
@@ -393,3 +397,39 @@ def recalculer_objectif(objectif):
             "taux_realise"
         ]
     )
+
+
+def recalculer_objectifs(objectifs):
+    """
+    Recalcule une liste d'objectifs.
+    """
+
+    total = 0
+
+    for objectif in objectifs:
+
+        recalculer_objectif(
+            objectif
+        )
+
+        total += 1
+
+    return total
+
+
+def existe_commandes_periode(mois, annee, point_ventes):
+    """
+    Verifie s'il existe des commandes sur une periode.
+    """
+
+    Commande = apps.get_model(
+        "commandes",
+        "Commande"
+    )
+
+    return Commande.objects.filter(
+        actif=True,
+        point_vente__in=point_ventes,
+        date_commande__month=mois,
+        date_commande__year=annee
+    ).exists()

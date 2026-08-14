@@ -11,11 +11,22 @@ nécessaires aux situations journalières.
 ==========================================================
 """
 
+from django.conf import settings
+from django.core.paginator import Paginator
 from django.db.models import Sum
 
 from distributions.models import Distribution
+from referentiel.models import Distributeur
+from comptes.utils import (
+    est_administrateur,
+    est_directeur,
+    est_gerant,
+)
 
-from .models import SituationJournaliere
+from .models import (
+    SituationJournaliere,
+    Manquant,
+)
 
 
 # ==========================================================
@@ -144,4 +155,174 @@ def situation_cloturee(
         )
 
         .first()
+    )
+
+
+# ==========================================================
+# QUERYSETS PRINCIPAUX
+# ==========================================================
+
+def situations_queryset():
+    """
+    Retourne les situations actives optimisées.
+    """
+
+    return (
+        SituationJournaliere.objects
+        .filter(
+            actif=True
+        )
+        .select_related(
+            "distributeur",
+            "point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie",
+            "manquant",
+        )
+    )
+
+
+def manquants_queryset():
+    """
+    Retourne les manquants optimisés.
+    """
+
+    return (
+        Manquant.objects
+        .select_related(
+            "situation",
+            "distributeur",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "reglements",
+        )
+    )
+
+
+def gerants_distribues_par_directeur(utilisateur):
+    """
+    Retourne les gérants auxquels le Directeur
+    a déjà fait une distribution.
+    """
+
+    return (
+        Distribution.objects
+        .filter(
+            utilisateur=utilisateur,
+            distributeur__categorie=(
+                Distributeur.CATEGORIE_GERANT
+            ),
+            actif=True,
+        )
+        .values_list(
+            "distributeur_id",
+            flat=True
+        )
+        .distinct()
+    )
+
+
+# ==========================================================
+# VISIBILITE
+# ==========================================================
+
+def situations_visibles(utilisateur):
+    """
+    Retourne les situations visibles par profil.
+    """
+
+    queryset = situations_queryset()
+
+    if est_administrateur(utilisateur):
+
+        return queryset
+
+    if est_directeur(utilisateur):
+
+        return queryset.filter(
+            distributeur_id__in=(
+                gerants_distribues_par_directeur(
+                    utilisateur
+                )
+            ),
+            distributeur__categorie=(
+                Distributeur.CATEGORIE_GERANT
+            ),
+        )
+
+    if est_gerant(utilisateur):
+
+        return queryset.filter(
+            distributeur__categorie=(
+                Distributeur.CATEGORIE_DISTRIBUTEUR
+            ),
+            distributeur__point_vente=(
+                utilisateur.profil.point_vente
+            ),
+        )
+
+    return queryset.none()
+
+
+def manquants_visibles(utilisateur):
+    """
+    Retourne les manquants visibles par profil.
+    """
+
+    queryset = manquants_queryset()
+
+    if est_administrateur(utilisateur):
+
+        return queryset
+
+    if est_directeur(utilisateur):
+
+        return queryset.filter(
+            distributeur_id__in=(
+                gerants_distribues_par_directeur(
+                    utilisateur
+                )
+            ),
+            distributeur__categorie=(
+                Distributeur.CATEGORIE_GERANT
+            ),
+        )
+
+    if est_gerant(utilisateur):
+
+        return queryset.filter(
+            distributeur__categorie=(
+                Distributeur.CATEGORIE_DISTRIBUTEUR
+            ),
+            distributeur__point_vente=(
+                utilisateur.profil.point_vente
+            ),
+        )
+
+    return queryset.none()
+
+
+# ==========================================================
+# PAGINATION
+# ==========================================================
+
+def paginer(queryset, page):
+    """
+    Pagine un queryset.
+    """
+
+    taille = getattr(
+        settings,
+        "NB_LIGNES_PAR_PAGE",
+        20
+    )
+
+    return Paginator(
+        queryset,
+        taille
+    ).get_page(
+        page
     )
