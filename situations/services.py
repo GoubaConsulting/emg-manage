@@ -12,10 +12,14 @@ Services métier du module Situations.
 
 from decimal import Decimal
 
+from types import SimpleNamespace
+
 from django.db import transaction
 from django.db.models import Sum
 
 from distributions.models import Distribution
+
+from referentiel.models import Distributeur
 
 from .models import (
     SituationJournaliere,
@@ -42,6 +46,33 @@ from .numerotation import (
 # RECUPERATION DES DISTRIBUTIONS DE LA JOURNEE
 # ==========================================================
 
+def types_distribution_pour_distributeur(distributeur):
+    """
+    Retourne les types de distribution attendus
+    selon la categorie du destinataire.
+    """
+
+    if distributeur.categorie == Distributeur.CATEGORIE_GERANT:
+
+        return [
+            Distribution.TYPE_COMMANDE_GERANT,
+        ]
+
+    if distributeur.categorie == Distributeur.CATEGORIE_DISTRIBUTEUR:
+
+        return [
+            Distribution.TYPE_DISTRIBUTEUR,
+        ]
+
+    if distributeur.categorie == Distributeur.CATEGORIE_CLIENT:
+
+        return [
+            Distribution.TYPE_CLIENT_DIRECT,
+        ]
+
+    return []
+
+
 def recuperer_distributions_journee(
     distributeur,
     date_situation
@@ -54,7 +85,11 @@ def recuperer_distributions_journee(
     en compte.
     """
 
-    return (
+    types_distribution = types_distribution_pour_distributeur(
+        distributeur
+    )
+
+    distributions = (
         Distribution.objects
 
         .filter(
@@ -73,10 +108,111 @@ def recuperer_distributions_journee(
         )
     )
 
+    if types_distribution:
+
+        distributions = distributions.filter(
+            type_distribution__in=types_distribution
+        )
+
+    return distributions
+
 
 # ==========================================================
 # CALCUL DU MONTANT TOTAL DISTRIBUE
 # ==========================================================
+
+def derniere_situation_cloturee_avant(
+    distributeur,
+    date_situation
+):
+    """
+    Retourne la derniere situation cloturee avant
+    la date traitee.
+    """
+
+    return (
+        SituationJournaliere.objects
+        .filter(
+            distributeur=distributeur,
+            date_situation__lt=date_situation,
+            etat=SituationJournaliere.ETAT_CLOTUREE,
+            actif=True,
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie",
+        )
+        .order_by(
+            "-date_situation",
+            "-idsituation",
+        )
+        .first()
+    )
+
+
+def calculer_valeur_nette_quantite(
+    quantite,
+    prix_unitaire,
+    taux_remise=0
+):
+    """
+    Valorise une quantite au prix net de remise.
+    """
+
+    montant_brut = (
+        Decimal(str(quantite))
+        *
+        Decimal(str(prix_unitaire))
+    )
+
+    remise = (
+        montant_brut
+        *
+        Decimal(str(taux_remise or 0))
+        /
+        Decimal("100")
+    )
+
+    return (
+        montant_brut
+        -
+        remise
+    )
+
+
+def calculer_valeur_reliquat_precedent(
+    distributeur,
+    date_situation
+):
+    """
+    Calcule la valeur des quantites restantes de
+    la derniere situation cloturee.
+    """
+
+    situation = derniere_situation_cloturee_avant(
+        distributeur,
+        date_situation
+    )
+
+    if situation is None:
+
+        return Decimal("0.00")
+
+    total = Decimal("0.00")
+
+    for ligne in situation.lignes.all():
+
+        if ligne.quantite_restante <= 0:
+
+            continue
+
+        total += calculer_valeur_nette_quantite(
+            ligne.quantite_restante,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+    return total
+
 
 def calculer_total_distribue(
     distributeur,
@@ -87,7 +223,11 @@ def calculer_total_distribue(
     distributions du distributeur pour la journée.
     """
 
-    total = (
+    types_distribution = types_distribution_pour_distributeur(
+        distributeur
+    )
+
+    distributions = (
 
         Distribution.objects
 
@@ -96,12 +236,27 @@ def calculer_total_distribue(
             date_distribution=date_situation,
             actif=True,
         )
+    )
+
+    if types_distribution:
+
+        distributions = distributions.filter(
+            type_distribution__in=types_distribution
+        )
+
+    total = (
+        distributions
 
         .aggregate(
             total=Sum("montant_net")
         )["total"]
 
         or Decimal("0.00")
+    )
+
+    total += calculer_valeur_reliquat_precedent(
+        distributeur,
+        date_situation
     )
 
     return total
@@ -140,6 +295,171 @@ def calculer_credit_distributeur(
 # CREATION DES LIGNES DE SITUATION
 # ==========================================================
 
+def construire_donnees_lignes_situation(
+    distributeur,
+    date_situation,
+    distributions=None
+):
+    """
+    Construit les lignes metier d'une situation.
+
+    La quantite distribuee du jour inclut une seule fois
+    le reliquat de la derniere situation cloturee.
+    """
+
+    if distributions is None:
+
+        distributions = recuperer_distributions_journee(
+            distributeur,
+            date_situation
+        )
+
+    produits = {}
+
+    situation_precedente = derniere_situation_cloturee_avant(
+        distributeur,
+        date_situation
+    )
+
+    if situation_precedente is not None:
+
+        for ligne in situation_precedente.lignes.select_related(
+            "produit",
+            "produit__compagnie",
+        ):
+
+            if ligne.quantite_restante <= 0:
+
+                continue
+
+            produit_id = ligne.produit.idproduit
+
+            produits[produit_id] = {
+                "produit": ligne.produit,
+                "prix_unitaire": ligne.prix_unitaire,
+                "taux_remise": ligne.taux_remise,
+                "taux_distribution": Decimal("0.00"),
+                "quantite_initiale": ligne.quantite_restante,
+                "quantite_jour": Decimal("0.00"),
+                "quantite_distribuee": ligne.quantite_restante,
+            }
+
+    for distribution in distributions:
+
+        for ligne in distribution.lignes.select_related(
+            "produit",
+            "produit__compagnie",
+        ):
+
+            produit_id = ligne.produit.idproduit
+
+            if produit_id not in produits:
+
+                produits[produit_id] = {
+                    "produit": ligne.produit,
+                    "prix_unitaire": ligne.prix_unitaire,
+                    "taux_remise": ligne.taux_remise,
+                    "taux_distribution": ligne.taux_remise,
+                    "quantite_initiale": Decimal("0.00"),
+                    "quantite_jour": Decimal("0.00"),
+                    "quantite_distribuee": Decimal("0.00"),
+                }
+
+            produits[produit_id]["quantite_jour"] += ligne.quantite
+
+            produits[produit_id]["quantite_distribuee"] += ligne.quantite
+
+            if produits[produit_id]["taux_distribution"] == Decimal("0.00"):
+
+                produits[produit_id]["taux_distribution"] = (
+                    ligne.taux_remise
+                )
+
+    return list(
+        produits.values()
+    )
+
+
+def construire_lignes_affichage_situation(
+    distributeur,
+    date_situation,
+    distributions=None
+):
+    """
+    Construit des lignes temporaires affichables dans
+    le formulaire de situation avant creation en base.
+    """
+
+    lignes = []
+
+    for donnees in construire_donnees_lignes_situation(
+        distributeur,
+        date_situation,
+        distributions
+    ):
+
+        lignes.append(
+            SimpleNamespace(
+                idlignesituation=None,
+                produit=donnees["produit"],
+                prix_unitaire=donnees["prix_unitaire"],
+                quantite_initiale=donnees["quantite_initiale"],
+                quantite_jour=donnees["quantite_jour"],
+                quantite_distribuee=donnees["quantite_distribuee"],
+                quantite_vendue=Decimal("0.00"),
+                quantite_restante=donnees["quantite_distribuee"],
+                taux_distribution=donnees["taux_distribution"],
+            )
+        )
+
+    return lignes
+
+
+def annoter_lignes_reliquat(
+    lignes,
+    distributeur,
+    date_situation,
+    distributions=None
+):
+    """
+    Ajoute les informations de reliquat aux lignes
+    existantes pour l'affichage.
+    """
+
+    donnees_par_produit = {
+        donnees["produit"].idproduit: donnees
+        for donnees in construire_donnees_lignes_situation(
+            distributeur,
+            date_situation,
+            distributions
+        )
+    }
+
+    for ligne in lignes:
+
+        donnees = donnees_par_produit.get(
+            ligne.produit.idproduit,
+            {}
+        )
+
+        ligne.quantite_initiale = donnees.get(
+            "quantite_initiale",
+            Decimal("0.00")
+        )
+
+        ligne.quantite_jour = donnees.get(
+            "quantite_jour",
+            Decimal("0.00")
+        )
+
+        ligne.taux_distribution = donnees.get(
+            "taux_distribution",
+            Decimal("0.00")
+        )
+
+    return lignes
+
+
 def creer_lignes_situation(
     situation,
     distributions
@@ -159,48 +479,11 @@ def creer_lignes_situation(
     Une seule ligne est créée pour chaque produit.
     """
 
-    produits = {}
-
-    for distribution in distributions:
-
-        for ligne in distribution.lignes.select_related(
-            "produit",
-            "produit__compagnie",
-        ):
-
-            produit_id = ligne.produit.idproduit
-
-            # ------------------------------------------
-            # PREMIERE APPARITION DU PRODUIT
-            # ------------------------------------------
-
-            if produit_id not in produits:
-
-                produits[produit_id] = {
-
-                    "produit": ligne.produit,
-
-                    "prix_unitaire": (
-                        ligne.prix_unitaire
-                    ),
-
-                    "taux_remise": (
-                        ligne.taux_remise
-                    ),
-
-                    "quantite_distribuee": (
-                        Decimal("0.00")
-                    ),
-
-                }
-
-            # ------------------------------------------
-            # CUMUL DES QUANTITES
-            # ------------------------------------------
-
-            produits[produit_id][
-                "quantite_distribuee"
-            ] += ligne.quantite
+    donnees_lignes = construire_donnees_lignes_situation(
+        situation.distributeur,
+        situation.date_situation,
+        distributions
+    )
 
     # ======================================================
     # CREATION DES LIGNES
@@ -208,7 +491,7 @@ def creer_lignes_situation(
 
     lignes = []
 
-    for donnees in produits.values():
+    for donnees in donnees_lignes:
 
         lignes.append(
 
@@ -249,6 +532,125 @@ def creer_lignes_situation(
     )
 
     return lignes
+
+
+# ==========================================================
+# SITUATION AUTOMATIQUE D'UNE VENTE DIRECTE
+# ==========================================================
+
+@transaction.atomic
+def synchroniser_situation_vente_directe(
+    distribution,
+    utilisateur
+):
+    """
+    Cree ou met a jour la situation automatique liee
+    aux ventes directes d'un client pour une journee.
+    """
+
+    if distribution.type_distribution != Distribution.TYPE_CLIENT_DIRECT:
+
+        return None
+
+    if distribution.distributeur.categorie != Distributeur.CATEGORIE_CLIENT:
+
+        raise ValueError(
+            "Une vente directe doit etre rattachee "
+            "a un client direct."
+        )
+
+    distributions = (
+        Distribution.objects
+        .filter(
+            actif=True,
+            type_distribution=Distribution.TYPE_CLIENT_DIRECT,
+            distributeur=distribution.distributeur,
+            date_distribution=distribution.date_distribution,
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie",
+        )
+    )
+
+    montant_total = (
+        distributions.aggregate(
+            total=Sum("montant_net")
+        )["total"]
+        or Decimal("0.00")
+    )
+
+    situation, created = SituationJournaliere.objects.get_or_create(
+        distributeur=distribution.distributeur,
+        date_situation=distribution.date_distribution,
+        actif=True,
+        defaults={
+            "numero": generer_numero_situation(),
+            "point_vente": distribution.point_vente_source,
+            "utilisateur": utilisateur,
+        }
+    )
+
+    situation.point_vente = distribution.point_vente_source
+    situation.utilisateur = utilisateur
+    situation.fond = Decimal("0.00")
+    situation.montant_total_distribue = montant_total
+    situation.montant_credit = Decimal("0.00")
+    situation.montant_credit_verse = Decimal("0.00")
+    situation.montant_vente_verse = montant_total
+    situation.montant_total_verse = montant_total
+    situation.montant_manquant = Decimal("0.00")
+    situation.coupures = "Situation automatique - vente directe"
+    situation.etat = SituationJournaliere.ETAT_CLOTUREE
+    situation.actif = True
+    situation.save()
+
+    if not created:
+
+        situation.lignes.all().delete()
+
+    produits = {}
+
+    for distribution_directe in distributions:
+
+        for ligne in distribution_directe.lignes.select_related(
+            "produit",
+            "produit__compagnie",
+        ):
+
+            produit_id = ligne.produit.idproduit
+
+            if produit_id not in produits:
+
+                produits[produit_id] = {
+                    "produit": ligne.produit,
+                    "prix_unitaire": ligne.prix_unitaire,
+                    "taux_remise": ligne.taux_remise,
+                    "quantite": Decimal("0.00"),
+                }
+
+            produits[produit_id]["quantite"] += ligne.quantite
+
+    lignes = []
+
+    for donnees in produits.values():
+
+        lignes.append(
+            LigneSituationJournaliere(
+                situation=situation,
+                produit=donnees["produit"],
+                prix_unitaire=donnees["prix_unitaire"],
+                taux_remise=donnees["taux_remise"],
+                quantite_distribuee=donnees["quantite"],
+                quantite_vendue=donnees["quantite"],
+                quantite_restante=Decimal("0.00"),
+            )
+        )
+
+    LigneSituationJournaliere.objects.bulk_create(
+        lignes
+    )
+
+    return situation
 
 
 # ==========================================================
@@ -407,10 +809,10 @@ def calculer_valeur_produits_restants(
 
     for ligne in situation.lignes.all():
 
-        total += (
-            ligne.quantite_restante
-            *
-            ligne.prix_unitaire
+        total += calculer_valeur_nette_quantite(
+            ligne.quantite_restante,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
         )
 
     return total
@@ -452,11 +854,11 @@ def calculer_manquant_situation(
     """
     Calcule le montant manquant d'une situation.
 
-    Le fond doit être reconstitué par :
+    Le montant net distribue doit etre justifie par :
 
-        montant des ventes versé
+        montant net verse
         +
-        valeur des produits restants.
+        valeur nette des produits restants.
     """
 
     montant_produits_restants = (
@@ -469,7 +871,7 @@ def calculer_manquant_situation(
 
     return calculer_manquant(
 
-        situation.fond,
+        situation.montant_total_distribue,
 
         situation.montant_vente_verse,
 
@@ -534,11 +936,11 @@ def cloturer_situation(
     Clôture une situation journalière.
 
     Le montant vendu saisi pour chaque produit
-    correspond directement au montant NET vendu.
+    correspond au montant brut vendu.
 
     La quantité vendue est calculée automatiquement :
 
-        montant vendu / prix unitaire
+        montant brut vendu / prix unitaire
 
     La quantité restante est calculée automatiquement :
 
@@ -615,7 +1017,7 @@ def cloturer_situation(
             )
 
         # --------------------------------------------------
-        # MONTANT NET VENDU SAISI
+        # MONTANT BRUT VENDU SAISI
         # --------------------------------------------------
 
         montant_vendu = Decimal(
@@ -753,7 +1155,7 @@ def cloturer_situation(
 
     montant_manquant = calculer_manquant(
 
-        situation.fond,
+        situation.montant_total_distribue,
 
         situation.montant_vente_verse,
 

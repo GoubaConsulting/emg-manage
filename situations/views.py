@@ -36,10 +36,15 @@ from .selectors import (
     situation_existante,
     situations_visibles,
     manquants_visibles,
+    reglements_manquants_visibles,
     paginer,
 )
 
 from .services import (
+    annoter_lignes_reliquat,
+    calculer_valeur_nette_quantite,
+    calculer_total_distribue,
+    construire_lignes_affichage_situation,
     creer_situation_journaliere,
     cloturer_situation,
     regler_manquant,
@@ -188,19 +193,14 @@ def _situation_affichage_temporaire(
     tableau lorsqu'aucune situation n'existe encore en base.
     """
 
-    montant_total_distribue = Decimal(
-        "0.00"
+    montant_total_distribue = calculer_total_distribue(
+        distributeur,
+        date_situation
     )
 
     point_vente = None
 
     for distribution in distributions:
-
-        montant_total_distribue += (
-            distribution.montant_net
-            or
-            Decimal("0.00")
-        )
 
         if point_vente is None:
 
@@ -373,15 +373,19 @@ def _preparer_details_situations(situations_page):
         for ligne in situation.lignes.all():
 
             ligne.montant_vendu = (
-                ligne.quantite_vendue
-                *
-                ligne.prix_unitaire
+                calculer_valeur_nette_quantite(
+                    ligne.quantite_vendue,
+                    ligne.prix_unitaire,
+                    ligne.taux_remise,
+                )
             )
 
             ligne.montant_restant = (
-                ligne.quantite_restante
-                *
-                ligne.prix_unitaire
+                calculer_valeur_nette_quantite(
+                    ligne.quantite_restante,
+                    ligne.prix_unitaire,
+                    ligne.taux_remise,
+                )
             )
 
             total_vendu += ligne.montant_vendu
@@ -438,6 +442,29 @@ def _preparer_details_manquants(manquants_page):
             (
                 reglement.montant
                 for reglement in reglements
+            ),
+            Decimal("0.00")
+        )
+
+
+def _preparer_details_reglements_manquants(reglements_page):
+    """
+    Prepare les informations completes du manquant
+    rattache a chaque reglement affiche.
+    """
+
+    for reglement in reglements_page:
+
+        reglements = list(
+            reglement.manquant.reglements.all()
+        )
+
+        reglement.manquant.reglements_liste = reglements
+
+        reglement.manquant.total_regle = sum(
+            (
+                item.montant
+                for item in reglements
             ),
             Decimal("0.00")
         )
@@ -558,6 +585,119 @@ def liste_situations(request):
             ),
             "total_manquant": (
                 totaux["total_manquant"]
+                or
+                Decimal("0.00")
+            ),
+        }
+    )
+
+
+# ==========================================================
+# LISTE DES REGLEMENTS DE MANQUANTS
+# ==========================================================
+
+@login_required
+def liste_reglements_manquants(request):
+    """
+    Liste detaillee des reglements effectues
+    sur les manquants.
+    """
+
+    numero = _filtre_texte(
+        request,
+        "numero"
+    )
+
+    numero_manquant = _filtre_texte(
+        request,
+        "numero_manquant"
+    )
+
+    date_debut, date_fin = _filtres_dates(
+        request
+    )
+
+    distributeur = request.GET.get(
+        "distributeur",
+        ""
+    )
+
+    reglements = reglements_manquants_visibles(
+        request.user
+    )
+
+    if numero:
+
+        reglements = reglements.filter(
+            numero__icontains=numero
+        )
+
+    if numero_manquant:
+
+        reglements = reglements.filter(
+            manquant__numero__icontains=numero_manquant
+        )
+
+    if date_debut:
+
+        reglements = reglements.filter(
+            date_reglement__gte=date_debut
+        )
+
+    if date_fin:
+
+        reglements = reglements.filter(
+            date_reglement__lte=date_fin
+        )
+
+    if distributeur:
+
+        reglements = reglements.filter(
+            manquant__distributeur_id=distributeur
+        )
+
+    reglements = reglements.order_by(
+        "-date_reglement",
+        "-idreglement"
+    )
+
+    totaux = reglements.aggregate(
+        total_regle=Sum(
+            "montant"
+        )
+    )
+
+    page = paginer(
+        reglements,
+        request.GET.get(
+            "page"
+        )
+    )
+
+    _preparer_details_reglements_manquants(
+        page
+    )
+
+    return render(
+        request,
+        "situations/reglements_manquants.html",
+        {
+            "reglements": page,
+            "numero": numero,
+            "numero_manquant": numero_manquant,
+            "date_debut": date_debut,
+            "date_fin": date_fin,
+            "distributeur_selectionne": distributeur,
+            "distributeurs": _distributeurs_filtre(
+                request.user
+            ),
+            "pagination_querystring": (
+                _querystring_pagination(
+                    request
+                )
+            ),
+            "total_regle": (
+                totaux["total_regle"]
                 or
                 Decimal("0.00")
             ),
@@ -1134,113 +1274,13 @@ def ajouter_situation(request):
                         # directement depuis les distributions.
                         # ----------------------------------
 
-                        produits = {}
-
-                        for distribution in distributions:
-
-                            for ligne_distribution in (
-                                distribution.lignes
-                                .select_related(
-                                    "produit",
-                                    "produit__compagnie",
-                                )
-                            ):
-
-                                produit_id = (
-                                    ligne_distribution
-                                    .produit
-                                    .idproduit
-                                )
-
-                                if produit_id not in produits:
-
-                                    produits[
-                                        produit_id
-                                    ] = {
-
-                                        "produit": (
-                                            ligne_distribution
-                                            .produit
-                                        ),
-
-                                        "prix_unitaire": (
-                                            ligne_distribution
-                                            .prix_unitaire
-                                        ),
-
-                                        "quantite_distribuee": (
-                                            Decimal("0.00")
-                                        ),
-
-                                        "taux_distribution": (
-                                            ligne_distribution
-                                            .taux_remise
-                                        ),
-
-                                    }
-
-                                produits[
-                                    produit_id
-                                ][
-                                    "quantite_distribuee"
-                                ] += (
-                                    ligne_distribution
-                                    .quantite
-                                )
-
-                        # ----------------------------------
-                        # CONSTRUCTION DES LIGNES
-                        # ----------------------------------
-
-                        lignes = []
-
-                        for donnees in produits.values():
-
-                            lignes.append(
-
-                                SimpleNamespace(
-
-                                    idlignesituation=(
-                                        None
-                                    ),
-
-                                    produit=(
-                                        donnees[
-                                            "produit"
-                                        ]
-                                    ),
-
-                                    prix_unitaire=(
-                                        donnees[
-                                            "prix_unitaire"
-                                        ]
-                                    ),
-
-                                    quantite_distribuee=(
-                                        donnees[
-                                            "quantite_distribuee"
-                                        ]
-                                    ),
-
-                                    quantite_vendue=(
-                                        Decimal("0.00")
-                                    ),
-
-                                    quantite_restante=(
-                                        donnees[
-                                            "quantite_distribuee"
-                                        ]
-                                    ),
-
-                                    taux_distribution=(
-                                        donnees[
-                                            "taux_distribution"
-                                        ]
-                                    ),
-
-                                )
-
+                        lignes = (
+                            construire_lignes_affichage_situation(
+                                distributeur,
+                                date_situation,
+                                distributions
                             )
+                        )
 
                         situation = (
                             _situation_affichage_temporaire(
@@ -1287,44 +1327,17 @@ def ajouter_situation(request):
     if lignes:
 
         # --------------------------------------------------
-        # SI UNE SITUATION EXISTE :
-        # récupérer le premier taux directement
-        # depuis les distributions.
+        # Ajout des informations de reliquat et de taux.
         # --------------------------------------------------
 
         if distributions:
 
-            for ligne in lignes:
-
-                ligne.taux_distribution = (
-                    Decimal("0.00")
-                )
-
-                taux_trouve = False
-
-                for distribution in distributions:
-
-                    for ligne_dist in (
-                        distribution.lignes.all()
-                    ):
-
-                        if (
-                            ligne_dist.produit_id
-                            ==
-                            ligne.produit.idproduit
-                        ):
-
-                            ligne.taux_distribution = (
-                                ligne_dist.taux_remise
-                            )
-
-                            taux_trouve = True
-
-                            break
-
-                    if taux_trouve:
-
-                        break
+            lignes = annoter_lignes_reliquat(
+                list(lignes),
+                situation.distributeur,
+                situation.date_situation,
+                distributions
+            )
 
         # --------------------------------------------------
         # TRI PAR COMPAGNIE PUIS PRODUIT

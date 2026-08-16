@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block title %}
-Distribution à un distributeur
+{{ titre|default:"Distribution" }}
 {% endblock %}
 
 {% block content %}
@@ -14,7 +14,7 @@ Distribution à un distributeur
 
         <h4 class="mb-0">
 
-            Nouvelle distribution à un distributeur
+            {{ titre|default:"Nouvelle distribution" }}
 
         </h4>
 
@@ -31,6 +31,16 @@ Distribution à un distributeur
                 <div class="alert alert-danger">
 
                     {{ form.non_field_errors }}
+
+                </div>
+
+            {% endif %}
+
+            {% if aucun_destinataire %}
+
+                <div class="alert alert-warning">
+
+                    Aucun distributeur actif n'est disponible pour ce point de vente.
 
                 </div>
 
@@ -54,7 +64,7 @@ Distribution à un distributeur
 
                     <label class="form-label">
 
-                        Distributeur
+                        {{ destinataire_label|default:"Distributeur" }}
 
                     </label>
 
@@ -80,10 +90,18 @@ Distribution à un distributeur
 
                 <th class="text-end">Prix unitaire</th>
 
+                <th class="text-end" width="140">
+                    Quantite initiale
+                </th>
+
                 <th width="180">Montant (FCFA)</th>
 
                 <th width="120">
                     Quantité
+                </th>
+
+                <th class="text-end" width="140">
+                    Total a suivre
                 </th>
 
                 <th width="120">
@@ -109,7 +127,7 @@ Distribution à un distributeur
 
 <tr class="table-secondary">
 
-    <td colspan="7">
+    <td colspan="10">
 
         <strong>
 
@@ -128,6 +146,7 @@ Distribution à un distributeur
     data-prix="{{ produit.prix|floatformat:2 }}"
     data-compagnie="{{ produit.compagnie.idcompagnie }}"
     data-stock="{{ produit.stock_disponible }}"
+    data-produit="{{ produit.idproduit }}"
 >
     <td class="text-center">
 
@@ -152,6 +171,17 @@ Distribution à un distributeur
 
     </td>
 
+    <td class="text-end">
+
+        <span
+            class="quantite-initiale"
+            data-produit-id="{{ produit.idproduit }}"
+        >
+            0
+        </span>
+
+    </td>
+
     <td>
 
         <input
@@ -170,6 +200,17 @@ Distribution à un distributeur
         <input
             type="text"
             class="form-control quantite"
+            readonly
+            value="0"
+        >
+
+    </td>
+
+    <td>
+
+        <input
+            type="text"
+            class="form-control quantite-totale"
             readonly
             value="0"
         >
@@ -219,7 +260,7 @@ Distribution à un distributeur
 {% endfor %}
 <tr class="table-warning">
 
-    <td colspan="6" class="text-end">
+    <td colspan="9" class="text-end">
 
         <strong>
 
@@ -342,7 +383,7 @@ Distribution à un distributeur
 
     >
 
-        Enregistrer
+        {{ bouton_enregistrer|default:"Enregistrer" }}
 
     </button>
 
@@ -358,6 +399,10 @@ Distribution à un distributeur
 
 {% block scripts %}
 
-<script src="{% static 'js/distributions_gerant.js' %}"></script>
+<script>
+window.reliquatsParDistributeur = {{ reliquats_json|default:"{}"|safe }};
+</script>
+
+<script src="{% static 'js/distributions_gerant.js' %}?v=reliquat-auto-20260816"></script>
 
 {% endblock %}

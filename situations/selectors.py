@@ -26,6 +26,11 @@ from comptes.utils import (
 from .models import (
     SituationJournaliere,
     Manquant,
+    ReglementManquant,
+)
+
+from .services import (
+    types_distribution_pour_distributeur,
 )
 
 
@@ -42,7 +47,11 @@ def distributions_du_jour(
     d'un distributeur pour une date donnée.
     """
 
-    return (
+    types_distribution = types_distribution_pour_distributeur(
+        distributeur
+    )
+
+    distributions = (
         Distribution.objects
 
         .filter(
@@ -68,6 +77,14 @@ def distributions_du_jour(
         )
     )
 
+    if types_distribution:
+
+        distributions = distributions.filter(
+            type_distribution__in=types_distribution
+        )
+
+    return distributions
+
 
 # ==========================================================
 # TOTAL DES DISTRIBUTIONS
@@ -82,7 +99,11 @@ def total_distributions_du_jour(
     du distributeur pour la date sélectionnée.
     """
 
-    resultat = (
+    types_distribution = types_distribution_pour_distributeur(
+        distributeur
+    )
+
+    distributions = (
 
         Distribution.objects
 
@@ -91,6 +112,16 @@ def total_distributions_du_jour(
             date_distribution=date_situation,
             actif=True,
         )
+    )
+
+    if types_distribution:
+
+        distributions = distributions.filter(
+            type_distribution__in=types_distribution
+        )
+
+    resultat = (
+        distributions
 
         .aggregate(
             total=Sum("montant_net")
@@ -202,6 +233,26 @@ def manquants_queryset():
     )
 
 
+def reglements_manquants_queryset():
+    """
+    Retourne les reglements de manquants optimises.
+    """
+
+    return (
+        ReglementManquant.objects
+        .select_related(
+            "manquant",
+            "manquant__situation",
+            "manquant__distributeur",
+            "manquant__distributeur__point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "manquant__reglements",
+        )
+    )
+
+
 def gerants_distribues_par_directeur(utilisateur):
     """
     Retourne les gérants auxquels le Directeur
@@ -256,9 +307,10 @@ def situations_visibles(utilisateur):
     if est_gerant(utilisateur):
 
         return queryset.filter(
-            distributeur__categorie=(
-                Distributeur.CATEGORIE_DISTRIBUTEUR
-            ),
+            distributeur__categorie__in=[
+                Distributeur.CATEGORIE_DISTRIBUTEUR,
+                Distributeur.CATEGORIE_CLIENT,
+            ],
             distributeur__point_vente=(
                 utilisateur.profil.point_vente
             ),
@@ -294,10 +346,51 @@ def manquants_visibles(utilisateur):
     if est_gerant(utilisateur):
 
         return queryset.filter(
-            distributeur__categorie=(
-                Distributeur.CATEGORIE_DISTRIBUTEUR
-            ),
+            distributeur__categorie__in=[
+                Distributeur.CATEGORIE_DISTRIBUTEUR,
+                Distributeur.CATEGORIE_CLIENT,
+            ],
             distributeur__point_vente=(
+                utilisateur.profil.point_vente
+            ),
+        )
+
+    return queryset.none()
+
+
+def reglements_manquants_visibles(utilisateur):
+    """
+    Retourne les reglements de manquants visibles
+    selon le meme perimetre que les manquants.
+    """
+
+    queryset = reglements_manquants_queryset()
+
+    if est_administrateur(utilisateur):
+
+        return queryset
+
+    if est_directeur(utilisateur):
+
+        return queryset.filter(
+            manquant__distributeur_id__in=(
+                gerants_distribues_par_directeur(
+                    utilisateur
+                )
+            ),
+            manquant__distributeur__categorie=(
+                Distributeur.CATEGORIE_GERANT
+            ),
+        )
+
+    if est_gerant(utilisateur):
+
+        return queryset.filter(
+            manquant__distributeur__categorie__in=[
+                Distributeur.CATEGORIE_DISTRIBUTEUR,
+                Distributeur.CATEGORIE_CLIENT,
+            ],
+            manquant__distributeur__point_vente=(
                 utilisateur.profil.point_vente
             ),
         )

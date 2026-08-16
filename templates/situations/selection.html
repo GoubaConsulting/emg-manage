@@ -294,11 +294,19 @@
                                 </th>
 
                                 <th class="text-end">
-                                    Quantité distribuée
+                                    Quantité du jour
+                                </th>
+
+                                <th class="text-end">
+                                    Total à justifier
                                 </th>
 
                                 <th width="180">
-                                    Montant vendu
+                                    Montant brut vendu
+                                </th>
+
+                                <th width="180">
+                                    Montant net vendu
                                 </th>
 
                                 <th width="150">
@@ -323,7 +331,7 @@
 
                             <tr class="table-secondary">
 
-                                <td colspan="7">
+                                <td colspan="9">
 
                                     <strong>
 
@@ -345,6 +353,8 @@
                             <tr
                                 class="ligne-situation"
                                 data-prix="{{ ligne.prix_unitaire }}"
+                                data-taux="{{ ligne.taux_distribution|default:0 }}"
+                                data-compagnie="{{ groupe.compagnie.idcompagnie }}"
                                 data-distribuee="{{ ligne.quantite_distribuee }}"
                             >
 
@@ -369,6 +379,12 @@
 
                                 <td class="text-end">
 
+                                    {{ ligne.quantite_jour|default:"0" }}
+
+                                </td>
+
+                                <td class="text-end fw-bold">
+
                                     {{ ligne.quantite_distribuee }}
 
                                 </td>
@@ -382,6 +398,17 @@
                                         class="form-control montant-vendu"
                                         name="montant_vendu_{{ ligne.produit.idproduit }}"
                                         value="0"
+                                    >
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control montant-net-vendu"
+                                        readonly
+                                        value="0 FCFA"
                                     >
 
                                 </td>
@@ -412,9 +439,77 @@
 
                             {% endfor %}
 
+                            <tr class="table-warning">
+
+                                <td colspan="6" class="text-end">
+
+                                    <strong>
+                                        Sous-total net {{ groupe.compagnie.designation }}
+                                    </strong>
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control fw-bold subtotal-net-compagnie"
+                                        data-compagnie="{{ groupe.compagnie.idcompagnie }}"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
+                                <td colspan="2"></td>
+
+                            </tr>
+
                             {% endfor %}
 
                         </tbody>
+
+                        <tfoot>
+
+                            <tr class="table-dark">
+
+                                <td colspan="5" class="text-end">
+
+                                    <strong>
+                                        Total général
+                                    </strong>
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        id="total-brut-vendu"
+                                        class="form-control fw-bold"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        id="total-net-vendu"
+                                        class="form-control fw-bold"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
+                                <td colspan="2"></td>
+
+                            </tr>
+
+                        </tfoot>
 
                     </table>
 
@@ -427,7 +522,7 @@
 
                 <div class="row mt-4">
 
-                    <div class="col-md-5">
+                    <div class="col-md-4">
 
                         <label class="form-label">
 
@@ -446,7 +541,7 @@
 
                     </div>
 
-                    <div class="col-md-5">
+                    <div class="col-md-4">
 
                         <label class="form-label">
 
@@ -459,8 +554,27 @@
                             step="0.01"
                             min="0"
                             class="form-control"
+                            id="montant-vente-verse"
                             name="montant_vente_verse"
                             value="{{ situation.montant_vente_verse }}"
+                        >
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <label class="form-label">
+
+                            Manquant
+
+                        </label>
+
+                        <input
+                            type="text"
+                            class="form-control fw-bold"
+                            id="montant-manquant-auto"
+                            readonly
+                            value="0 FCFA"
                         >
 
                     </div>
@@ -606,7 +720,7 @@
 {% load static %}
 
 <script
-    src="{% static 'js/situations.js' %}"
+    src="{% static 'js/situations.js' %}?v=manquant-auto-20260816"
 ></script>
 
 {% endblock %}

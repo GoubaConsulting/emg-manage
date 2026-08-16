@@ -115,3 +115,23 @@ class DistributionForm(forms.ModelForm):
         if not self.instance.pk:
 
             self.fields["date_distribution"].initial = timezone.now().date()
+
+
+class VenteDirecteForm(forms.Form):
+    """
+    Formulaire d'en-tete d'une vente directe.
+
+    Le client direct est cree automatiquement
+    lors de l'enregistrement.
+    """
+
+    date_distribution = forms.DateField(
+        label="Date de vente",
+        initial=timezone.now().date,
+        widget=forms.DateInput(
+            attrs={
+                "class": "form-control",
+                "type": "date",
+            }
+        ),
+    )

@@ -111,8 +111,29 @@ def calculer_montant_produits_restants(
             )
         )
 
-        total += (
+        taux_remise = Decimal(
+            str(
+                ligne.get(
+                    "taux_remise",
+                    0
+                )
+            )
+        )
+
+        montant_brut = (
             quantite * prix
+        )
+
+        total += (
+            montant_brut
+            -
+            (
+                montant_brut
+                *
+                taux_remise
+                /
+                Decimal("100")
+            )
         )
 
     return total
@@ -123,25 +144,25 @@ def calculer_montant_produits_restants(
 # ==========================================================
 
 def calculer_manquant(
-    fond,
+    montant_total_distribue,
     montant_vente_verse,
     montant_produits_restants
 ):
     """
     Calcule le montant manquant.
 
-    Le fond doit être reconstitué par :
+    Le montant net distribue doit etre justifie par :
 
-        ventes versées
+        montant net verse
         +
-        valeur des produits restants
+        valeur nette des produits restants
 
-    Si cette somme est inférieure au fond,
+    Si cette somme est inferieure au net distribue,
     la différence constitue un manquant.
     """
 
-    fond = Decimal(
-        str(fond)
+    montant_total_distribue = Decimal(
+        str(montant_total_distribue)
     )
 
     montant_vente_verse = Decimal(
@@ -154,7 +175,7 @@ def calculer_manquant(
 
     manquant = (
 
-        fond
+        montant_total_distribue
 
         -
 

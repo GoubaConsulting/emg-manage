@@ -33,6 +33,12 @@ const totalNet = document.getElementById(
 
 );
 
+const selectDistributeur = document.getElementById(
+
+    "id_distributeur"
+
+);
+
 
 // ======================================================
 // Initialisation
@@ -66,6 +72,273 @@ function initialiser() {
     recalculerTotaux();
 
     recalculerSousTotaux();
+
+    if (selectDistributeur) {
+
+        selectDistributeur.addEventListener(
+
+            "change",
+
+            actualiserQuantitesInitiales
+
+        );
+
+        actualiserQuantitesInitiales();
+
+    }
+
+}
+
+
+// ======================================================
+// Affichage des reliquats du destinataire
+// ======================================================
+
+function actualiserQuantitesInitiales() {
+
+    const reliquats = window.reliquatsParDistributeur || {};
+
+    const distributeur = selectDistributeur.value;
+
+    const quantites = reliquats[distributeur] || {};
+
+    lignes.forEach(function (ligne) {
+
+        const produit = ligne.dataset.produit;
+
+        const champ = ligne.querySelector(
+
+            ".quantite-initiale"
+
+        );
+
+        if (!champ) {
+
+            return;
+
+        }
+
+        const quantiteInitiale = Number(
+
+            String(
+
+                quantites[produit] || 0
+
+            ).replace(",", ".")
+
+        ) || 0;
+
+        champ.textContent = quantiteInitiale;
+
+        appliquerReliquatLigne(
+
+            ligne,
+
+            quantiteInitiale
+
+        );
+
+        actualiserQuantiteTotale(
+
+            ligne
+
+        );
+
+        recalculerLigne(
+
+            ligne
+
+        );
+
+    });
+
+    recalculerSousTotaux();
+
+    recalculerTotaux();
+
+}
+
+
+// ======================================================
+// Selection automatique des lignes avec reliquat
+// ======================================================
+
+function appliquerReliquatLigne(
+    ligne,
+    quantiteInitiale
+) {
+
+    const check = ligne.querySelector(
+
+        ".produit-check"
+
+    );
+
+    if (!check) {
+
+        return;
+
+    }
+
+    if (quantiteInitiale > 0) {
+
+        activerLigne(
+
+            ligne
+
+        );
+
+        check.dataset.autoReliquat = "1";
+
+        return;
+
+    }
+
+    if (check.dataset.autoReliquat === "1") {
+
+        desactiverLigne(
+
+            ligne
+
+        );
+
+        delete check.dataset.autoReliquat;
+
+    }
+
+}
+
+
+function activerLigne(ligne) {
+
+    const check = ligne.querySelector(
+
+        ".produit-check"
+
+    );
+
+    const montant = ligne.querySelector(
+
+        ".montant"
+
+    );
+
+    const taux = ligne.querySelector(
+
+        ".taux"
+
+    );
+
+    check.checked = true;
+
+    montant.disabled = false;
+
+    taux.disabled = false;
+
+    ligne.classList.add(
+
+        "table-success"
+
+    );
+
+}
+
+
+function desactiverLigne(ligne) {
+
+    const check = ligne.querySelector(
+
+        ".produit-check"
+
+    );
+
+    const montant = ligne.querySelector(
+
+        ".montant"
+
+    );
+
+    const taux = ligne.querySelector(
+
+        ".taux"
+
+    );
+
+    check.checked = false;
+
+    montant.disabled = true;
+
+    taux.disabled = true;
+
+    montant.value = 0;
+
+    taux.value = 0;
+
+    ligne.querySelector(
+
+        ".quantite"
+
+    ).value = 0;
+
+    ligne.querySelector(
+
+        ".remise"
+
+    ).value = 0;
+
+    ligne.querySelector(
+
+        ".net"
+
+    ).value = 0;
+
+    ligne.classList.remove(
+
+        "table-success"
+
+    );
+
+    actualiserQuantiteTotale(
+
+        ligne
+
+    );
+
+}
+
+// ======================================================
+// Total a suivre = reliquat + nouvelle distribution
+// ======================================================
+
+function actualiserQuantiteTotale(ligne) {
+
+    const initiale = Number(
+        String(
+            ligne.querySelector(".quantite-initiale")?.textContent || "0"
+        ).replace(",", ".")
+    ) || 0;
+
+    const quantite = Number(
+        String(
+            ligne.querySelector(".quantite")?.value || "0"
+        ).replace(",", ".")
+    ) || 0;
+
+    const champTotal = ligne.querySelector(
+        ".quantite-totale"
+    );
+
+    if (!champTotal) {
+
+        return;
+
+    }
+
+    champTotal.value = (
+        initiale
+        +
+        quantite
+    );
 
 }
 
@@ -109,13 +382,11 @@ function initialiserLigne(ligne) {
 
             if (this.checked) {
 
-                montant.disabled = false;
+                delete this.dataset.autoReliquat;
 
-                taux.disabled = false;
+                activerLigne(
 
-                ligne.classList.add(
-
-                    "table-success"
+                    ligne
 
                 );
 
@@ -123,37 +394,15 @@ function initialiserLigne(ligne) {
 
             else {
 
-                montant.disabled = true;
+                delete this.dataset.autoReliquat;
 
-                taux.disabled = true;
+                desactiverLigne(
 
-                montant.value = 0;
-
-                taux.value = 0;
-
-                ligne.querySelector(
-
-                    ".quantite"
-
-                ).value = 0;
-
-                ligne.querySelector(
-
-                    ".remise"
-
-                ).value = 0;
-
-                ligne.querySelector(
-
-                    ".net"
-
-                ).value = 0;
-
-                ligne.classList.remove(
-
-                    "table-success"
+                    ligne
 
                 );
+
+                recalculerSousTotaux();
 
                 recalculerTotaux();
 
@@ -192,6 +441,12 @@ function initialiserLigne(ligne) {
             );
 
         }
+
+    );
+
+    actualiserQuantiteTotale(
+
+        ligne
 
     );
 
@@ -291,9 +546,26 @@ function recalculerLigne(ligne) {
 
     const montantRemise = montant * taux / 100;
 
-    const montantNet = montant - montantRemise;
+    const montantNet = (
+        calculerMontantNet(
+            montant,
+            taux
+        )
+        +
+        calculerMontantNetInitial(
+            ligne,
+            prix,
+            taux
+        )
+    );
 
     quantiteInput.value = quantite;
+
+    actualiserQuantiteTotale(
+
+        ligne
+
+    );
 
     remiseInput.value = montantRemise.toFixed(0);
 
@@ -440,5 +712,49 @@ function recalculerTotaux() {
             "fr-FR"
 
         ) + " FCFA";
+
+}
+
+
+// ======================================================
+// Calcul du net
+// ======================================================
+
+function calculerMontantNet(
+    montantBrut,
+    taux
+) {
+
+    return (
+        montantBrut
+        -
+        (
+            montantBrut
+            *
+            taux
+            /
+            100
+        )
+    );
+
+}
+
+
+function calculerMontantNetInitial(
+    ligne,
+    prix,
+    taux
+) {
+
+    const quantiteInitiale = Number(
+        String(
+            ligne.querySelector(".quantite-initiale")?.textContent || "0"
+        ).replace(",", ".")
+    ) || 0;
+
+    return calculerMontantNet(
+        quantiteInitiale * prix,
+        taux
+    );
 
 }

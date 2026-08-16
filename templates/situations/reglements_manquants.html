@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Suivi des manquants
+Règlements des manquants
 {% endblock %}
 
 {% block content %}
@@ -9,21 +9,21 @@ Suivi des manquants
 <div class="d-flex justify-content-between align-items-center mb-4">
 
     <h3>
-        Suivi des manquants
+        Règlements des manquants
     </h3>
 
     <div class="d-flex gap-2">
         <a
-            href="{% url 'situations:liste_reglements_manquants' %}"
-            class="btn btn-outline-success"
+            href="{% url 'situations:liste_manquants' %}"
+            class="btn btn-outline-danger"
         >
-            Règlements
+            Manquants
         </a>
         <a
             href="{% url 'situations:liste_situations' %}"
             class="btn btn-secondary"
         >
-            Situations clôturées
+            Versements clôturés
         </a>
     </div>
 
@@ -43,12 +43,24 @@ Suivi des manquants
 
                 <div class="col-md-2">
                     <label class="form-label">
-                        Numéro
+                        Règlement
                     </label>
                     <input
                         type="text"
                         name="numero"
                         value="{{ numero }}"
+                        class="form-control"
+                    >
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">
+                        Manquant
+                    </label>
+                    <input
+                        type="text"
+                        name="numero_manquant"
+                        value="{{ numero_manquant }}"
                         class="form-control"
                     >
                 </div>
@@ -75,30 +87,6 @@ Suivi des manquants
                         value="{{ date_fin }}"
                         class="form-control"
                     >
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label">
-                        Statut
-                    </label>
-                    <select
-                        name="statut"
-                        class="form-select"
-                    >
-                        <option value="">
-                            Tous
-                        </option>
-                        {% for valeur, libelle in statuts %}
-                            <option
-                                value="{{ valeur }}"
-                                {% if statut == valeur %}
-                                    selected
-                                {% endif %}
-                            >
-                                {{ libelle }}
-                            </option>
-                        {% endfor %}
-                    </select>
                 </div>
 
                 <div class="col-md-3">
@@ -138,7 +126,7 @@ Suivi des manquants
 
             <div class="mt-3">
                 <a
-                    href="{% url 'situations:liste_manquants' %}"
+                    href="{% url 'situations:liste_reglements_manquants' %}"
                     class="btn btn-secondary"
                 >
                     Réinitialiser
@@ -151,34 +139,15 @@ Suivi des manquants
 
 </div>
 
-<div class="row mb-4">
-
-    <div class="col-md-6">
-        <div class="card border-danger shadow-sm">
-            <div class="card-header bg-danger text-white">
-                Total manquants
-            </div>
-            <div class="card-body text-end">
-                <h4 class="mb-0">
-                    {{ total_manquant|floatformat:2 }} FCFA
-                </h4>
-            </div>
-        </div>
+<div class="card border-success shadow-sm mb-4">
+    <div class="card-header bg-success text-white">
+        Total réglé
     </div>
-
-    <div class="col-md-6">
-        <div class="card border-warning shadow-sm">
-            <div class="card-header bg-warning">
-                Reste à payer
-            </div>
-            <div class="card-body text-end">
-                <h4 class="mb-0">
-                    {{ total_reste|floatformat:2 }} FCFA
-                </h4>
-            </div>
-        </div>
+    <div class="card-body text-end">
+        <h4 class="mb-0">
+            {{ total_regle|floatformat:2 }} FCFA
+        </h4>
     </div>
-
 </div>
 
 <div class="card shadow">
@@ -192,19 +161,20 @@ Suivi des manquants
                 <thead class="table-dark">
                     <tr>
                         <th width="50"></th>
-                        <th>Numéro</th>
-                        <th>Date situation</th>
+                        <th>Règlement</th>
+                        <th>Date règlement</th>
+                        <th>Manquant</th>
+                        <th>Situation</th>
                         <th>Gérant / Distributeur</th>
-                        <th class="text-end">Montant</th>
+                        <th class="text-end">Montant réglé</th>
                         <th class="text-end">Reste à payer</th>
-                        <th>Statut</th>
-                        <th class="text-center">Actions</th>
+                        <th>Utilisateur</th>
                     </tr>
                 </thead>
 
                 <tbody>
 
-                    {% for manquant in manquants %}
+                    {% for reglement in reglements %}
 
                     <tr>
                         <td class="text-center">
@@ -212,62 +182,58 @@ Suivi des manquants
                                 class="btn btn-sm btn-outline-secondary"
                                 type="button"
                                 data-bs-toggle="collapse"
-                                data-bs-target="#manquant{{ manquant.idmanquant }}"
+                                data-bs-target="#reglement{{ reglement.idreglement }}"
                             >
                                 ▼
                             </button>
                         </td>
-                        <td>{{ manquant.numero }}</td>
-                        <td>{{ manquant.situation.date_situation|date:"d/m/Y" }}</td>
+                        <td>{{ reglement.numero }}</td>
+                        <td>{{ reglement.date_reglement|date:"d/m/Y" }}</td>
+                        <td>{{ reglement.manquant.numero }}</td>
+                        <td>{{ reglement.manquant.situation.numero }}</td>
                         <td>
-                            {{ manquant.distributeur.nom }}
-                            {{ manquant.distributeur.prenom }}
+                            {{ reglement.manquant.distributeur.nom }}
+                            {{ reglement.manquant.distributeur.prenom }}
                         </td>
-                        <td class="text-end">{{ manquant.montant|floatformat:2 }}</td>
-                        <td class="text-end">{{ manquant.reste_a_payer|floatformat:2 }}</td>
-                        <td>{{ manquant.get_statut_display }}</td>
-                        <td class="text-center">
-                            {% if manquant.statut == "EN_COURS" %}
-                                <a
-                                    href="{% url 'situations:regler_manquant' manquant.pk %}"
-                                    class="btn btn-success btn-sm"
-                                >
-                                    Régler
-                                </a>
-                            {% else %}
-                                <span class="text-muted">
-                                    Soldé
-                                </span>
-                            {% endif %}
-                        </td>
+                        <td class="text-end">{{ reglement.montant|floatformat:2 }}</td>
+                        <td class="text-end">{{ reglement.manquant.reste_a_payer|floatformat:2 }}</td>
+                        <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
                     </tr>
 
-                    <tr class="collapse" id="manquant{{ manquant.idmanquant }}">
-                        <td colspan="8">
+                    <tr class="collapse" id="reglement{{ reglement.idreglement }}">
+                        <td colspan="9">
 
                             <div class="p-3 bg-light">
 
-                                <div class="row mb-3">
+                                <div class="row g-3 mb-3">
                                     <div class="col-md-3">
-                                        <strong>Situation :</strong>
-                                        {{ manquant.situation.numero }}
+                                        <strong>Date situation :</strong>
+                                        {{ reglement.manquant.situation.date_situation|date:"d/m/Y" }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Point de vente :</strong>
+                                        {{ reglement.manquant.distributeur.point_vente.designation }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Montant manquant :</strong>
+                                        {{ reglement.manquant.montant|floatformat:2 }} FCFA
                                     </div>
                                     <div class="col-md-3">
                                         <strong>Total réglé :</strong>
-                                        {{ manquant.total_regle|floatformat:2 }} FCFA
+                                        {{ reglement.manquant.total_regle|floatformat:2 }} FCFA
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Statut :</strong>
+                                        {{ reglement.manquant.get_statut_display }}
                                     </div>
                                     <div class="col-md-3">
                                         <strong>Créé le :</strong>
-                                        {{ manquant.date_creation|date:"d/m/Y H:i" }}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <strong>Utilisateur :</strong>
-                                        {{ manquant.utilisateur.get_full_name|default:manquant.utilisateur.username }}
+                                        {{ reglement.date_creation|date:"d/m/Y H:i" }}
                                     </div>
                                 </div>
 
                                 <h6>
-                                    Règlements
+                                    Historique des règlements du manquant
                                 </h6>
 
                                 <table class="table table-sm table-bordered">
@@ -280,18 +246,16 @@ Suivi des manquants
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for reglement in manquant.reglements_liste %}
-                                        <tr>
-                                            <td>{{ reglement.numero }}</td>
-                                            <td>{{ reglement.date_reglement|date:"d/m/Y" }}</td>
-                                            <td class="text-end">{{ reglement.montant|floatformat:2 }}</td>
-                                            <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
-                                        </tr>
-                                        {% empty %}
-                                        <tr>
-                                            <td colspan="4" class="text-center">
-                                                Aucun règlement enregistré.
-                                            </td>
+                                        {% for item in reglement.manquant.reglements_liste %}
+                                        <tr
+                                            {% if item.pk == reglement.pk %}
+                                                class="table-success"
+                                            {% endif %}
+                                        >
+                                            <td>{{ item.numero }}</td>
+                                            <td>{{ item.date_reglement|date:"d/m/Y" }}</td>
+                                            <td class="text-end">{{ item.montant|floatformat:2 }}</td>
+                                            <td>{{ item.utilisateur.get_full_name|default:item.utilisateur.username }}</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -305,8 +269,8 @@ Suivi des manquants
                     {% empty %}
 
                     <tr>
-                        <td colspan="8" class="text-center">
-                            Aucun manquant trouvé.
+                        <td colspan="9" class="text-center">
+                            Aucun règlement de manquant trouvé.
                         </td>
                     </tr>
 
@@ -318,16 +282,16 @@ Suivi des manquants
 
         </div>
 
-        {% if manquants.has_other_pages %}
+        {% if reglements.has_other_pages %}
 
         <nav>
             <ul class="pagination justify-content-center">
 
-                {% if manquants.has_previous %}
+                {% if reglements.has_previous %}
                 <li class="page-item">
                     <a
                         class="page-link"
-                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ manquants.previous_page_number }}"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ reglements.previous_page_number }}"
                     >
                         Précédent
                     </a>
@@ -336,15 +300,15 @@ Suivi des manquants
 
                 <li class="page-item active">
                     <span class="page-link">
-                        {{ manquants.number }}
+                        {{ reglements.number }}
                     </span>
                 </li>
 
-                {% if manquants.has_next %}
+                {% if reglements.has_next %}
                 <li class="page-item">
                     <a
                         class="page-link"
-                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ manquants.next_page_number }}"
+                        href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ reglements.next_page_number }}"
                     >
                         Suivant
                     </a>

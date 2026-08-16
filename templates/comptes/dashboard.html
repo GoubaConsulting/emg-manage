@@ -1,47 +1,426 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Dashboard
+Tableau de bord
 {% endblock %}
 
 {% block content %}
 
-<h2>
-    Bienvenue {{ profil.nom }} {{ profil.prenom }}
-</h2>
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2 class="mb-1">
+            Tableau de bord
+        </h2>
+        <div class="text-muted">
+            Période en cours : {{ periode.libelle }}
+        </div>
+    </div>
 
-<hr>
-
-<div class="row">
-
-    <div class="col-md-4">
-
-        <div class="card">
-
-            <div class="card-body">
-
-                <h5>Profil</h5>
-
-                <p>
-                    Rôle :
-                    {{ profil.get_role_display }}
-                </p>
-
-                <p>
-                    Point de vente :
-                    {% if profil.point_vente %}
-                        {{ profil.point_vente.designation }}
-                    {% else %}
-                        Aucun
-                    {% endif %}
-                </p>
-
+    <div class="text-end">
+        <span class="badge text-bg-primary">
+            {{ profil.get_role_display }}
+        </span>
+        {% if profil.point_vente %}
+            <div class="small text-muted mt-1">
+                {{ profil.point_vente.designation }}
             </div>
+        {% endif %}
+    </div>
+</div>
 
+{% if not profil.point_vente and not est_directeur and not est_gerant %}
+
+    <div class="alert alert-info">
+        Aucun tableau de bord opérationnel n'est rattaché à ce profil.
+    </div>
+
+{% endif %}
+
+{% if est_directeur %}
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-lg-4">
+            <div class="card border-primary shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    Objectifs du mois
+                </div>
+                <div class="card-body">
+                    <h3 class="mb-1">
+                        {{ objectifs.total_realise|floatformat:2 }}
+                    </h3>
+                    <div class="text-muted">
+                        sur {{ objectifs.total_cible|floatformat:2 }}
+                    </div>
+                    <div class="progress mt-3" style="height: 18px;">
+                        <div
+                            class="progress-bar"
+                            style="width: {{ objectifs.taux_global_graphique_css }}%;"
+                        >
+                            {{ objectifs.taux_global|floatformat:2 }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    Graphe des objectifs
+                </div>
+                <div class="card-body">
+                    {% for objectif in objectifs.objectifs %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <strong>
+                                    {{ objectif.designation }}
+                                </strong>
+                                <span>
+                                    {{ objectif.taux_realise|floatformat:2 }}%
+                                </span>
+                            </div>
+                            <div class="progress" style="height: 22px;">
+                                <div
+                                    class="progress-bar {% if objectif.objectif_atteint %}bg-success{% else %}bg-primary{% endif %}"
+                                    style="width: {{ objectif.taux_graphique_css }}%;"
+                                >
+                                    {{ objectif.montant_realise|floatformat:0 }}
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="alert alert-warning mb-0">
+                            Aucun objectif enregistré pour la période en cours.
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
 
     </div>
 
-</div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            Objectifs de la période
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Désignation</th>
+                            <th>Compagnie</th>
+                            <th class="text-end">Cible</th>
+                            <th class="text-end">Réalisé</th>
+                            <th class="text-end">Taux</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for objectif in objectifs.objectifs %}
+                            <tr>
+                                <td>{{ objectif.designation }}</td>
+                                <td>{{ objectif.compagnie.designation }}</td>
+                                <td class="text-end">{{ objectif.montant_cible|floatformat:2 }}</td>
+                                <td class="text-end">{{ objectif.montant_realise|floatformat:2 }}</td>
+                                <td class="text-end">
+                                    <span class="badge {% if objectif.objectif_atteint %}text-bg-success{% else %}text-bg-primary{% endif %}">
+                                        {{ objectif.taux_realise|floatformat:2 }}%
+                                    </span>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center">
+                                    Aucun objectif trouvé.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="2" class="text-end">
+                                Total objectifs
+                            </td>
+                            <td class="text-end">{{ objectifs.total_cible|floatformat:2 }}</td>
+                            <td class="text-end">{{ objectifs.total_realise|floatformat:2 }}</td>
+                            <td class="text-end">{{ objectifs.taux_global|floatformat:2 }}%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% endif %}
+
+{% if est_directeur or est_gerant %}
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            Distributions par produit
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-end">Quantité en stock</th>
+                            <th class="text-end">Quantité distribuée</th>
+                            <th class="text-end">Montant brut distribué</th>
+                            <th class="text-end">Montant net distribué</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for groupe in distribution_groupes %}
+                            <tr class="table-secondary">
+                                <th colspan="5">
+                                    {{ groupe.compagnie.designation }}
+                                </th>
+                            </tr>
+                            {% for ligne in groupe.lignes %}
+                                <tr>
+                                    <td>{{ ligne.produit.designation }}</td>
+                                    <td class="text-end">{{ ligne.stock|floatformat:2 }}</td>
+                                    <td class="text-end">{{ ligne.quantite|floatformat:2 }}</td>
+                                    <td class="text-end">{{ ligne.montant_brut|floatformat:2 }}</td>
+                                    <td class="text-end fw-bold">{{ ligne.montant_net|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                            <tr class="table-light fw-bold">
+                                <td>
+                                    Sous-total {{ groupe.compagnie.designation }}
+                                </td>
+                                <td class="text-end">{{ groupe.totaux.stock|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.quantite|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.montant_brut|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.montant_net|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center">
+                                    Aucune distribution pour la période en cours.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark fw-bold">
+                        <tr>
+                            <td>Total distributions</td>
+                            <td class="text-end">{{ distribution_totaux.stock|floatformat:2 }}</td>
+                            <td class="text-end">{{ distribution_totaux.quantite|floatformat:2 }}</td>
+                            <td class="text-end">{{ distribution_totaux.montant_brut|floatformat:2 }}</td>
+                            <td class="text-end">{{ distribution_totaux.montant_net|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                Situations par {{ personne_label|lower }}
+            </span>
+
+            <form method="get" class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0">
+                    {{ personne_label }}
+                </label>
+                <select
+                    name="personne"
+                    class="form-select form-select-sm"
+                    onchange="this.form.submit()"
+                >
+                    {% for personne in personnes %}
+                        <option
+                            value="{{ personne.pk }}"
+                            {% if personne_selectionnee and personne.pk == personne_selectionnee.pk %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ personne.nom }} {{ personne.prenom }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        <div class="card-body">
+            {% if personne_selectionnee %}
+                <div class="alert alert-primary py-2">
+                    {{ personne_label }} sélectionné :
+                    <strong>
+                        {{ personne_selectionnee.nom }} {{ personne_selectionnee.prenom }}
+                    </strong>
+                </div>
+            {% endif %}
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-end">{{ montant_reference_label }}</th>
+                            <th class="text-end">Montant net versé</th>
+                            <th class="text-end">Écart</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for groupe in situation_groupes %}
+                            <tr class="table-secondary">
+                                <th colspan="4">
+                                    {{ groupe.compagnie.designation }}
+                                </th>
+                            </tr>
+                            {% for ligne in groupe.lignes %}
+                                <tr>
+                                    <td>{{ ligne.produit.designation }}</td>
+                                    <td class="text-end">{{ ligne.montant_reference|floatformat:2 }}</td>
+                                    <td class="text-end fw-bold">{{ ligne.montant_verse|floatformat:2 }}</td>
+                                    <td class="text-end">{{ ligne.ecart|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                            <tr class="table-light fw-bold">
+                                <td>
+                                    Sous-total {{ groupe.compagnie.designation }}
+                                </td>
+                                <td class="text-end">{{ groupe.totaux.montant_reference|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.montant_verse|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.ecart|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center">
+                                    Aucune situation trouvée pour la période.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark fw-bold">
+                        <tr>
+                            <td>Total situations</td>
+                            <td class="text-end">{{ situation_totaux.montant_reference|floatformat:2 }}</td>
+                            <td class="text-end">{{ situation_totaux.montant_verse|floatformat:2 }}</td>
+                            <td class="text-end">{{ situation_totaux.ecart|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            Manquants du {{ personne_label|lower }} sélectionné
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Numéro</th>
+                            <th>Date situation</th>
+                            <th class="text-end">Montant manquant</th>
+                            <th class="text-end">Paiements</th>
+                            <th class="text-end">Reste à payer</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ligne in manquants %}
+                            <tr>
+                                <td>{{ ligne.manquant.numero }}</td>
+                                <td>{{ ligne.manquant.situation.date_situation|date:"d/m/Y" }}</td>
+                                <td class="text-end">{{ ligne.manquant.montant|floatformat:2 }}</td>
+                                <td class="text-end">{{ ligne.total_paiements|floatformat:2 }}</td>
+                                <td class="text-end fw-bold">{{ ligne.reste_a_payer|floatformat:2 }}</td>
+                                <td>{{ ligne.manquant.get_statut_display }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center">
+                                    Aucun manquant trouvé pour la période.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark fw-bold">
+                        <tr>
+                            <td colspan="2" class="text-end">
+                                Total manquants
+                            </td>
+                            <td class="text-end">{{ manquants_totaux.montant|floatformat:2 }}</td>
+                            <td class="text-end">{{ manquants_totaux.paiements|floatformat:2 }}</td>
+                            <td class="text-end">{{ manquants_totaux.reste|floatformat:2 }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% endif %}
+
+{% if est_gerant %}
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            Ventes directes par produit
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-end">Quantité</th>
+                            <th class="text-end">Montant net</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for groupe in ventes_directes_groupes %}
+                            <tr class="table-secondary">
+                                <th colspan="3">
+                                    {{ groupe.compagnie.designation }}
+                                </th>
+                            </tr>
+                            {% for ligne in groupe.lignes %}
+                                <tr>
+                                    <td>{{ ligne.produit.designation }}</td>
+                                    <td class="text-end">{{ ligne.quantite|floatformat:2 }}</td>
+                                    <td class="text-end fw-bold">{{ ligne.montant_net|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                            <tr class="table-light fw-bold">
+                                <td>
+                                    Sous-total {{ groupe.compagnie.designation }}
+                                </td>
+                                <td class="text-end">{{ groupe.totaux.quantite|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.montant_net|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center">
+                                    Aucune vente directe pour la période.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark fw-bold">
+                        <tr>
+                            <td>Total ventes directes</td>
+                            <td class="text-end">{{ ventes_directes_totaux.quantite|floatformat:2 }}</td>
+                            <td class="text-end">{{ ventes_directes_totaux.montant_net|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% endif %}
 
 {% endblock %}

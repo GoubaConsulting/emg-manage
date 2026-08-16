@@ -2,12 +2,17 @@ from django.shortcuts import (
     render,
     redirect,
 )
+import json
+
 from commandes.selectors import commandes_en_attente
 from commandes.presentation import preparer_affichage_commande
 from commandes.models import Commande
 from referentiel.models import Produit
 
-from .forms import DistributionForm
+from .forms import (
+    DistributionForm,
+    VenteDirecteForm,
+)
 from .models import Distribution
 from django.contrib.auth.decorators import login_required
 from .permissions import verifier_creation_distribution
@@ -32,11 +37,15 @@ from itertools import groupby
 
 from django.core.paginator import Paginator
 
+from django.db import transaction
+
 from django.db.models import Sum
 
 from comptes.models import ProfilUtilisateur
 
 from stocks.models import Stock
+
+from situations.services import derniere_situation_cloturee_avant
 
 
 def filtres_dates_recherche(
@@ -129,6 +138,196 @@ def filtre_texte(
     return valeur
 
 
+def produits_disponibles_point_vente(point_vente):
+    """
+    Retourne les produits ayant du stock sur un point
+    de vente, avec la quantite disponible annotee.
+    """
+
+    stocks = (
+        Stock.objects
+        .filter(
+            point_vente=point_vente,
+            produit__actif=True,
+            quantite__gt=0,
+        )
+        .select_related(
+            "produit",
+            "produit__compagnie",
+        )
+        .order_by(
+            "produit__compagnie__designation",
+            "produit__designation",
+        )
+    )
+
+    produits = []
+
+    for stock in stocks:
+
+        stock.produit.stock_disponible = stock.quantite
+
+        produits.append(
+            stock.produit
+        )
+
+    return produits
+
+
+def configurer_form_destinataire(
+    form,
+    point_vente,
+    categorie,
+    label
+):
+    """
+    Limite le destinataire au perimetre et a la
+    categorie attendue par le parcours.
+    """
+
+    form.fields["distributeur"].label = label
+
+    form.fields["distributeur"].queryset = (
+        Distributeur.objects
+        .filter(
+            actif=True,
+            point_vente=point_vente,
+            categorie=categorie,
+        )
+        .order_by(
+            "nom",
+            "prenom",
+        )
+    )
+
+
+def date_distribution_saisie(request):
+    """
+    Retourne la date saisie dans le formulaire ou la
+    date du jour lorsque la saisie n'est pas exploitable.
+    """
+
+    valeur = (
+        request.POST.get("date_distribution")
+        or request.GET.get("date_distribution")
+        or date.today().isoformat()
+    )
+
+    try:
+
+        return date.fromisoformat(
+            str(valeur)
+        )
+
+    except ValueError:
+
+        return date.today()
+
+
+def quantites_initiales_destinataire(
+    distributeur,
+    date_distribution
+):
+    """
+    Retourne les quantites restantes de la derniere
+    situation cloturee avant la distribution.
+    """
+
+    if distributeur is None:
+
+        return {}
+
+    situation = derniere_situation_cloturee_avant(
+        distributeur,
+        date_distribution
+    )
+
+    if situation is None:
+
+        return {}
+
+    quantites = {}
+
+    for ligne in situation.lignes.all():
+
+        if ligne.quantite_restante <= 0:
+
+            continue
+
+        quantites[str(ligne.produit_id)] = float(
+            ligne.quantite_restante
+        )
+
+    return quantites
+
+
+def reliquats_destinataires_json(
+    destinataires,
+    date_distribution
+):
+    """
+    Prepare les reliquats par destinataire pour
+    l'affichage dynamique du formulaire gerant.
+    """
+
+    donnees = {}
+
+    for distributeur in destinataires:
+
+        donnees[str(distributeur.pk)] = (
+            quantites_initiales_destinataire(
+                distributeur,
+                date_distribution
+            )
+        )
+
+    return json.dumps(
+        donnees
+    )
+
+
+def creer_client_direct_automatique(
+    point_vente
+):
+    """
+    Cree un client direct ponctuel pour une vente directe.
+    """
+
+    numero = (
+        Distributeur.objects
+        .filter(
+            point_vente=point_vente,
+            categorie=Distributeur.CATEGORIE_CLIENT,
+        )
+        .count()
+        + 1
+    )
+
+    while True:
+
+        suffixe = f"{numero:04d}"
+
+        code = f"CLD{point_vente.idpointvente:03d}{suffixe}"
+
+        if not Distributeur.objects.filter(
+            code=code
+        ).exists():
+
+            break
+
+        numero += 1
+
+    return Distributeur.objects.create(
+        code=code,
+        nom=f"Client {suffixe}",
+        prenom=point_vente.designation[:100],
+        categorie=Distributeur.CATEGORIE_CLIENT,
+        point_vente=point_vente,
+        fond=Decimal("0.00"),
+        actif=True,
+    )
+
+
 @login_required
 def ajouter_distribution(request):
 
@@ -141,6 +340,17 @@ def ajouter_distribution(request):
     est_directeur = profil.role == "DIRECTEUR"
 
     est_gerant = profil.role == "GERANT"
+
+    if not est_gerant:
+
+        messages.error(
+            request,
+            "Cette distribution est reservee aux gerants."
+        )
+
+        return redirect(
+            "distributions:liste_distributions"
+        )
 
 
     stocks = (
@@ -232,11 +442,23 @@ def ajouter_distribution(request):
 
         commandes_json[str(commande.idcommande)] = lignes
 
+    date_distribution_form = date_distribution_saisie(
+        request
+    )
+
     if request.method == "POST":
 
         post_data = request.POST.copy()
 
         form = DistributionForm(post_data)
+
+        configurer_form_destinataire(
+            form,
+            profil.point_vente,
+            Distributeur.CATEGORIE_DISTRIBUTEUR,
+            "Distributeur"
+        )
+
         #if not form.is_valid():
          #   print(form.errors.as_json())
         if form.is_valid():
@@ -303,16 +525,21 @@ def ajouter_distribution(request):
 
         elif est_gerant:
 
-            form.fields["distributeur"].queryset = (
-                Distributeur.objects.filter(
-                    actif=True,
-                    point_vente=profil.point_vente,
-                    code__startswith="DIST",
-                ).order_by(
-                    "nom",
-                    "prenom",
-                )
+            configurer_form_destinataire(
+                form,
+                profil.point_vente,
+                Distributeur.CATEGORIE_DISTRIBUTEUR,
+                "Distributeur"
             )
+
+    destinataires_distribution = (
+        form.fields["distributeur"].queryset
+    )
+
+    reliquats_json = reliquats_destinataires_json(
+        destinataires_distribution,
+        date_distribution_form
+    )
 
     return render(
 
@@ -330,11 +557,21 @@ def ajouter_distribution(request):
 
             "commandes": commandes,
 
-            "titre": "Nouvelle distribution",
+            "titre": "Nouvelle distribution a un distributeur",
+
+            "destinataire_label": "Distributeur",
+
+            "bouton_enregistrer": "Enregistrer la distribution",
+
+            "aucun_destinataire": (
+                not form.fields["distributeur"].queryset.exists()
+            ),
 
             "url_retour": "liste_distributions",
 
             "context_commandes": json.dumps(commandes_json),
+
+            "reliquats_json": reliquats_json,
 
             "est_gerant": est_gerant,
 
@@ -349,7 +586,77 @@ def ajouter_distribution_client(request):
     Distribution du gérant vers
     un client direct.
     """
-    pass
+    profil = request.user.profil
+
+    if profil.role != "GERANT":
+
+        messages.error(
+            request,
+            "Seul un gerant peut enregistrer une vente directe."
+        )
+
+        return redirect(
+            "distributions:liste_distributions"
+        )
+
+    produits = produits_disponibles_point_vente(
+        profil.point_vente
+    )
+
+    form = VenteDirecteForm(
+        request.POST or None
+    )
+
+    if request.method == "POST" and form.is_valid():
+
+        try:
+
+            lignes = construire_lignes_depuis_formulaire(
+                request.POST
+            )
+
+            with transaction.atomic():
+
+                client = creer_client_direct_automatique(
+                    profil.point_vente
+                )
+
+                creer_distribution_gerant(
+                    utilisateur=request.user,
+                    type_distribution=Distribution.TYPE_CLIENT_DIRECT,
+                    distributeur=client,
+                    date_distribution=(
+                        form.cleaned_data["date_distribution"]
+                    ),
+                    lignes=lignes,
+                )
+
+            messages.success(
+                request,
+                "Vente directe enregistree et situation cloturee automatiquement."
+            )
+
+            return redirect(
+                "distributions:liste_distributions"
+            )
+
+        except Exception as e:
+
+            form.add_error(
+                None,
+                str(e)
+            )
+
+    return render(
+        request,
+        "distributions/gerant/client_form.html",
+        {
+            "form": form,
+            "produits": produits,
+            "titre": "Nouvelle vente directe",
+            "bouton_enregistrer": "Enregistrer la vente directe",
+        }
+    )
 
 
 @login_required
@@ -721,7 +1028,10 @@ def liste_distributions(request):
         .filter(
             actif=True,
             point_vente=profil.point_vente,
-            code__startswith="DIST",
+            categorie__in=[
+                Distributeur.CATEGORIE_DISTRIBUTEUR,
+                Distributeur.CATEGORIE_CLIENT,
+            ],
         )
         .order_by("nom", "prenom")
     )
@@ -845,6 +1155,21 @@ def ajouter_distribution_directeur(request):
 
         lignes = {}
 
+        distributeur_gerant = (
+            Distributeur.objects
+            .filter(
+                point_vente=commande.point_vente,
+                categorie=Distributeur.CATEGORIE_GERANT,
+                actif=True,
+            )
+            .first()
+        )
+
+        quantites_initiales = quantites_initiales_destinataire(
+            distributeur_gerant,
+            date.today()
+        )
+
         for ligne in commande.lignes.select_related(
 
             "produit__compagnie"
@@ -866,6 +1191,13 @@ def ajouter_distribution_directeur(request):
                 "montant": float(ligne.montant),
 
                 "quantite": float(ligne.quantite),
+
+                "quantite_initiale": float(
+                    quantites_initiales.get(
+                        str(ligne.produit.idproduit),
+                        0
+                    )
+                ),
 
                 "taux": float(ligne.taux_remise),
 

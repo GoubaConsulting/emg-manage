@@ -50,6 +50,16 @@ urlpatterns = [
 
     path(
 
+        "manquants/reglements/",
+
+        views.liste_reglements_manquants,
+
+        name="liste_reglements_manquants"
+
+    ),
+
+    path(
+
         "manquants/<int:pk>/regler/",
 
         views.regler_manquant_view,

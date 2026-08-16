@@ -145,7 +145,7 @@ function construireTableau(produits) {
 
             <tr class="table-secondary">
 
-                <td colspan="7">
+                <td colspan="9">
 
                     <strong>
 
@@ -177,6 +177,8 @@ function construireTableau(produits) {
 
                     data-compagnie="${produit.compagnie_id}"
 
+                    data-initiale="${produit.quantite_initiale || 0}"
+
                 >
 
                     <td>
@@ -188,6 +190,12 @@ function construireTableau(produits) {
                     <td class="text-end">
 
                         ${produit.prix}
+
+                    </td>
+
+                    <td class="text-end">
+
+                        ${produit.quantite_initiale || 0}
 
                     </td>
 
@@ -238,6 +246,22 @@ function construireTableau(produits) {
                             class="form-control quantite"
 
                             value="${produit.quantite}"
+
+                            readonly
+
+                        >
+
+                    </td>
+
+                    <td>
+
+                        <input
+
+                            type="text"
+
+                            class="form-control quantite-totale"
+
+                            value="${(produit.quantite_initiale || 0) + produit.quantite}"
 
                             readonly
 
@@ -307,7 +331,7 @@ function construireTableau(produits) {
 
             <tr class="table-warning">
 
-                <td colspan="6" class="text-end">
+                <td colspan="8" class="text-end">
 
                     <strong>
 
@@ -428,6 +452,10 @@ function recalculerLigne(ligne) {
         ".quantite"
     );
 
+    const quantiteTotaleInput = ligne.querySelector(
+        ".quantite-totale"
+    );
+
     const tauxInput = ligne.querySelector(
         ".taux"
     );
@@ -498,11 +526,25 @@ function recalculerLigne(ligne) {
 
     const quantite = montant / prix;
 
+    const quantiteInitiale = Number(
+        ligne.dataset.initiale
+    ) || 0;
+
     const montantRemise = montant * taux / 100;
 
     const montantNet = montant - montantRemise;
 
     quantiteInput.value = quantite;
+
+    if (quantiteTotaleInput) {
+
+        quantiteTotaleInput.value = (
+            quantiteInitiale
+            +
+            quantite
+        );
+
+    }
 
     remiseInput.value = montantRemise.toFixed(0);
 

@@ -16,14 +16,42 @@ Liste des distributions
 
         </h4>
 
-        <a
-            href="{% url url_nouveau %}"
-            class="btn btn-success"
-        >
+        <div class="d-flex gap-2">
 
-            Nouvelle distribution
+            {% if est_gerant %}
 
-        </a>
+                <a
+                    href="{% url 'distributions:ajouter_distribution' %}"
+                    class="btn btn-success"
+                >
+
+                    Distribution distributeur
+
+                </a>
+
+                <a
+                    href="{% url 'distributions:ajouter_distribution_client' %}"
+                    class="btn btn-primary"
+                >
+
+                    Vente directe
+
+                </a>
+
+            {% else %}
+
+                <a
+                    href="{% url url_nouveau %}"
+                    class="btn btn-success"
+                >
+
+                    Nouvelle distribution
+
+                </a>
+
+            {% endif %}
+
+        </div>
 
     </div>
 
@@ -148,7 +176,7 @@ Liste des distributions
 
                 <label class="form-label">
 
-                    Sous-distributeur
+                    Destinataire
 
                 </label>
 
@@ -159,7 +187,7 @@ Liste des distributions
 
                     <option value="">
 
-                        Tous les sous-distributeurs
+                        Tous les destinataires
 
                     </option>
 
@@ -485,12 +513,12 @@ Liste des distributions
                                     <div class="col-md-6">
 
                                         <strong>
-                                            {% if distribution.type_distribution == "GERANT_DISTRIBUTEUR" %}
+                                            {% if distribution.type_distribution == "DISTRIBUTEUR" %}
                                                 Sous-distributeur
-                                            {% elif distribution.type_distribution == "GERANT_CLIENT" %}
+                                            {% elif distribution.type_distribution == "CLIENT_DIRECT" %}
                                                 Client direct
                                             {% else %}
-                                                Distributeur
+                                                Gérant
                                             {% endif %}
                                             :
                                         </strong>
@@ -890,12 +918,6 @@ Liste des distributions
                             <th class="text-end">Montant brut</th>
                             <th class="text-end">Montant net</th>
 
-                            <th width="110">
-
-                                Actions
-
-                            </th>
-
                         </tr>
 
                     </thead>
@@ -956,26 +978,6 @@ Liste des distributions
 
                             </td>
 
-                            <td class="text-center">
-
-                                <button
-
-                                    class="btn btn-outline-primary btn-sm"
-
-                                    type="button"
-
-                                    data-bs-toggle="collapse"
-
-                                    data-bs-target="#sous{{ distribution.iddistribution }}"
-
-                                >
-
-                                    <i class="bi bi-eye"></i>
-
-                                </button>
-
-                            </td>
-
                         </tr>
 
                         <tr
@@ -986,7 +988,7 @@ Liste des distributions
 
                         >
 
-                            <td colspan="7">
+                            <td colspan="6">
 
                                 <div class="p-3">
 
@@ -1156,7 +1158,7 @@ Liste des distributions
 
                         <tr>
 
-                            <td colspan="7" class="text-center">
+                            <td colspan="6" class="text-center">
 
                                 Aucune distribution vers un sous-distributeur.
 
@@ -1346,12 +1348,6 @@ Liste des distributions
 
                             </th>
 
-                            <th width="110">
-
-                                Actions
-
-                            </th>
-
                         </tr>
 
                     </thead>
@@ -1412,26 +1408,6 @@ Liste des distributions
 
                             </td>
 
-                            <td class="text-center">
-
-                                <button
-
-                                    class="btn btn-outline-primary btn-sm"
-
-                                    type="button"
-
-                                    data-bs-toggle="collapse"
-
-                                    data-bs-target="#client{{ distribution.iddistribution }}"
-
-                                >
-
-                                    <i class="bi bi-eye"></i>
-
-                                </button>
-
-                            </td>
-
                         </tr>
 
                         <tr
@@ -1442,7 +1418,7 @@ Liste des distributions
 
                         >
 
-                            <td colspan="7">
+                            <td colspan="6">
 
                                 <div class="p-3">
 
@@ -1668,7 +1644,7 @@ Liste des distributions
 
                         <tr>
 
-                            <td colspan="7" class="text-center">
+                            <td colspan="6" class="text-center">
 
                                 Aucune distribution à un client direct.
 

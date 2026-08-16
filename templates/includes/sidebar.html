@@ -280,6 +280,12 @@
                                             Suivi
                                         </span>
                                     </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_reglements_manquants' %}active{% endif %}"
+                                        href="{% url 'situations:liste_reglements_manquants' %}"
+                                    >
+                                        Règlements manquants
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -385,6 +391,12 @@
                                         <span class="badge rounded-pill {% if request.resolver_match.url_name == 'liste_manquants' or request.resolver_match.url_name == 'regler_manquant' %}text-bg-light text-primary{% else %}text-bg-danger{% endif %}">
                                             Suivi
                                         </span>
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_reglements_manquants' %}active{% endif %}"
+                                        href="{% url 'situations:liste_reglements_manquants' %}"
+                                    >
+                                        Règlements manquants
                                     </a>
                                 </div>
                             </div>

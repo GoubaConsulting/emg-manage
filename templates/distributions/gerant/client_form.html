@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block title %}
-Distribution à un distributeur
+{{ titre|default:"Vente directe" }}
 {% endblock %}
 
 {% block content %}
@@ -14,7 +14,7 @@ Distribution à un distributeur
 
         <h4 class="mb-0">
 
-            Nouvelle distribution à un distributeur
+            {{ titre|default:"Nouvelle vente directe" }}
 
         </h4>
 
@@ -42,23 +42,11 @@ Distribution à un distributeur
 
                     <label class="form-label">
 
-                        Date de distribution
+                        Date de vente
 
                     </label>
 
                     {{ form.date_distribution }}
-
-                </div>
-
-                <div class="col-md-5">
-
-                    <label class="form-label">
-
-                        Distributeur
-
-                    </label>
-
-                    {{ form.distributeur }}
 
                 </div>
 
@@ -342,7 +330,7 @@ Distribution à un distributeur
 
     >
 
-        Enregistrer
+        {{ bouton_enregistrer|default:"Enregistrer" }}
 
     </button>
 
@@ -358,6 +346,6 @@ Distribution à un distributeur
 
 {% block scripts %}
 
-<script src="{% static 'js/distributions_gerant.js' %}"></script>
+<script src="{% static 'js/distributions_client.js' %}"></script>
 
 {% endblock %}

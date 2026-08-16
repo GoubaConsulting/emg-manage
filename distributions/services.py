@@ -22,6 +22,7 @@ from commandes.models import (
 )
 
 from referentiel.models import (
+    Distributeur,
     PointVente,
     Produit,
 )
@@ -50,6 +51,8 @@ from .validators import (
     valider_prix,
     valider_quantite,
     valider_taux_remise,
+    valider_distributeur,
+    valider_type_distribution,
     verifier_commande_selectionnee,
     verifier_date_distribution,
     verifier_commande_distribuable,
@@ -145,6 +148,58 @@ def construire_lignes_depuis_formulaire(donnees):
 
     return lignes
 
+
+def verifier_destinataire_distribution_gerant(
+    type_distribution,
+    distributeur
+):
+    """
+    Verifie que le destinataire correspond au type
+    de distribution realisee par le gerant.
+    """
+
+    valider_type_distribution(
+        type_distribution
+    )
+
+    valider_distributeur(
+        distributeur
+    )
+
+    if (
+        type_distribution == Distribution.TYPE_COMMANDE_GERANT
+        and
+        distributeur.categorie != Distributeur.CATEGORIE_GERANT
+    ):
+
+        raise Exception(
+            "Une distribution Directeur vers point de vente "
+            "doit etre rattachee a un gerant."
+        )
+
+    if (
+        type_distribution == Distribution.TYPE_DISTRIBUTEUR
+        and
+        distributeur.categorie != Distributeur.CATEGORIE_DISTRIBUTEUR
+    ):
+
+        raise Exception(
+            "Une distribution terrain doit etre "
+            "rattachee a un distributeur."
+        )
+
+    if (
+        type_distribution == Distribution.TYPE_CLIENT_DIRECT
+        and
+        distributeur.categorie != Distributeur.CATEGORIE_CLIENT
+    ):
+
+        raise Exception(
+            "Une vente directe doit etre rattachee "
+            "a un client direct."
+        )
+
+
 # ==========================================================
 # CREATION D'UNE DISTRIBUTION
 # ==========================================================
@@ -175,6 +230,11 @@ def creer_distribution(
 
     verifier_date_distribution(
         date_distribution
+    )
+
+    verifier_destinataire_distribution_gerant(
+        type_distribution,
+        distributeur
     )
 
     verifier_presence_ligne(
@@ -321,6 +381,11 @@ def creer_distribution_gerant(
         date_distribution
     )
 
+    verifier_destinataire_distribution_gerant(
+        type_distribution,
+        distributeur
+    )
+
     verifier_presence_ligne(
         lignes
     )
@@ -422,6 +487,17 @@ def traiter_distribution_gerant(
         distribution
 
     )
+
+    if distribution.type_distribution == Distribution.TYPE_CLIENT_DIRECT:
+
+        from situations.services import (
+            synchroniser_situation_vente_directe,
+        )
+
+        synchroniser_situation_vente_directe(
+            distribution,
+            distribution.utilisateur
+        )
 
 
 # ==========================================================
