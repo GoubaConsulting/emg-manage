@@ -177,6 +177,82 @@ def _stock_normal_par_produit(point_vente):
     }
 
 
+def _taux_derniere_commande_par_produit(point_vente, type_commande):
+    """
+    Retourne le taux de la derniere commande normale validee par produit.
+    """
+
+    lignes = (
+        LigneCommande.objects
+        .filter(
+            commande__actif=True,
+            commande__point_vente=point_vente,
+            commande__type_commande=type_commande,
+            commande__categorie_commande=Commande.CATEGORIE_NORMALE,
+            commande__etat__in=[
+                Commande.VALIDEE,
+                Commande.VALIDEE_PARTIELLEMENT,
+            ],
+        )
+        .select_related(
+            "commande"
+        )
+        .order_by(
+            "produit_id",
+            "-commande__date_commande",
+            "-commande__idcommande",
+            "-idlignecommande",
+        )
+    )
+
+    taux_par_produit = {}
+
+    for ligne in lignes:
+
+        if ligne.produit_id not in taux_par_produit:
+
+            taux_par_produit[ligne.produit_id] = _decimal(
+                ligne.taux_remise
+            )
+
+    return taux_par_produit
+
+
+def _valoriser_quantite(produit, quantite, taux_par_produit):
+    """
+    Valorise une quantite avec le prix produit et le dernier taux connu.
+    """
+
+    quantite = _decimal(
+        quantite
+    )
+
+    montant_brut = produit.prix * quantite
+
+    taux = _decimal(
+        taux_par_produit.get(
+            produit.pk
+        )
+    )
+
+    montant_remise = (
+        montant_brut
+        *
+        taux
+        /
+        Decimal("100")
+    )
+
+    return {
+        "montant_brut": montant_brut,
+        "montant_net": (
+            montant_brut
+            -
+            montant_remise
+        ),
+    }
+
+
 def objectifs_mois(point_vente, mois, annee):
     """
     Objectifs du point de vente pour le mois courant.
@@ -274,6 +350,7 @@ def synthese_distributions(
     mois,
     annee,
     types_distribution,
+    type_commande_reference,
 ):
     """
     Synthese des distributions par produit.
@@ -283,6 +360,11 @@ def synthese_distributions(
 
     stock_map = _stock_normal_par_produit(
         point_vente
+    )
+
+    taux_map = _taux_derniere_commande_par_produit(
+        point_vente,
+        type_commande_reference,
     )
 
     lignes_distribution = (
@@ -298,8 +380,6 @@ def synthese_distributions(
             "produit_id"
         )
         .annotate(
-            montant_brut=Sum("montant"),
-            montant_net=Sum("montant_net"),
             quantite=Sum("quantite"),
         )
     )
@@ -318,25 +398,49 @@ def synthese_distributions(
             {}
         )
 
+        stock = stock_map.get(
+            produit.pk,
+            Decimal("0.00")
+        )
+
+        quantite = _decimal(
+            distribution.get("quantite")
+        )
+
+        stock_valorise = _valoriser_quantite(
+            produit,
+            stock,
+            taux_map,
+        )
+
+        distribution_valorisee = _valoriser_quantite(
+            produit,
+            quantite,
+            taux_map,
+        )
+
         lignes.append({
             "produit": produit,
-            "stock": stock_map.get(
-                produit.pk,
-                Decimal("0.00")
-            ),
-            "quantite": _decimal(
-                distribution.get("quantite")
-            ),
-            "montant_brut": _decimal(
-                distribution.get("montant_brut")
-            ),
-            "montant_net": _decimal(
-                distribution.get("montant_net")
-            ),
+            "stock": stock,
+            "stock_montant_brut": stock_valorise[
+                "montant_brut"
+            ],
+            "stock_montant_net": stock_valorise[
+                "montant_net"
+            ],
+            "quantite": quantite,
+            "montant_brut": distribution_valorisee[
+                "montant_brut"
+            ],
+            "montant_net": distribution_valorisee[
+                "montant_net"
+            ],
         })
 
     champs_totaux = [
         "stock",
+        "stock_montant_brut",
+        "stock_montant_net",
         "quantite",
         "montant_brut",
         "montant_net",
@@ -683,7 +787,12 @@ def tableau_manquants(personne, mois, annee):
     }
 
 
-def synthese_ventes_directes(point_vente, mois, annee):
+def synthese_ventes_directes(
+    point_vente,
+    mois,
+    annee,
+    type_commande_reference,
+):
     """
     Somme des ventes directes par produit.
     """
@@ -701,7 +810,6 @@ def synthese_ventes_directes(point_vente, mois, annee):
             "produit_id"
         )
         .annotate(
-            montant_net=Sum("montant_net"),
             quantite=Sum("quantite"),
         )
     )
@@ -727,6 +835,11 @@ def synthese_ventes_directes(point_vente, mois, annee):
 
     lignes = []
 
+    taux_map = _taux_derniere_commande_par_produit(
+        point_vente,
+        type_commande_reference,
+    )
+
     for produit in produits:
 
         distribution = distribution_map.get(
@@ -734,18 +847,30 @@ def synthese_ventes_directes(point_vente, mois, annee):
             {}
         )
 
+        quantite = _decimal(
+            distribution.get("quantite")
+        )
+
+        vente_valorisee = _valoriser_quantite(
+            produit,
+            quantite,
+            taux_map,
+        )
+
         lignes.append({
             "produit": produit,
-            "quantite": _decimal(
-                distribution.get("quantite")
-            ),
-            "montant_net": _decimal(
-                distribution.get("montant_net")
-            ),
+            "quantite": quantite,
+            "montant_brut": vente_valorisee[
+                "montant_brut"
+            ],
+            "montant_net": vente_valorisee[
+                "montant_net"
+            ],
         })
 
     champs_totaux = [
         "quantite",
+        "montant_brut",
         "montant_net",
     ]
 
@@ -809,6 +934,7 @@ def donnees_dashboard(utilisateur, personne_id=None):
             [
                 Distribution.TYPE_COMMANDE_GERANT,
             ],
+            Commande.TYPE_DIRECTEUR,
         )
 
         situation_synthese = synthese_situations_personne(
@@ -879,6 +1005,7 @@ def donnees_dashboard(utilisateur, personne_id=None):
             [
                 Distribution.TYPE_DISTRIBUTEUR,
             ],
+            Commande.TYPE_GERANT,
         )
 
         situation_synthese = synthese_situations_personne(
@@ -898,6 +1025,7 @@ def donnees_dashboard(utilisateur, personne_id=None):
             point_vente,
             mois,
             annee,
+            Commande.TYPE_GERANT,
         )
 
         contexte.update({

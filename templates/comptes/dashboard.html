@@ -167,6 +167,8 @@ Tableau de bord
                         <tr>
                             <th>Produit</th>
                             <th class="text-end">Quantité en stock</th>
+                            <th class="text-end">Montant brut stock</th>
+                            <th class="text-end">Montant net stock</th>
                             <th class="text-end">Quantité distribuée</th>
                             <th class="text-end">Montant brut distribué</th>
                             <th class="text-end">Montant net distribué</th>
@@ -175,7 +177,7 @@ Tableau de bord
                     <tbody>
                         {% for groupe in distribution_groupes %}
                             <tr class="table-secondary">
-                                <th colspan="5">
+                                <th colspan="7">
                                     {{ groupe.compagnie.designation }}
                                 </th>
                             </tr>
@@ -183,6 +185,8 @@ Tableau de bord
                                 <tr>
                                     <td>{{ ligne.produit.designation }}</td>
                                     <td class="text-end">{{ ligne.stock|floatformat:2 }}</td>
+                                    <td class="text-end">{{ ligne.stock_montant_brut|floatformat:2 }}</td>
+                                    <td class="text-end">{{ ligne.stock_montant_net|floatformat:2 }}</td>
                                     <td class="text-end">{{ ligne.quantite|floatformat:2 }}</td>
                                     <td class="text-end">{{ ligne.montant_brut|floatformat:2 }}</td>
                                     <td class="text-end fw-bold">{{ ligne.montant_net|floatformat:2 }}</td>
@@ -193,13 +197,15 @@ Tableau de bord
                                     Sous-total {{ groupe.compagnie.designation }}
                                 </td>
                                 <td class="text-end">{{ groupe.totaux.stock|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.stock_montant_brut|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.stock_montant_net|floatformat:2 }}</td>
                                 <td class="text-end">{{ groupe.totaux.quantite|floatformat:2 }}</td>
                                 <td class="text-end">{{ groupe.totaux.montant_brut|floatformat:2 }}</td>
                                 <td class="text-end">{{ groupe.totaux.montant_net|floatformat:2 }}</td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="5" class="text-center">
+                                <td colspan="7" class="text-center">
                                     Aucune distribution pour la période en cours.
                                 </td>
                             </tr>
@@ -209,6 +215,8 @@ Tableau de bord
                         <tr>
                             <td>Total distributions</td>
                             <td class="text-end">{{ distribution_totaux.stock|floatformat:2 }}</td>
+                            <td class="text-end">{{ distribution_totaux.stock_montant_brut|floatformat:2 }}</td>
+                            <td class="text-end">{{ distribution_totaux.stock_montant_net|floatformat:2 }}</td>
                             <td class="text-end">{{ distribution_totaux.quantite|floatformat:2 }}</td>
                             <td class="text-end">{{ distribution_totaux.montant_brut|floatformat:2 }}</td>
                             <td class="text-end">{{ distribution_totaux.montant_net|floatformat:2 }}</td>
@@ -377,13 +385,14 @@ Tableau de bord
                         <tr>
                             <th>Produit</th>
                             <th class="text-end">Quantité</th>
+                            <th class="text-end">Montant brut</th>
                             <th class="text-end">Montant net</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for groupe in ventes_directes_groupes %}
                             <tr class="table-secondary">
-                                <th colspan="3">
+                                <th colspan="4">
                                     {{ groupe.compagnie.designation }}
                                 </th>
                             </tr>
@@ -391,6 +400,7 @@ Tableau de bord
                                 <tr>
                                     <td>{{ ligne.produit.designation }}</td>
                                     <td class="text-end">{{ ligne.quantite|floatformat:2 }}</td>
+                                    <td class="text-end">{{ ligne.montant_brut|floatformat:2 }}</td>
                                     <td class="text-end fw-bold">{{ ligne.montant_net|floatformat:2 }}</td>
                                 </tr>
                             {% endfor %}
@@ -399,11 +409,12 @@ Tableau de bord
                                     Sous-total {{ groupe.compagnie.designation }}
                                 </td>
                                 <td class="text-end">{{ groupe.totaux.quantite|floatformat:2 }}</td>
+                                <td class="text-end">{{ groupe.totaux.montant_brut|floatformat:2 }}</td>
                                 <td class="text-end">{{ groupe.totaux.montant_net|floatformat:2 }}</td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="3" class="text-center">
+                                <td colspan="4" class="text-center">
                                     Aucune vente directe pour la période.
                                 </td>
                             </tr>
@@ -413,6 +424,7 @@ Tableau de bord
                         <tr>
                             <td>Total ventes directes</td>
                             <td class="text-end">{{ ventes_directes_totaux.quantite|floatformat:2 }}</td>
+                            <td class="text-end">{{ ventes_directes_totaux.montant_brut|floatformat:2 }}</td>
                             <td class="text-end">{{ ventes_directes_totaux.montant_net|floatformat:2 }}</td>
                         </tr>
                     </tfoot>
