@@ -11,9 +11,11 @@ Agregations de lecture pour le tableau de bord.
 """
 
 from collections import defaultdict
+from calendar import monthrange
+from datetime import date
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from commandes.models import (
@@ -44,18 +46,99 @@ from stocks.models import (
 )
 
 
+def _date_iso_ou_none(valeur):
+    """
+    Convertit une date ISO issue des filtres GET.
+    """
+
+    if not valeur:
+
+        return None
+
+    if hasattr(
+        valeur,
+        "year"
+    ):
+
+        return valeur
+
+    try:
+
+        return date.fromisoformat(
+            str(valeur)
+        )
+
+    except ValueError:
+
+        return None
+
+
+def periode_dashboard(date_debut=None, date_fin=None):
+    """
+    Retourne la periode filtree du tableau de bord.
+    Par defaut, elle couvre le mois courant.
+    """
+
+    aujourd_hui = timezone.localdate()
+
+    debut_defaut = aujourd_hui.replace(
+        day=1
+    )
+
+    fin_defaut = aujourd_hui.replace(
+        day=monthrange(
+            aujourd_hui.year,
+            aujourd_hui.month,
+        )[1]
+    )
+
+    debut = (
+        _date_iso_ou_none(date_debut)
+        or debut_defaut
+    )
+
+    fin = (
+        _date_iso_ou_none(date_fin)
+        or fin_defaut
+    )
+
+    if debut > fin:
+
+        debut, fin = fin, debut
+
+    return {
+        "mois": debut.month,
+        "annee": debut.year,
+        "date_debut": debut,
+        "date_fin": fin,
+        "date_debut_iso": debut.isoformat(),
+        "date_fin_iso": fin.isoformat(),
+        "libelle": (
+            f"du {debut.strftime('%d/%m/%Y')} "
+            f"au {fin.strftime('%d/%m/%Y')}"
+        ),
+    }
+
+
 def periode_courante():
     """
     Retourne le mois et l'annee courants.
     """
 
-    aujourd_hui = timezone.localdate()
+    return periode_dashboard()
 
-    return {
-        "mois": aujourd_hui.month,
-        "annee": aujourd_hui.year,
-        "libelle": f"{aujourd_hui.month:02d}/{aujourd_hui.year}",
-    }
+
+def _filtrer_intervalle(queryset, champ_date, date_debut, date_fin):
+    """
+    Applique un intervalle de dates inclusif a un queryset.
+    """
+
+    return queryset.filter(
+        **{
+            f"{champ_date}__gte": date_debut,
+            f"{champ_date}__lte": date_fin,
+        }
+    )
 
 
 def _decimal(valeur):
@@ -347,8 +430,8 @@ def objectifs_mois(point_vente, mois, annee):
 
 def synthese_distributions(
     point_vente,
-    mois,
-    annee,
+    date_debut,
+    date_fin,
     types_distribution,
     type_commande_reference,
 ):
@@ -367,15 +450,19 @@ def synthese_distributions(
         type_commande_reference,
     )
 
-    lignes_distribution = (
+    lignes_distribution = _filtrer_intervalle(
         LigneDistribution.objects
         .filter(
             distribution__actif=True,
             distribution__point_vente_source=point_vente,
-            distribution__date_distribution__month=mois,
-            distribution__date_distribution__year=annee,
             distribution__type_distribution__in=types_distribution,
-        )
+        ),
+        "distribution__date_distribution",
+        date_debut,
+        date_fin,
+    )
+    lignes_distribution = (
+        lignes_distribution
         .values(
             "produit_id"
         )
@@ -458,6 +545,111 @@ def synthese_distributions(
     }
 
 
+def synthese_distributions_par_destinataire(
+    point_vente,
+    date_debut,
+    date_fin,
+):
+    """
+    Detail des distributions terrain par distributeur.
+    Les clients directs sont volontairement exclus.
+    """
+
+    lignes_queryset = _filtrer_intervalle(
+        LigneDistribution.objects
+        .filter(
+            distribution__actif=True,
+            distribution__point_vente_source=point_vente,
+            distribution__type_distribution=Distribution.TYPE_DISTRIBUTEUR,
+        )
+        .select_related(
+            "distribution",
+            "distribution__distributeur",
+            "produit",
+            "produit__compagnie",
+        )
+        .order_by(
+            "distribution__distributeur__nom",
+            "distribution__distributeur__prenom",
+            "produit__compagnie__designation",
+            "produit__designation",
+        ),
+        "distribution__date_distribution",
+        date_debut,
+        date_fin,
+    )
+
+    donnees = {}
+
+    for ligne in lignes_queryset:
+
+        distributeur = ligne.distribution.distributeur
+
+        if distributeur.pk not in donnees:
+
+            donnees[distributeur.pk] = {
+                "distributeur": distributeur,
+                "produits": {},
+            }
+
+        produits = donnees[distributeur.pk]["produits"]
+
+        if ligne.produit_id not in produits:
+
+            produits[ligne.produit_id] = {
+                "produit": ligne.produit,
+                "quantite": Decimal("0.00"),
+                "montant_brut": Decimal("0.00"),
+                "montant_net": Decimal("0.00"),
+            }
+
+        produits[ligne.produit_id]["quantite"] += ligne.quantite
+        produits[ligne.produit_id]["montant_brut"] += ligne.montant
+        produits[ligne.produit_id]["montant_net"] += ligne.montant_net
+
+    champs_totaux = [
+        "quantite",
+        "montant_brut",
+        "montant_net",
+    ]
+
+    destinataires = []
+
+    toutes_lignes = []
+
+    for donnees_distributeur in donnees.values():
+
+        lignes = list(
+            donnees_distributeur["produits"].values()
+        )
+
+        toutes_lignes.extend(
+            lignes
+        )
+
+        destinataires.append({
+            "distributeur": donnees_distributeur[
+                "distributeur"
+            ],
+            "groupes": _grouper_par_compagnie(
+                lignes,
+                champs_totaux,
+            ),
+            "totaux": _totaux_lignes(
+                lignes,
+                champs_totaux,
+            ),
+        })
+
+    return {
+        "destinataires": destinataires,
+        "totaux": _totaux_lignes(
+            toutes_lignes,
+            champs_totaux,
+        ),
+    }
+
+
 def gerants_disponibles():
     """
     Liste des gerants pour le tableau Directeur.
@@ -473,6 +665,38 @@ def gerants_disponibles():
             "point_vente"
         )
         .order_by(
+            "point_vente__designation",
+            "nom",
+            "prenom",
+        )
+    )
+
+
+def personnes_directeur(point_vente):
+    """
+    Liste les gerants et les distributeurs directs du Directeur.
+    """
+
+    return list(
+        Distributeur.objects
+        .filter(
+            actif=True,
+        )
+        .filter(
+            Q(
+                categorie=Distributeur.CATEGORIE_GERANT,
+            )
+            |
+            Q(
+                categorie=Distributeur.CATEGORIE_DISTRIBUTEUR,
+                point_vente=point_vente,
+            )
+        )
+        .select_related(
+            "point_vente"
+        )
+        .order_by(
+            "categorie",
             "point_vente__designation",
             "nom",
             "prenom",
@@ -519,7 +743,42 @@ def _selectionner_personne(personnes, personne_id):
     return personnes[0]
 
 
-def _montants_commandes_gerant(personne, mois, annee):
+def _montants_reference_directeur(
+    personne,
+    point_vente,
+    date_debut,
+    date_fin,
+):
+    """
+    Retourne le montant reference d'une personne suivie
+    par le Directeur selon sa categorie.
+    """
+
+    if personne is None:
+
+        return {}
+
+    if personne.categorie == Distributeur.CATEGORIE_GERANT:
+
+        return _montants_commandes_gerant(
+            personne,
+            date_debut,
+            date_fin,
+        )
+
+    if personne.categorie == Distributeur.CATEGORIE_DISTRIBUTEUR:
+
+        return _montants_distribues_distributeur(
+            personne,
+            point_vente,
+            date_debut,
+            date_fin,
+        )
+
+    return {}
+
+
+def _montants_commandes_gerant(personne, date_debut, date_fin):
     """
     Montants nets commandes par produit pour un gerant.
     """
@@ -528,15 +787,19 @@ def _montants_commandes_gerant(personne, mois, annee):
 
         return {}
 
-    lignes = (
+    lignes = _filtrer_intervalle(
         LigneCommande.objects
         .filter(
             commande__actif=True,
             commande__point_vente=personne.point_vente,
             commande__categorie_commande=Commande.CATEGORIE_NORMALE,
-            commande__date_commande__month=mois,
-            commande__date_commande__year=annee,
-        )
+        ),
+        "commande__date_commande",
+        date_debut,
+        date_fin,
+    )
+    lignes = (
+        lignes
         .values(
             "produit_id"
         )
@@ -551,7 +814,12 @@ def _montants_commandes_gerant(personne, mois, annee):
     }
 
 
-def _montants_distribues_distributeur(personne, point_vente, mois, annee):
+def _montants_distribues_distributeur(
+    personne,
+    point_vente,
+    date_debut,
+    date_fin,
+):
     """
     Montants nets distribues par produit a un distributeur.
     """
@@ -560,16 +828,20 @@ def _montants_distribues_distributeur(personne, point_vente, mois, annee):
 
         return {}
 
-    lignes = (
+    lignes = _filtrer_intervalle(
         LigneDistribution.objects
         .filter(
             distribution__actif=True,
             distribution__point_vente_source=point_vente,
             distribution__distributeur=personne,
             distribution__type_distribution=Distribution.TYPE_DISTRIBUTEUR,
-            distribution__date_distribution__month=mois,
-            distribution__date_distribution__year=annee,
-        )
+        ),
+        "distribution__date_distribution",
+        date_debut,
+        date_fin,
+    )
+    lignes = (
+        lignes
         .values(
             "produit_id"
         )
@@ -584,7 +856,7 @@ def _montants_distribues_distributeur(personne, point_vente, mois, annee):
     }
 
 
-def _montants_verses_par_produit(personne, mois, annee):
+def _montants_verses_par_produit(personne, date_debut, date_fin):
     """
     Montants vendus/verses issus des lignes de situation.
     """
@@ -597,15 +869,19 @@ def _montants_verses_par_produit(personne, mois, annee):
 
         return montants
 
-    lignes = (
+    lignes = _filtrer_intervalle(
         LigneSituationJournaliere.objects
         .filter(
             situation__actif=True,
             situation__etat=SituationJournaliere.ETAT_CLOTUREE,
             situation__distributeur=personne,
-            situation__date_situation__month=mois,
-            situation__date_situation__year=annee,
-        )
+        ),
+        "situation__date_situation",
+        date_debut,
+        date_fin,
+    )
+    lignes = (
+        lignes
         .select_related(
             "produit",
             "produit__compagnie",
@@ -625,8 +901,8 @@ def _montants_verses_par_produit(personne, mois, annee):
 
 def synthese_situations_personne(
     personne,
-    mois,
-    annee,
+    date_debut,
+    date_fin,
     montant_reference_map,
 ):
     """
@@ -635,8 +911,8 @@ def synthese_situations_personne(
 
     montant_verse_map = _montants_verses_par_produit(
         personne,
-        mois,
-        annee,
+        date_debut,
+        date_fin,
     )
 
     produit_ids = set(
@@ -704,7 +980,7 @@ def synthese_situations_personne(
     }
 
 
-def tableau_manquants(personne, mois, annee):
+def tableau_manquants(personne, date_debut, date_fin):
     """
     Manquants et paiements d'une personne pour la periode.
     """
@@ -720,14 +996,18 @@ def tableau_manquants(personne, mois, annee):
             },
         }
 
-    manquants = (
+    manquants = _filtrer_intervalle(
         Manquant.objects
         .filter(
             situation__actif=True,
             situation__distributeur=personne,
-            situation__date_situation__month=mois,
-            situation__date_situation__year=annee,
-        )
+        ),
+        "situation__date_situation",
+        date_debut,
+        date_fin,
+    )
+    manquants = (
+        manquants
         .select_related(
             "situation",
             "distributeur",
@@ -789,23 +1069,27 @@ def tableau_manquants(personne, mois, annee):
 
 def synthese_ventes_directes(
     point_vente,
-    mois,
-    annee,
+    date_debut,
+    date_fin,
     type_commande_reference,
 ):
     """
     Somme des ventes directes par produit.
     """
 
-    lignes_distribution = (
+    lignes_distribution = _filtrer_intervalle(
         LigneDistribution.objects
         .filter(
             distribution__actif=True,
             distribution__point_vente_source=point_vente,
             distribution__type_distribution=Distribution.TYPE_CLIENT_DIRECT,
-            distribution__date_distribution__month=mois,
-            distribution__date_distribution__year=annee,
-        )
+        ),
+        "distribution__date_distribution",
+        date_debut,
+        date_fin,
+    )
+    lignes_distribution = (
+        lignes_distribution
         .values(
             "produit_id"
         )
@@ -886,16 +1170,28 @@ def synthese_ventes_directes(
     }
 
 
-def donnees_dashboard(utilisateur, personne_id=None):
+def donnees_dashboard(
+    utilisateur,
+    personne_id=None,
+    date_debut=None,
+    date_fin=None,
+):
     """
     Construit le contexte metier du tableau de bord.
     """
 
-    periode = periode_courante()
+    periode = periode_dashboard(
+        date_debut,
+        date_fin,
+    )
 
     mois = periode["mois"]
 
     annee = periode["annee"]
+
+    date_debut = periode["date_debut"]
+
+    date_fin = periode["date_fin"]
 
     profil = utilisateur.profil
 
@@ -914,40 +1210,58 @@ def donnees_dashboard(utilisateur, personne_id=None):
 
     if est_directeur(utilisateur):
 
-        personnes = gerants_disponibles()
+        personnes = personnes_directeur(
+            point_vente
+        )
 
         personne_selectionnee = _selectionner_personne(
             personnes,
             personne_id,
         )
 
-        montant_reference_map = _montants_commandes_gerant(
+        montant_reference_map = _montants_reference_directeur(
             personne_selectionnee,
-            mois,
-            annee,
+            point_vente,
+            date_debut,
+            date_fin,
         )
 
         distribution_synthese = synthese_distributions(
             point_vente,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
             [
                 Distribution.TYPE_COMMANDE_GERANT,
             ],
             Commande.TYPE_DIRECTEUR,
         )
 
+        distribution_destinataires_synthese = (
+            synthese_distributions_par_destinataire(
+                point_vente,
+                date_debut,
+                date_fin,
+            )
+        )
+
         situation_synthese = synthese_situations_personne(
             personne_selectionnee,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
             montant_reference_map,
         )
 
         manquants_synthese = tableau_manquants(
             personne_selectionnee,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
+        )
+
+        ventes_directes_synthese = synthese_ventes_directes(
+            point_vente,
+            date_debut,
+            date_fin,
+            Commande.TYPE_DIRECTEUR,
         )
 
         contexte.update({
@@ -962,10 +1276,20 @@ def donnees_dashboard(utilisateur, personne_id=None):
             "distribution_totaux": distribution_synthese[
                 "totaux"
             ],
+            "distribution_destinataires": (
+                distribution_destinataires_synthese[
+                    "destinataires"
+                ]
+            ),
+            "distribution_destinataires_totaux": (
+                distribution_destinataires_synthese[
+                    "totaux"
+                ]
+            ),
             "personnes": personnes,
             "personne_selectionnee": personne_selectionnee,
-            "personne_label": "Gérant",
-            "montant_reference_label": "Montant net commandé",
+            "personne_label": "Gérant / Distributeur",
+            "montant_reference_label": "Montant net à justifier",
             "situation_groupes": situation_synthese[
                 "groupes"
             ],
@@ -976,6 +1300,12 @@ def donnees_dashboard(utilisateur, personne_id=None):
                 "lignes"
             ],
             "manquants_totaux": manquants_synthese[
+                "totaux"
+            ],
+            "ventes_directes_groupes": ventes_directes_synthese[
+                "groupes"
+            ],
+            "ventes_directes_totaux": ventes_directes_synthese[
                 "totaux"
             ],
         })
@@ -994,37 +1324,45 @@ def donnees_dashboard(utilisateur, personne_id=None):
         montant_reference_map = _montants_distribues_distributeur(
             personne_selectionnee,
             point_vente,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
         )
 
         distribution_synthese = synthese_distributions(
             point_vente,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
             [
                 Distribution.TYPE_DISTRIBUTEUR,
             ],
             Commande.TYPE_GERANT,
         )
 
+        distribution_destinataires_synthese = (
+            synthese_distributions_par_destinataire(
+                point_vente,
+                date_debut,
+                date_fin,
+            )
+        )
+
         situation_synthese = synthese_situations_personne(
             personne_selectionnee,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
             montant_reference_map,
         )
 
         manquants_synthese = tableau_manquants(
             personne_selectionnee,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
         )
 
         ventes_directes_synthese = synthese_ventes_directes(
             point_vente,
-            mois,
-            annee,
+            date_debut,
+            date_fin,
             Commande.TYPE_GERANT,
         )
 
@@ -1035,6 +1373,16 @@ def donnees_dashboard(utilisateur, personne_id=None):
             "distribution_totaux": distribution_synthese[
                 "totaux"
             ],
+            "distribution_destinataires": (
+                distribution_destinataires_synthese[
+                    "destinataires"
+                ]
+            ),
+            "distribution_destinataires_totaux": (
+                distribution_destinataires_synthese[
+                    "totaux"
+                ]
+            ),
             "personnes": personnes,
             "personne_selectionnee": personne_selectionnee,
             "personne_label": "Distributeur",

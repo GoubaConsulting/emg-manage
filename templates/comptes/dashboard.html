@@ -12,7 +12,7 @@ Tableau de bord
             Tableau de bord
         </h2>
         <div class="text-muted">
-            Période en cours : {{ periode.libelle }}
+            Période affichée : {{ periode.libelle }}
         </div>
     </div>
 
@@ -27,6 +27,66 @@ Tableau de bord
         {% endif %}
     </div>
 </div>
+
+{% if est_directeur or est_gerant %}
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                {% if personne_selectionnee %}
+                    <input
+                        type="hidden"
+                        name="personne"
+                        value="{{ personne_selectionnee.pk }}"
+                    >
+                {% endif %}
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Du
+                    </label>
+                    <input
+                        type="date"
+                        name="date_debut"
+                        class="form-control"
+                        value="{{ periode.date_debut_iso }}"
+                    >
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Au
+                    </label>
+                    <input
+                        type="date"
+                        name="date_fin"
+                        class="form-control"
+                        value="{{ periode.date_fin_iso }}"
+                    >
+                </div>
+
+                <div class="col-md-3">
+                    <button
+                        type="submit"
+                        class="btn btn-primary w-100"
+                    >
+                        Filtrer
+                    </button>
+                </div>
+
+                <div class="col-md-3">
+                    <a
+                        href="{% url 'dashboard' %}"
+                        class="btn btn-secondary w-100"
+                    >
+                        Réinitialiser
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+{% endif %}
 
 {% if not profil.point_vente and not est_directeur and not est_gerant %}
 
@@ -228,12 +288,96 @@ Tableau de bord
     </div>
 
     <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            Distributions par distributeur
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-end">Quantité</th>
+                            <th class="text-end">Montant brut</th>
+                            <th class="text-end">Montant net</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bloc in distribution_destinataires %}
+                            <tr class="table-primary">
+                                <th colspan="4">
+                                    {{ bloc.distributeur.nom }} {{ bloc.distributeur.prenom }}
+                                </th>
+                            </tr>
+                            {% for groupe in bloc.groupes %}
+                                <tr class="table-secondary">
+                                    <th colspan="4">
+                                        {{ groupe.compagnie.designation }}
+                                    </th>
+                                </tr>
+                                {% for ligne in groupe.lignes %}
+                                    <tr>
+                                        <td>{{ ligne.produit.designation }}</td>
+                                        <td class="text-end">{{ ligne.quantite|floatformat:2 }}</td>
+                                        <td class="text-end">{{ ligne.montant_brut|floatformat:2 }}</td>
+                                        <td class="text-end fw-bold">{{ ligne.montant_net|floatformat:2 }}</td>
+                                    </tr>
+                                {% endfor %}
+                                <tr class="table-light fw-bold">
+                                    <td>
+                                        Sous-total {{ groupe.compagnie.designation }}
+                                    </td>
+                                    <td class="text-end">{{ groupe.totaux.quantite|floatformat:2 }}</td>
+                                    <td class="text-end">{{ groupe.totaux.montant_brut|floatformat:2 }}</td>
+                                    <td class="text-end">{{ groupe.totaux.montant_net|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                            <tr class="table-info fw-bold">
+                                <td>
+                                    Total {{ bloc.distributeur.nom }} {{ bloc.distributeur.prenom }}
+                                </td>
+                                <td class="text-end">{{ bloc.totaux.quantite|floatformat:2 }}</td>
+                                <td class="text-end">{{ bloc.totaux.montant_brut|floatformat:2 }}</td>
+                                <td class="text-end">{{ bloc.totaux.montant_net|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center">
+                                    Aucune distribution à un distributeur pour la période.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark fw-bold">
+                        <tr>
+                            <td>Total distributions aux distributeurs</td>
+                            <td class="text-end">{{ distribution_destinataires_totaux.quantite|floatformat:2 }}</td>
+                            <td class="text-end">{{ distribution_destinataires_totaux.montant_brut|floatformat:2 }}</td>
+                            <td class="text-end">{{ distribution_destinataires_totaux.montant_net|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>
                 Situations par {{ personne_label|lower }}
             </span>
 
             <form method="get" class="d-flex align-items-center gap-2">
+                <input
+                    type="hidden"
+                    name="date_debut"
+                    value="{{ periode.date_debut_iso }}"
+                >
+                <input
+                    type="hidden"
+                    name="date_fin"
+                    value="{{ periode.date_fin_iso }}"
+                >
                 <label class="form-label mb-0">
                     {{ personne_label }}
                 </label>
@@ -372,7 +516,7 @@ Tableau de bord
 
 {% endif %}
 
-{% if est_gerant %}
+{% if est_directeur or est_gerant %}
 
     <div class="card shadow-sm mb-4">
         <div class="card-header">

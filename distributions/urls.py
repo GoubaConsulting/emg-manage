@@ -24,6 +24,16 @@ urlpatterns = [
         name="ajouter_distribution_directeur",
     ),
     path(
+        "directeur/distributeur/ajouter/",
+        views.ajouter_distribution_directeur_distributeur,
+        name="ajouter_distribution_directeur_distributeur",
+    ),
+    path(
+        "directeur/client/ajouter/",
+        views.ajouter_distribution_directeur_client,
+        name="ajouter_distribution_directeur_client",
+    ),
+    path(
         "gerant/client/ajouter/",
         views.ajouter_distribution_client,
         name="ajouter_distribution_client",

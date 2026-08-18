@@ -328,6 +328,191 @@ def creer_client_direct_automatique(
     )
 
 
+def ajouter_distribution_distributeur_point_vente(
+    request,
+    role_autorise,
+    message_interdit,
+    titre,
+):
+    """
+    Enregistre une distribution terrain vers un distributeur
+    rattache au point de vente de l'utilisateur connecte.
+    """
+
+    profil = request.user.profil
+
+    if profil.role != role_autorise:
+
+        messages.error(
+            request,
+            message_interdit,
+        )
+
+        return redirect(
+            "distributions:liste_distributions"
+        )
+
+    produits = produits_disponibles_point_vente(
+        profil.point_vente
+    )
+
+    date_distribution_form = date_distribution_saisie(
+        request
+    )
+
+    form = DistributionForm(
+        request.POST or None
+    )
+
+    configurer_form_destinataire(
+        form,
+        profil.point_vente,
+        Distributeur.CATEGORIE_DISTRIBUTEUR,
+        "Distributeur",
+    )
+
+    if request.method == "POST" and form.is_valid():
+
+        try:
+
+            lignes = construire_lignes_depuis_formulaire(
+                request.POST
+            )
+
+            creer_distribution_gerant(
+                utilisateur=request.user,
+                type_distribution=Distribution.TYPE_DISTRIBUTEUR,
+                distributeur=form.cleaned_data["distributeur"],
+                date_distribution=(
+                    form.cleaned_data["date_distribution"]
+                ),
+                lignes=lignes,
+            )
+
+            messages.success(
+                request,
+                "Distribution enregistrée avec succès."
+            )
+
+            return redirect(
+                "distributions:liste_distributions"
+            )
+
+        except Exception as e:
+
+            form.add_error(
+                None,
+                str(e)
+            )
+
+    destinataires_distribution = (
+        form.fields["distributeur"].queryset
+    )
+
+    return render(
+        request,
+        "distributions/gerant/form.html",
+        {
+            "form": form,
+            "produits": produits,
+            "titre": titre,
+            "destinataire_label": "Distributeur",
+            "bouton_enregistrer": "Enregistrer la distribution",
+            "aucun_destinataire": (
+                not destinataires_distribution.exists()
+            ),
+            "reliquats_json": reliquats_destinataires_json(
+                destinataires_distribution,
+                date_distribution_form,
+            ),
+        }
+    )
+
+
+def ajouter_vente_directe_point_vente(
+    request,
+    role_autorise,
+    message_interdit,
+    titre,
+):
+    """
+    Enregistre une vente directe depuis le point de vente
+    de l'utilisateur connecte.
+    """
+
+    profil = request.user.profil
+
+    if profil.role != role_autorise:
+
+        messages.error(
+            request,
+            message_interdit,
+        )
+
+        return redirect(
+            "distributions:liste_distributions"
+        )
+
+    produits = produits_disponibles_point_vente(
+        profil.point_vente
+    )
+
+    form = VenteDirecteForm(
+        request.POST or None
+    )
+
+    if request.method == "POST" and form.is_valid():
+
+        try:
+
+            lignes = construire_lignes_depuis_formulaire(
+                request.POST
+            )
+
+            with transaction.atomic():
+
+                client = creer_client_direct_automatique(
+                    profil.point_vente
+                )
+
+                creer_distribution_gerant(
+                    utilisateur=request.user,
+                    type_distribution=Distribution.TYPE_CLIENT_DIRECT,
+                    distributeur=client,
+                    date_distribution=(
+                        form.cleaned_data["date_distribution"]
+                    ),
+                    lignes=lignes,
+                )
+
+            messages.success(
+                request,
+                "Vente directe enregistrée et situation clôturée automatiquement."
+            )
+
+            return redirect(
+                "distributions:liste_distributions"
+            )
+
+        except Exception as e:
+
+            form.add_error(
+                None,
+                str(e)
+            )
+
+    return render(
+        request,
+        "distributions/gerant/client_form.html",
+        {
+            "form": form,
+            "produits": produits,
+            "titre": titre,
+            "bouton_enregistrer": "Enregistrer la vente directe",
+        }
+    )
+
+
 @login_required
 def ajouter_distribution(request):
 
@@ -656,6 +841,39 @@ def ajouter_distribution_client(request):
             "titre": "Nouvelle vente directe",
             "bouton_enregistrer": "Enregistrer la vente directe",
         }
+    )
+
+
+@login_required
+def ajouter_distribution_directeur_distributeur(request):
+    """
+    Distribution du Directeur vers un distributeur
+    non gerant rattache a son point de vente.
+    """
+
+    return ajouter_distribution_distributeur_point_vente(
+        request=request,
+        role_autorise="DIRECTEUR",
+        message_interdit=(
+            "Seul le Directeur peut enregistrer cette distribution."
+        ),
+        titre="Distribution Directeur vers distributeur",
+    )
+
+
+@login_required
+def ajouter_distribution_directeur_client(request):
+    """
+    Vente directe du Directeur.
+    """
+
+    return ajouter_vente_directe_point_vente(
+        request=request,
+        role_autorise="DIRECTEUR",
+        message_interdit=(
+            "Seul le Directeur peut enregistrer cette vente directe."
+        ),
+        titre="Vente directe Directeur",
     )
 
 

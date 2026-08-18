@@ -44,7 +44,9 @@ def dashboard(request):
 
     context = donnees_dashboard(
         request.user,
-        request.GET.get("personne")
+        request.GET.get("personne"),
+        request.GET.get("date_debut"),
+        request.GET.get("date_fin"),
     )
 
     return render(

@@ -38,14 +38,32 @@ Liste des distributions
 
                 </a>
 
-            {% else %}
+            {% elif est_directeur %}
 
                 <a
-                    href="{% url url_nouveau %}"
+                    href="{% url 'distributions:ajouter_distribution_directeur' %}"
                     class="btn btn-success"
                 >
 
-                    Nouvelle distribution
+                    Distribution gérant
+
+                </a>
+
+                <a
+                    href="{% url 'distributions:ajouter_distribution_directeur_distributeur' %}"
+                    class="btn btn-outline-success"
+                >
+
+                    Distribution distributeur
+
+                </a>
+
+                <a
+                    href="{% url 'distributions:ajouter_distribution_directeur_client' %}"
+                    class="btn btn-primary"
+                >
+
+                    Vente directe
 
                 </a>
 
