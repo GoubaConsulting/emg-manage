@@ -14,12 +14,12 @@ from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.shortcuts import render
-from .models import Stock
 from .permissions import peut_consulter
 from .selectors import (
     stocks_point_vente,
     paginer
 )
+from .services import valoriser_stocks
 
 
 @login_required
@@ -71,9 +71,17 @@ def liste_stock(request):
     # Préparation des groupes par compagnie
     # ==========================================================
 
+    stocks_valorises = valoriser_stocks(
+
+        page.object_list
+
+    )
+
+    page.object_list = stocks_valorises
+
     stocks_tries = sorted(
 
-        page.object_list,
+        stocks_valorises,
 
         key=lambda stock: (
             stock.produit.compagnie.designation,
@@ -83,6 +91,34 @@ def liste_stock(request):
     )
 
     groupes_compagnies = []
+
+    total_general = {
+
+        "quantite": sum(
+            (
+                stock.quantite
+                for stock in stocks_tries
+            ),
+            Decimal("0.00")
+        ),
+
+        "montant_brut": sum(
+            (
+                stock.montant_brut
+                for stock in stocks_tries
+            ),
+            Decimal("0.00")
+        ),
+
+        "montant_net": sum(
+            (
+                stock.montant_net
+                for stock in stocks_tries
+            ),
+            Decimal("0.00")
+        ),
+
+    }
 
     for compagnie, lignes in groupby(
 
@@ -94,11 +130,38 @@ def liste_stock(request):
 
         lignes = list(lignes)
 
+        totaux = {
+
+            "quantite": sum(
+                (
+                    stock.quantite
+                    for stock in lignes
+                )
+            ),
+
+            "montant_brut": sum(
+                (
+                    stock.montant_brut
+                    for stock in lignes
+                )
+            ),
+
+            "montant_net": sum(
+                (
+                    stock.montant_net
+                    for stock in lignes
+                )
+            ),
+
+        }
+
         groupes_compagnies.append({
 
             "compagnie": compagnie,
 
             "stocks": lignes,
+
+            "totaux": totaux,
 
         })
 
@@ -112,6 +175,8 @@ def liste_stock(request):
             "stocks": page,
 
             "groupes_compagnies": groupes_compagnies,
+
+            "total_general": total_general,
 
             "est_directeur": est_directeur,
 

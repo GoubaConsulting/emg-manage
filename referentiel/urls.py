@@ -27,6 +27,12 @@ urlpatterns = [
         name='supprimer_pointvente'
     ),
 
+    path(
+        'pointvente/reactiver/<int:pk>/',
+        views.reactiver_pointvente,
+        name='reactiver_pointvente'
+    ),
+
     # ==========================================
     # COMPAGNIES
     # ==========================================

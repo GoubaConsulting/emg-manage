@@ -21,7 +21,7 @@
 
     <div class="row">
 
-        <div class="col-md-6">
+        <div class="col-md-5">
 
             <input
                 type="text"
@@ -30,6 +30,37 @@
                 placeholder="Rechercher..."
                 value="{{ recherche }}"
             >
+
+        </div>
+
+        <div class="col-md-3">
+
+            <select
+                name="statut"
+                class="form-select"
+            >
+                <option
+                    value="tous"
+                    {% if statut == 'tous' %}selected{% endif %}
+                >
+                    Tous les statuts
+                </option>
+
+                <option
+                    value="actifs"
+                    {% if statut == 'actifs' %}selected{% endif %}
+                >
+                    Actifs
+                </option>
+
+                <option
+                    value="inactifs"
+                    {% if statut == 'inactifs' %}selected{% endif %}
+                >
+                    DÃ©sactivÃ©s
+                </option>
+
+            </select>
 
         </div>
 
@@ -79,6 +110,8 @@
 
             <th>Adresse</th>
 
+            <th width="130">Statut</th>
+
             <th width="180">Actions</th>
 
         </tr>
@@ -89,7 +122,7 @@
 
         {% for pv in page_obj %}
 
-        <tr>
+        <tr class="{% if not pv.actif %}table-secondary{% endif %}">
 
             <td>
 
@@ -111,6 +144,24 @@
 
             <td>
 
+                {% if pv.actif %}
+
+                    <span class="badge bg-success">
+                        Actif
+                    </span>
+
+                {% else %}
+
+                    <span class="badge bg-secondary">
+                        DÃ©sactivÃ©
+                    </span>
+
+                {% endif %}
+
+            </td>
+
+            <td>
+
                 <a
                     href="{% url 'modifier_pointvente' pv.pk %}"
                     class="btn btn-warning btn-sm"
@@ -118,12 +169,34 @@
                     Modifier
                 </a>
 
-                <a
-                    href="{% url 'supprimer_pointvente' pv.pk %}"
-                    class="btn btn-danger btn-sm"
-                >
-                    Supprimer
-                </a>
+                {% if pv.actif %}
+
+                    <a
+                        href="{% url 'supprimer_pointvente' pv.pk %}"
+                        class="btn btn-danger btn-sm"
+                    >
+                        Supprimer
+                    </a>
+
+                {% else %}
+
+                    <form
+                        method="post"
+                        action="{% url 'reactiver_pointvente' pv.pk %}"
+                        class="d-inline"
+                    >
+                        {% csrf_token %}
+
+                        <button
+                            type="submit"
+                            class="btn btn-success btn-sm"
+                        >
+                            RÃ©activer
+                        </button>
+
+                    </form>
+
+                {% endif %}
 
             </td>
 
@@ -133,7 +206,7 @@
 
         <tr>
 
-            <td colspan="4" class="text-center">
+            <td colspan="5" class="text-center">
 
                 Aucun point de vente trouvé.
 
@@ -157,7 +230,7 @@
 
                 <a
                     class="page-link"
-                    href="?page=1&recherche={{ recherche }}"
+                    href="?page=1&recherche={{ recherche }}&statut={{ statut }}"
                 >
                     Première
                 </a>
@@ -168,7 +241,7 @@
 
                 <a
                     class="page-link"
-                    href="?page={{ page_obj.previous_page_number }}&recherche={{ recherche }}"
+                    href="?page={{ page_obj.previous_page_number }}&recherche={{ recherche }}&statut={{ statut }}"
                 >
                     Précédente
                 </a>
@@ -197,7 +270,7 @@
 
                 <a
                     class="page-link"
-                    href="?page={{ page_obj.next_page_number }}&recherche={{ recherche }}"
+                    href="?page={{ page_obj.next_page_number }}&recherche={{ recherche }}&statut={{ statut }}"
                 >
                     Suivante
                 </a>
@@ -208,7 +281,7 @@
 
                 <a
                     class="page-link"
-                    href="?page={{ page_obj.paginator.num_pages }}&recherche={{ recherche }}"
+                    href="?page={{ page_obj.paginator.num_pages }}&recherche={{ recherche }}&statut={{ statut }}"
                 >
                     Dernière
                 </a>

@@ -84,6 +84,18 @@
 
                         </th>
 
+                        <th class="text-end">
+
+                            Montant brut
+
+                        </th>
+
+                        <th class="text-end">
+
+                            Montant net
+
+                        </th>
+
                     </tr>
 
                 </thead>
@@ -94,7 +106,7 @@
 
                     <tr class="table-secondary">
 
-                        <th colspan="4">
+                        <th colspan="6">
 
                             {{ groupe.compagnie.designation }}
 
@@ -130,15 +142,55 @@
 
                             </td>
 
+                            <td class="text-end">
+
+                                {{ stock.montant_brut|floatformat:2 }}
+
+                            </td>
+
+                            <td class="text-end fw-bold">
+
+                                {{ stock.montant_net|floatformat:2 }}
+
+                            </td>
+
                         </tr>
 
                     {% endfor %}
+
+                    <tr class="table-light fw-bold">
+
+                        <td colspan="3">
+
+                            Sous-total {{ groupe.compagnie.designation }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ groupe.totaux.quantite|floatformat:2 }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ groupe.totaux.montant_brut|floatformat:2 }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ groupe.totaux.montant_net|floatformat:2 }}
+
+                        </td>
+
+                    </tr>
 
                 {% empty %}
 
                     <tr>
 
-                        <td colspan="5" class="text-center">
+                        <td colspan="6" class="text-center">
 
                             Aucun stock disponible.
 
@@ -149,6 +201,38 @@
                 {% endfor %}
 
                 </tbody>
+
+                <tfoot class="table-dark fw-bold">
+
+                    <tr>
+
+                        <td colspan="3">
+
+                            Total gÃ©nÃ©ral
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ total_general.quantite|floatformat:2 }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ total_general.montant_brut|floatformat:2 }}
+
+                        </td>
+
+                        <td class="text-end">
+
+                            {{ total_general.montant_net|floatformat:2 }}
+
+                        </td>
+
+                    </tr>
+
+                </tfoot>
             </table>
 
         </div>

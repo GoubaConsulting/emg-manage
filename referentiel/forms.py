@@ -164,6 +164,25 @@ class DistributeurForm(forms.ModelForm):
 
         }
 
+    def __init__(
+        self,
+        *args,
+        **kwargs
+    ):
+
+        super().__init__(
+            *args,
+            **kwargs
+        )
+
+        self.fields["point_vente"].queryset = (
+            PointVente.objects.filter(
+                actif=True
+            ).order_by(
+                "designation"
+            )
+        )
+
     def clean_fond(self):
 
         fond = self.cleaned_data.get(

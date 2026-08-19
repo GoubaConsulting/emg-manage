@@ -1,11 +1,13 @@
 from django.shortcuts import render
 from django.shortcuts import redirect
 from django.shortcuts import get_object_or_404
+from uuid import uuid4
 
 from .models import PointVente
 from .forms import PointVenteForm
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q
 from django.core.paginator import Paginator
 from .models import Compagnie
@@ -15,6 +17,39 @@ from .forms import ProduitForm
 from .models import Distributeur
 from .forms import DistributeurForm
 from .services import distributeurs_visibles
+
+
+def generer_code_provisoire_distributeur():
+    """
+    Genere un code temporaire unique avant l'obtention
+    de l'identifiant auto-incremente du distributeur.
+    """
+
+    while True:
+
+        code = f"TMP{uuid4().hex[:17].upper()}"
+
+        if not Distributeur.objects.filter(
+            code=code
+        ).exists():
+
+            return code
+
+
+def generer_code_distributeur(distributeur):
+    """
+    Genere le code final d'un distributeur.
+    """
+
+    code_point_vente = (
+        distributeur.point_vente.designation[:3].upper()
+    )
+
+    return (
+        f"DIST"
+        f"{distributeur.iddistributeur:03d}"
+        f"{code_point_vente}"
+    )
 
 
 # ==========================================
@@ -29,9 +64,32 @@ def liste_pointvente(request):
         ''
     )
 
-    pointventes = PointVente.objects.filter(
-        actif=True
+    statut = request.GET.get(
+        'statut',
+        'tous'
     )
+
+    if statut not in [
+        'tous',
+        'actifs',
+        'inactifs'
+    ]:
+
+        statut = 'tous'
+
+    pointventes = PointVente.objects.all()
+
+    if statut == 'actifs':
+
+        pointventes = pointventes.filter(
+            actif=True
+        )
+
+    elif statut == 'inactifs':
+
+        pointventes = pointventes.filter(
+            actif=False
+        )
 
     if recherche:
 
@@ -46,9 +104,14 @@ def liste_pointvente(request):
     'designation'
     )
 
+    taille_page = max(
+        pointventes.count(),
+        1
+    )
+
     paginator = Paginator(
         pointventes,
-        10
+        taille_page
     )
 
     page_number = request.GET.get(
@@ -62,7 +125,8 @@ def liste_pointvente(request):
     context = {
 
         'page_obj': page_obj,
-        'recherche': recherche
+        'recherche': recherche,
+        'statut': statut
 
     }
 
@@ -171,6 +235,35 @@ def supprimer_pointvente(request, pk):
         request,
         'referentiel/pointvente/confirmation_suppression.html',
         context
+    )
+
+
+@login_required
+def reactiver_pointvente(request, pk):
+
+    pointvente = get_object_or_404(
+        PointVente,
+        pk=pk
+    )
+
+    if request.method == 'POST':
+
+        pointvente.actif = True
+
+        pointvente.save(
+            update_fields=[
+                'actif',
+                'date_modification'
+            ]
+        )
+
+        messages.success(
+            request,
+            "Point de vente réactivé avec succès."
+        )
+
+    return redirect(
+        'liste_pointvente'
     )
 
 
@@ -622,18 +715,21 @@ def ajouter_distributeur(request):
 
         if form.is_valid():
 
-            # Enregistrement du distributeur
-            distributeur = form.save()
+            with transaction.atomic():
 
-            # Génération automatique du code
-            code_point_vente = distributeur.point_vente.designation[:3].upper()
+                distributeur = form.save(commit=False)
 
-            distributeur.code = (
-                f"DIST{distributeur.iddistributeur:03d}{code_point_vente}"
-            )
+                distributeur.code = generer_code_provisoire_distributeur()
 
-            # Mise à jour uniquement du champ code
-            distributeur.save(update_fields=["code"])
+                distributeur.save()
+
+                distributeur.code = generer_code_distributeur(
+                    distributeur
+                )
+
+                distributeur.save(
+                    update_fields=["code"]
+                )
 
             messages.success(
                 request,
@@ -677,14 +773,13 @@ def modifier_distributeur(request, pk):
 
             distributeur = form.save()
 
-            # Génération automatique du code
-            distributeur.code = (
-                f"DIST"
-                f"{distributeur.iddistributeur:03d}"
-                f"{distributeur.point_vente.designation[:3].upper()}"
+            distributeur.code = generer_code_distributeur(
+                distributeur
             )
 
-            distributeur.save(update_fields=["code"])
+            distributeur.save(
+                update_fields=["code"]
+            )
 
             messages.success(
                 request,

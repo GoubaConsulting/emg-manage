@@ -21,6 +21,119 @@ from .models import (
 )
 
 
+def _decimal(valeur):
+    """
+    Retourne une valeur Decimal exploitable pour les affichages.
+    """
+
+    return Decimal(str(valeur or "0"))
+
+
+def taux_derniere_commande_directeur_par_produit(produit_ids):
+    """
+    Retourne le dernier taux applique par le Directeur
+    pour chaque produit donne.
+    """
+
+    from commandes.models import (
+        Commande,
+        LigneCommande
+    )
+
+    produit_ids = list(
+        produit_ids
+    )
+
+    if not produit_ids:
+
+        return {}
+
+    lignes = (
+        LigneCommande.objects
+        .filter(
+            produit_id__in=produit_ids,
+            commande__actif=True,
+            commande__type_commande=Commande.TYPE_DIRECTEUR,
+            commande__categorie_commande__in=[
+                Commande.CATEGORIE_NORMALE,
+                Commande.CATEGORIE_STOCK_TAMPON,
+                Commande.CATEGORIE_CAUTION,
+            ],
+            commande__etat__in=[
+                Commande.VALIDEE,
+                Commande.VALIDEE_PARTIELLEMENT,
+            ],
+        )
+        .select_related(
+            "commande"
+        )
+        .order_by(
+            "produit_id",
+            "-commande__date_commande",
+            "-commande__date_validation",
+            "-commande__idcommande",
+            "-idlignecommande",
+        )
+    )
+
+    taux_par_produit = {}
+
+    for ligne in lignes:
+
+        if ligne.produit_id not in taux_par_produit:
+
+            taux_par_produit[ligne.produit_id] = _decimal(
+                ligne.taux_remise
+            )
+
+    return taux_par_produit
+
+
+def valoriser_stocks(stocks):
+    """
+    Ajoute les montants brut et net aux lignes de stock affichees.
+    """
+
+    stocks = list(
+        stocks
+    )
+
+    taux_par_produit = taux_derniere_commande_directeur_par_produit(
+        {
+            stock.produit_id
+            for stock in stocks
+        }
+    )
+
+    for stock in stocks:
+
+        montant_brut = (
+            _decimal(stock.produit.prix)
+            *
+            _decimal(stock.quantite)
+        )
+
+        taux = _decimal(
+            taux_par_produit.get(
+                stock.produit_id
+            )
+        )
+
+        montant_remise = (
+            montant_brut
+            *
+            taux
+            /
+            Decimal("100")
+        )
+
+        stock.montant_brut = montant_brut
+        stock.montant_net = montant_brut - montant_remise
+        stock.taux_remise_reference = taux
+
+    return stocks
+
+
 # ==========================================================
 # CREATION DU STOCK
 # ==========================================================

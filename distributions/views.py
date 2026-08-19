@@ -43,7 +43,10 @@ from django.db.models import Sum
 
 from comptes.models import ProfilUtilisateur
 
-from stocks.models import Stock
+from stocks.models import (
+    Stock,
+    TYPE_NORMAL,
+)
 
 from situations.services import derniere_situation_cloturee_avant
 
@@ -141,19 +144,25 @@ def filtre_texte(
 def produits_disponibles_point_vente(point_vente):
     """
     Retourne les produits ayant du stock sur un point
-    de vente, avec la quantite disponible annotee.
+    de vente, avec la quantite normale disponible annotee.
     """
 
     stocks = (
         Stock.objects
         .filter(
+            actif=True,
             point_vente=point_vente,
+            type_stock=TYPE_NORMAL,
             produit__actif=True,
             quantite__gt=0,
         )
-        .select_related(
-            "produit",
-            "produit__compagnie",
+        .values(
+            "produit_id",
+            "produit__compagnie__designation",
+            "produit__designation",
+        )
+        .annotate(
+            stock_disponible=Sum("quantite")
         )
         .order_by(
             "produit__compagnie__designation",
@@ -161,14 +170,44 @@ def produits_disponibles_point_vente(point_vente):
         )
     )
 
+    produit_ids = [
+        stock["produit_id"]
+        for stock in stocks
+    ]
+
+    produits_par_id = {
+        produit.pk: produit
+        for produit in (
+            Produit.objects
+            .filter(
+                pk__in=produit_ids,
+                actif=True,
+            )
+            .select_related(
+                "compagnie"
+            )
+        )
+    }
+
     produits = []
 
     for stock in stocks:
 
-        stock.produit.stock_disponible = stock.quantite
+        produit = produits_par_id.get(
+            stock["produit_id"]
+        )
+
+        if produit is None:
+
+            continue
+
+        produit.stock_disponible = (
+            stock["stock_disponible"]
+            or Decimal("0.00")
+        )
 
         produits.append(
-            stock.produit
+            produit
         )
 
     return produits
