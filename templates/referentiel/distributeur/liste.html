@@ -10,7 +10,9 @@ Distributeurs
 
     <div>
 
-        <h3>Distributeurs</h3>
+        <h3>
+            {{ titre|default:"Distributeurs" }}
+        </h3>
 
         <small class="text-muted">
 
@@ -21,12 +23,36 @@ Distributeurs
 
     </div>
 
-    <a
-        href="{% url 'ajouter_distributeur' %}"
-        class="btn btn-primary"
-    >
-        Ajouter
-    </a>
+    <div class="d-flex gap-2">
+
+        {% if corbeille %}
+
+            <a
+                href="{% url 'liste_distributeur' %}"
+                class="btn btn-secondary"
+            >
+                Retour
+            </a>
+
+        {% else %}
+
+            <a
+                href="{% url 'corbeille_distributeur' %}"
+                class="btn btn-outline-danger"
+            >
+                Corbeille
+            </a>
+
+            <a
+                href="{% url 'ajouter_distributeur' %}"
+                class="btn btn-primary"
+            >
+                Ajouter
+            </a>
+
+        {% endif %}
+
+    </div>
 
 </div>
 
@@ -40,7 +66,7 @@ Distributeurs
                 type="text"
                 name="recherche"
                 class="form-control"
-                placeholder="Code, nom, prénom ou point de vente..."
+                placeholder="Code, nom, pr&eacute;nom ou point de vente..."
                 value="{{ recherche }}"
             >
 
@@ -60,10 +86,10 @@ Distributeurs
         <div class="col-md-2">
 
             <a
-                href="{% url 'liste_distributeur' %}"
+                href="{% if corbeille %}{% url 'corbeille_distributeur' %}{% else %}{% url 'liste_distributeur' %}{% endif %}"
                 class="btn btn-secondary w-100"
             >
-                Réinitialiser
+                R&eacute;initialiser
             </a>
 
         </div>
@@ -84,13 +110,13 @@ Distributeurs
 
             <th>Nom</th>
 
-            <th>Prénom</th>
+            <th>Pr&eacute;nom</th>
 
-            <th>Téléphone</th>
+            <th>T&eacute;l&eacute;phone</th>
 
             <th>Fond</th>
 
-            <th>Catégorie</th>
+            <th>Cat&eacute;gorie</th>
 
             <th>Point de vente</th>
 
@@ -126,19 +152,41 @@ Distributeurs
 
             <td>
 
-                <a
-                    href="{% url 'modifier_distributeur' distributeur.pk %}"
-                    class="btn btn-warning btn-sm"
-                >
-                    Modifier
-                </a>
+                {% if corbeille %}
 
-                <a
-                    href="{% url 'supprimer_distributeur' distributeur.pk %}"
-                    class="btn btn-danger btn-sm"
-                >
-                    Supprimer
-                </a>
+                    <form
+                        method="post"
+                        action="{% url 'reactiver_distributeur' distributeur.pk %}"
+                        class="d-inline"
+                    >
+                        {% csrf_token %}
+
+                        <button
+                            type="submit"
+                            class="btn btn-success btn-sm"
+                        >
+                            R&eacute;activer
+                        </button>
+
+                    </form>
+
+                {% else %}
+
+                    <a
+                        href="{% url 'modifier_distributeur' distributeur.pk %}"
+                        class="btn btn-warning btn-sm"
+                    >
+                        Modifier
+                    </a>
+
+                    <a
+                        href="{% url 'supprimer_distributeur' distributeur.pk %}"
+                        class="btn btn-danger btn-sm"
+                    >
+                        Supprimer
+                    </a>
+
+                {% endif %}
 
             </td>
 
@@ -150,7 +198,7 @@ Distributeurs
 
             <td colspan="9" class="text-center">
 
-                Aucun distributeur trouvé.
+                {{ message_vide|default:"Aucun distributeur trouv&eacute;." }}
 
             </td>
 
@@ -174,7 +222,7 @@ Distributeurs
                 class="page-link"
                 href="?page=1&recherche={{ recherche }}"
             >
-                Première
+                Premi&egrave;re
             </a>
 
         </li>
@@ -185,7 +233,7 @@ Distributeurs
                 class="page-link"
                 href="?page={{ page_obj.previous_page_number }}&recherche={{ recherche }}"
             >
-                Précédente
+                Pr&eacute;c&eacute;dente
             </a>
 
         </li>
@@ -225,7 +273,7 @@ Distributeurs
                 class="page-link"
                 href="?page={{ page_obj.paginator.num_pages }}&recherche={{ recherche }}"
             >
-                Dernière
+                Derni&egrave;re
             </a>
 
         </li>

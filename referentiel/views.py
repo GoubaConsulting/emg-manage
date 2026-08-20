@@ -64,32 +64,9 @@ def liste_pointvente(request):
         ''
     )
 
-    statut = request.GET.get(
-        'statut',
-        'tous'
+    pointventes = PointVente.objects.filter(
+        actif=True
     )
-
-    if statut not in [
-        'tous',
-        'actifs',
-        'inactifs'
-    ]:
-
-        statut = 'tous'
-
-    pointventes = PointVente.objects.all()
-
-    if statut == 'actifs':
-
-        pointventes = pointventes.filter(
-            actif=True
-        )
-
-    elif statut == 'inactifs':
-
-        pointventes = pointventes.filter(
-            actif=False
-        )
 
     if recherche:
 
@@ -126,7 +103,9 @@ def liste_pointvente(request):
 
         'page_obj': page_obj,
         'recherche': recherche,
-        'statut': statut
+        'titre': 'Points de vente',
+        'corbeille': False,
+        'message_vide': 'Aucun point de vente actif trouvé.'
 
     }
 
@@ -210,6 +189,7 @@ def supprimer_pointvente(request, pk):
 
     pointvente = get_object_or_404(
         PointVente,
+        actif=True,
         pk=pk
     )
 
@@ -239,10 +219,69 @@ def supprimer_pointvente(request, pk):
 
 
 @login_required
+def corbeille_pointvente(request):
+
+    recherche = request.GET.get(
+        'recherche',
+        ''
+    )
+
+    pointventes = PointVente.objects.filter(
+        actif=False
+    )
+
+    if recherche:
+
+        pointventes = pointventes.filter(
+
+            Q(designation__icontains=recherche) |
+            Q(adresse__icontains=recherche)
+
+        )
+
+    pointventes = pointventes.order_by(
+    'designation'
+    )
+
+    taille_page = max(
+        pointventes.count(),
+        1
+    )
+
+    paginator = Paginator(
+        pointventes,
+        taille_page
+    )
+
+    page_obj = paginator.get_page(
+        request.GET.get(
+            'page'
+        )
+    )
+
+    context = {
+
+        'page_obj': page_obj,
+        'recherche': recherche,
+        'titre': 'Corbeille des points de vente',
+        'corbeille': True,
+        'message_vide': 'Aucun point de vente supprimé trouvé.'
+
+    }
+
+    return render(
+        request,
+        'referentiel/pointvente/liste.html',
+        context
+    )
+
+
+@login_required
 def reactiver_pointvente(request, pk):
 
     pointvente = get_object_or_404(
         PointVente,
+        actif=False,
         pk=pk
     )
 
@@ -263,7 +302,7 @@ def reactiver_pointvente(request, pk):
         )
 
     return redirect(
-        'liste_pointvente'
+        'corbeille_pointvente'
     )
 
 
@@ -653,6 +692,43 @@ def supprimer_produit(request, pk):
 # DISTRIBUTEURS
 # ==========================================
 
+def filtrer_distributeurs(
+    distributeurs,
+    recherche
+):
+
+    if not recherche:
+
+        return distributeurs
+
+    return distributeurs.filter(
+
+        Q(code__icontains=recherche) |
+        Q(nom__icontains=recherche) |
+        Q(prenom__icontains=recherche) |
+        Q(point_vente__designation__icontains=recherche)
+
+    )
+
+
+def paginer_distributeurs(
+    distributeurs,
+    page_number
+):
+
+    paginator = Paginator(
+        distributeurs.order_by(
+            'nom',
+            'prenom'
+        ),
+        10
+    )
+
+    return paginator.get_page(
+        page_number
+    )
+
+
 @login_required
 def liste_distributeur(request):
 
@@ -665,33 +741,16 @@ def liste_distributeur(request):
         request.user
     )
 
-    if recherche:
-
-        distributeurs = distributeurs.filter(
-
-            Q(code__icontains=recherche) |
-            Q(nom__icontains=recherche) |
-            Q(prenom__icontains=recherche) |
-            Q(point_vente__designation__icontains=recherche)
-
-        )
-
-    distributeurs = distributeurs.order_by(
-        'nom',
-        'prenom'
-    )
-
-    paginator = Paginator(
+    distributeurs = filtrer_distributeurs(
         distributeurs,
-        10
+        recherche
     )
 
-    page_number = request.GET.get(
-        'page'
-    )
-
-    page_obj = paginator.get_page(
-        page_number
+    page_obj = paginer_distributeurs(
+        distributeurs,
+        request.GET.get(
+            'page'
+        )
     )
 
     return render(
@@ -699,7 +758,50 @@ def liste_distributeur(request):
         'referentiel/distributeur/liste.html',
         {
             'page_obj': page_obj,
-            'recherche': recherche
+            'recherche': recherche,
+            'titre': 'Distributeurs et gérants',
+            'corbeille': False,
+            'message_vide': 'Aucun distributeur ou gérant actif trouvé.'
+        }
+    )
+
+
+@login_required
+def corbeille_distributeur(request):
+
+    recherche = request.GET.get(
+        'recherche',
+        ''
+    )
+
+    distributeurs = distributeurs_visibles(
+        request.user,
+        actif=False
+    )
+
+    distributeurs = filtrer_distributeurs(
+        distributeurs,
+        recherche
+    )
+
+    page_obj = paginer_distributeurs(
+        distributeurs,
+        request.GET.get(
+            'page'
+        )
+    )
+
+    return render(
+        request,
+        'referentiel/distributeur/liste.html',
+        {
+            'page_obj': page_obj,
+            'recherche': recherche,
+            'titre': 'Corbeille des distributeurs et gérants',
+            'corbeille': True,
+            'message_vide': (
+                'Aucun distributeur ou gérant supprimé trouvé.'
+            )
         }
     )
 
@@ -810,7 +912,9 @@ def modifier_distributeur(request, pk):
 def supprimer_distributeur(request, pk):
 
     distributeur = get_object_or_404(
-        Distributeur,
+        distributeurs_visibles(
+            request.user
+        ),
         pk=pk
     )
 
@@ -835,4 +939,36 @@ def supprimer_distributeur(request, pk):
         {
             'distributeur': distributeur
         }
+    )
+
+
+@login_required
+def reactiver_distributeur(request, pk):
+
+    distributeur = get_object_or_404(
+        distributeurs_visibles(
+            request.user,
+            actif=False
+        ),
+        pk=pk
+    )
+
+    if request.method == 'POST':
+
+        distributeur.actif = True
+
+        distributeur.save(
+            update_fields=[
+                'actif',
+                'date_modification'
+            ]
+        )
+
+        messages.success(
+            request,
+            "Distributeur réactivé avec succès."
+        )
+
+    return redirect(
+        'corbeille_distributeur'
     )

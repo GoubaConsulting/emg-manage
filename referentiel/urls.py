@@ -10,6 +10,12 @@ urlpatterns = [
     ),
 
     path(
+        'pointvente/corbeille/',
+        views.corbeille_pointvente,
+        name='corbeille_pointvente'
+    ),
+
+    path(
         'pointvente/ajouter/',
         views.ajouter_pointvente,
         name='ajouter_pointvente'
@@ -100,6 +106,12 @@ urlpatterns = [
     ),
 
     path(
+        'distributeurs/corbeille/',
+        views.corbeille_distributeur,
+        name='corbeille_distributeur'
+    ),
+
+    path(
         'distributeurs/ajouter/',
         views.ajouter_distributeur,
         name='ajouter_distributeur'
@@ -115,6 +127,12 @@ urlpatterns = [
         'distributeurs/supprimer/<int:pk>/',
         views.supprimer_distributeur,
         name='supprimer_distributeur'
+    ),
+
+    path(
+        'distributeurs/reactiver/<int:pk>/',
+        views.reactiver_distributeur,
+        name='reactiver_distributeur'
     ),
 
 ]

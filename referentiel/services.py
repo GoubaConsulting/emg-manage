@@ -9,26 +9,35 @@ from comptes.utils import (
 )
 
 
-def distributeurs_visibles(utilisateur):
+def distributeurs_visibles(
+    utilisateur,
+    actif=True
+):
     """
     Retourne les distributeurs visibles
     selon le profil connecté.
     """
 
-    if est_direction(utilisateur):
+    categories = [
+        Distributeur.CATEGORIE_GERANT,
+        Distributeur.CATEGORIE_DISTRIBUTEUR,
+    ]
 
-        return (
-            Distributeur.objects
-            .filter(actif=True)
-            .select_related("point_vente")
-            .order_by("nom", "prenom")
+    filtres = {
+        "actif": actif,
+        "categorie__in": categories,
+    }
+
+    if not est_direction(utilisateur):
+
+        filtres["point_vente"] = point_vente_utilisateur(
+            utilisateur
         )
 
     return (
         Distributeur.objects
         .filter(
-            actif=True,
-            point_vente=point_vente_utilisateur(utilisateur)
+            **filtres
         )
         .select_related("point_vente")
         .order_by("nom", "prenom")
