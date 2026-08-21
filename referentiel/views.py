@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.shortcuts import redirect
 from django.shortcuts import get_object_or_404
 from uuid import uuid4
+from itertools import groupby
 
 from .models import PointVente
 from .forms import PointVenteForm
@@ -512,8 +513,14 @@ def liste_produit(request):
         ''
     )
 
-    produits = Produit.objects.filter(
-        actif=True
+    produits = (
+        Produit.objects
+        .filter(
+            actif=True
+        )
+        .select_related(
+            'compagnie'
+        )
     )
 
     if recherche:
@@ -526,6 +533,7 @@ def liste_produit(request):
         )
 
     produits = produits.order_by(
+        'compagnie__designation',
         'designation'
     )
 
@@ -542,9 +550,37 @@ def liste_produit(request):
         page_number
     )
 
+    produits_page = list(
+        page_obj.object_list
+    )
+
+    for index, produit in enumerate(
+        produits_page,
+        start=page_obj.start_index()
+    ):
+
+        produit.rang = index
+
+    groupes_produits = []
+
+    for compagnie, produits_compagnie in groupby(
+        produits_page,
+        key=lambda produit: produit.compagnie
+    ):
+
+        groupes_produits.append({
+
+            'compagnie': compagnie,
+            'produits': list(
+                produits_compagnie
+            )
+
+        })
+
     context = {
 
         'page_obj': page_obj,
+        'groupes_produits': groupes_produits,
         'recherche': recherche
 
     }

@@ -145,7 +145,7 @@ function construireTableau(produits) {
 
             <tr class="table-secondary">
 
-                <td colspan="9">
+                <td colspan="7">
 
                     <strong>
 
@@ -163,7 +163,21 @@ function construireTableau(produits) {
 
         groupes[compagnie].forEach(function (produit) {
 
-            sousTotal += produit.net;
+            const montantInitial = lireNombre(
+                produit.montant_initial || 0
+            );
+
+            const montantInitialBrut = lireNombre(
+                produit.montant_initial_brut || 0
+            );
+
+            const montantNetASuivre = (
+                montantInitial
+                +
+                lireNombre(produit.net)
+            );
+
+            sousTotal += montantNetASuivre;
 
             tbody.innerHTML += `
 
@@ -177,7 +191,9 @@ function construireTableau(produits) {
 
                     data-compagnie="${produit.compagnie_id}"
 
-                    data-initiale="${produit.quantite_initiale || 0}"
+                    data-initiale="${montantInitial}"
+
+                    data-initiale-brut="${montantInitialBrut}"
 
                 >
 
@@ -195,7 +211,7 @@ function construireTableau(produits) {
 
                     <td class="text-end">
 
-                        ${produit.quantite_initiale || 0}
+                        ${formaterMontant(montantInitial)}
 
                     </td>
 
@@ -234,38 +250,6 @@ function construireTableau(produits) {
                         Le montant ne peut pas dépasser celui de la commande.
 
                     </div>
-
-                    </td>
-
-                    <td>
-
-                        <input
-
-                            type="text"
-
-                            class="form-control quantite"
-
-                            value="${produit.quantite}"
-
-                            readonly
-
-                        >
-
-                    </td>
-
-                    <td>
-
-                        <input
-
-                            type="text"
-
-                            class="form-control quantite-totale"
-
-                            value="${(produit.quantite_initiale || 0) + produit.quantite}"
-
-                            readonly
-
-                        >
 
                     </td>
 
@@ -313,7 +297,7 @@ function construireTableau(produits) {
 
                             class="form-control net"
 
-                            value="${produit.net}"
+                            value="${montantNetASuivre.toFixed(0)}"
 
                             readonly
 
@@ -331,7 +315,7 @@ function construireTableau(produits) {
 
             <tr class="table-warning">
 
-                <td colspan="8" class="text-end">
+                <td colspan="6" class="text-end">
 
                     <strong>
 
@@ -448,14 +432,6 @@ function recalculerLigne(ligne) {
         montantInput.dataset.max
     );
 
-    const quantiteInput = ligne.querySelector(
-        ".quantite"
-    );
-
-    const quantiteTotaleInput = ligne.querySelector(
-        ".quantite-totale"
-    );
-
     const tauxInput = ligne.querySelector(
         ".taux"
     );
@@ -524,27 +500,19 @@ function recalculerLigne(ligne) {
     // Calculs
     // ==========================================
 
-    const quantite = montant / prix;
-
-    const quantiteInitiale = Number(
+    const montantInitial = Number(
         ligne.dataset.initiale
     ) || 0;
 
     const montantRemise = montant * taux / 100;
 
-    const montantNet = montant - montantRemise;
-
-    quantiteInput.value = quantite;
-
-    if (quantiteTotaleInput) {
-
-        quantiteTotaleInput.value = (
-            quantiteInitiale
-            +
-            quantite
-        );
-
-    }
+    const montantNet = (
+        montantInitial
+        +
+        montant
+        -
+        montantRemise
+    );
 
     remiseInput.value = montantRemise.toFixed(0);
 
@@ -579,11 +547,19 @@ function recalculerTotaux() {
             ligne.querySelector(".montant").value
         ) || 0;
 
+        const montantInitialBrut = Number(
+            ligne.dataset.initialeBrut
+        ) || 0;
+
         const net = Number(
             ligne.querySelector(".net").value
         ) || 0;
 
-        totalBrut += montant;
+        totalBrut += (
+            montantInitialBrut
+            +
+            montant
+        );
 
         totalNet += net;
 
@@ -625,4 +601,36 @@ function recalculerTotaux() {
 
         ) + " FCFA";
     
+}
+
+
+function lireNombre(valeur) {
+
+    const nombre = Number(
+        String(valeur || "0")
+            .replace(/\s/g, "")
+            .replace(/[^\d,.-]/g, "")
+            .replace(",", ".")
+    );
+
+    if (Number.isNaN(nombre)) {
+
+        return 0;
+
+    }
+
+    return nombre;
+
+}
+
+
+function formaterMontant(valeur) {
+
+    return (
+        lireNombre(valeur)
+        .toLocaleString("fr-FR")
+        +
+        " FCFA"
+    );
+
 }

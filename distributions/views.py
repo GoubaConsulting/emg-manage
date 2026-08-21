@@ -48,7 +48,10 @@ from stocks.models import (
     TYPE_NORMAL,
 )
 
-from situations.services import derniere_situation_cloturee_avant
+from situations.services import (
+    calculer_valeur_nette_quantite,
+    derniere_situation_cloturee_avant,
+)
 
 
 def filtres_dates_recherche(
@@ -263,12 +266,12 @@ def date_distribution_saisie(request):
         return date.today()
 
 
-def quantites_initiales_destinataire(
+def montants_initiaux_destinataire(
     distributeur,
     date_distribution
 ):
     """
-    Retourne les quantites restantes de la derniere
+    Retourne les montants bruts et nets restants de la derniere
     situation cloturee avant la distribution.
     """
 
@@ -285,7 +288,7 @@ def quantites_initiales_destinataire(
 
         return {}
 
-    quantites = {}
+    montants = {}
 
     for ligne in situation.lignes.all():
 
@@ -293,11 +296,22 @@ def quantites_initiales_destinataire(
 
             continue
 
-        quantites[str(ligne.produit_id)] = float(
-            ligne.quantite_restante
-        )
+        montants[str(ligne.produit_id)] = {
+            "brut": float(
+                ligne.quantite_restante
+                *
+                ligne.prix_unitaire
+            ),
+            "net": float(
+                calculer_valeur_nette_quantite(
+                    ligne.quantite_restante,
+                    ligne.prix_unitaire,
+                    ligne.taux_remise,
+                )
+            ),
+        }
 
-    return quantites
+    return montants
 
 
 def reliquats_destinataires_json(
@@ -305,7 +319,7 @@ def reliquats_destinataires_json(
     date_distribution
 ):
     """
-    Prepare les reliquats par destinataire pour
+    Prepare les montants initiaux par destinataire pour
     l'affichage dynamique du formulaire gerant.
     """
 
@@ -314,7 +328,7 @@ def reliquats_destinataires_json(
     for distributeur in destinataires:
 
         donnees[str(distributeur.pk)] = (
-            quantites_initiales_destinataire(
+            montants_initiaux_destinataire(
                 distributeur,
                 date_distribution
             )
@@ -1422,7 +1436,7 @@ def ajouter_distribution_directeur(request):
             .first()
         )
 
-        quantites_initiales = quantites_initiales_destinataire(
+        montants_initiaux = montants_initiaux_destinataire(
             distributeur_gerant,
             date.today()
         )
@@ -1432,6 +1446,11 @@ def ajouter_distribution_directeur(request):
             "produit__compagnie"
 
         ):
+
+            donnees_initiales = montants_initiaux.get(
+                str(ligne.produit.idproduit),
+                {}
+            )
 
             lignes[str(ligne.produit.idproduit)] = {
 
@@ -1449,11 +1468,12 @@ def ajouter_distribution_directeur(request):
 
                 "quantite": float(ligne.quantite),
 
-                "quantite_initiale": float(
-                    quantites_initiales.get(
-                        str(ligne.produit.idproduit),
-                        0
-                    )
+                "montant_initial": float(
+                    donnees_initiales.get("net", 0)
+                ),
+
+                "montant_initial_brut": float(
+                    donnees_initiales.get("brut", 0)
                 ),
 
                 "taux": float(ligne.taux_remise),

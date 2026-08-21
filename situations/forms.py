@@ -11,16 +11,29 @@ Formulaires du module Situations.
 """
 
 from django import forms
+from django.db.models import Q
 from django.utils import timezone
 
 from referentiel.models import Distributeur
-
-from distributions.models import Distribution
 
 
 # ==========================================================
 # FORMULAIRE : SELECTION D'UNE SITUATION
 # ==========================================================
+
+
+class DistributeurSituationChoiceField(forms.ModelChoiceField):
+    """
+    Affiche les personnes selectionnables avec leur categorie.
+    """
+
+    def label_from_instance(self, obj):
+
+        return (
+            f"{obj.nom} {obj.prenom} - "
+            f"{obj.get_categorie_display()}"
+        )
+
 
 class SelectionSituationForm(forms.Form):
     """
@@ -28,15 +41,16 @@ class SelectionSituationForm(forms.Form):
     et la date de la situation journalière.
 
     Directeur :
-        sélectionne un gérant auquel il a fait
-        une ou plusieurs distributions.
+        sélectionne tous les gérants actifs et les
+        distributeurs actifs de son point de vente,
+        hors clients directs.
 
     Gérant :
         sélectionne un distributeur de son
         point de vente.
     """
 
-    distributeur = forms.ModelChoiceField(
+    distributeur = DistributeurSituationChoiceField(
 
         queryset=Distributeur.objects.none(),
 
@@ -125,35 +139,7 @@ class SelectionSituationForm(forms.Form):
 
             self.fields[
                 "distributeur"
-            ].label = "Gérant"
-
-            gerants_ids = (
-
-                Distribution.objects
-
-                .filter(
-
-                    utilisateur=utilisateur,
-
-                    distributeur__categorie=(
-                        Distributeur.CATEGORIE_GERANT
-                    ),
-
-                    actif=True,
-
-                )
-
-                .values_list(
-
-                    "distributeur_id",
-
-                    flat=True
-
-                )
-
-                .distinct()
-
-            )
+            ].label = "Gérant / Distributeur"
 
             self.fields[
                 "distributeur"
@@ -163,14 +149,23 @@ class SelectionSituationForm(forms.Form):
 
                 .filter(
 
-                    iddistributeur__in=gerants_ids,
-
                     actif=True,
 
-                    categorie=(
-                        Distributeur.CATEGORIE_GERANT
-                    ),
+                )
 
+                .filter(
+                    Q(
+                        categorie=(
+                            Distributeur.CATEGORIE_GERANT
+                        )
+                    )
+                    |
+                    Q(
+                        categorie=(
+                            Distributeur.CATEGORIE_DISTRIBUTEUR
+                        ),
+                        point_vente=profil.point_vente,
+                    )
                 )
 
                 .select_related(
@@ -178,8 +173,6 @@ class SelectionSituationForm(forms.Form):
                 )
 
                 .order_by(
-
-                    "point_vente__designation",
 
                     "nom",
 

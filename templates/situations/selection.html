@@ -221,7 +221,7 @@
                         <div class="border rounded p-3">
 
                             <small>
-                                Total distribué
+                                Total net distribué
                             </small>
 
                             <h5>
@@ -294,27 +294,19 @@
                                 </th>
 
                                 <th class="text-end">
-                                    Quantité du jour
+                                    Montant net distribué
                                 </th>
 
                                 <th class="text-end">
-                                    Total à justifier
+                                    Montant brut restant
                                 </th>
 
                                 <th width="180">
-                                    Montant brut vendu
+                                    Montant net restant
                                 </th>
 
                                 <th width="180">
                                     Montant net vendu
-                                </th>
-
-                                <th width="150">
-                                    Quantité vendue
-                                </th>
-
-                                <th width="150">
-                                    Quantité restante
                                 </th>
 
                             </tr>
@@ -331,7 +323,7 @@
 
                             <tr class="table-secondary">
 
-                                <td colspan="9">
+                                <td colspan="7">
 
                                     <strong>
 
@@ -356,6 +348,7 @@
                                 data-taux="{{ ligne.taux_distribution|default:0 }}"
                                 data-compagnie="{{ groupe.compagnie.idcompagnie }}"
                                 data-distribuee="{{ ligne.quantite_distribuee }}"
+                                data-net-distribue="{{ ligne.montant_net_distribue|default:0 }}"
                             >
 
                                 <td>
@@ -377,15 +370,10 @@
 
                                 </td>
 
-                                <td class="text-end">
-
-                                    {{ ligne.quantite_jour|default:"0" }}
-
-                                </td>
-
                                 <td class="text-end fw-bold">
 
-                                    {{ ligne.quantite_distribuee }}
+                                    {{ ligne.montant_net_distribue|floatformat:2 }}
+                                    FCFA
 
                                 </td>
 
@@ -395,8 +383,8 @@
                                         type="number"
                                         step="1"
                                         min="0"
-                                        class="form-control montant-vendu"
-                                        name="montant_vendu_{{ ligne.produit.idproduit }}"
+                                        class="form-control montant-restant"
+                                        name="montant_restant_{{ ligne.produit.idproduit }}"
                                         value="0"
                                     >
 
@@ -406,7 +394,7 @@
 
                                     <input
                                         type="text"
-                                        class="form-control montant-net-vendu"
+                                        class="form-control montant-net-restant"
                                         readonly
                                         value="0 FCFA"
                                     >
@@ -417,20 +405,9 @@
 
                                     <input
                                         type="text"
-                                        class="form-control quantite-vendue"
+                                        class="form-control montant-net-vendu"
                                         readonly
-                                        value="0"
-                                    >
-
-                                </td>
-
-                                <td>
-
-                                    <input
-                                        type="text"
-                                        class="form-control quantite-restante"
-                                        readonly
-                                        value="{{ ligne.quantite_distribuee }}"
+                                        value="{{ ligne.montant_net_distribue|floatformat:2 }} FCFA"
                                     >
 
                                 </td>
@@ -461,57 +438,74 @@
 
                                 </td>
 
-                                <td colspan="2"></td>
-
                             </tr>
 
                             {% endfor %}
 
                         </tbody>
 
-                        <tfoot>
-
-                            <tr class="table-dark">
-
-                                <td colspan="5" class="text-end">
-
-                                    <strong>
-                                        Total général
-                                    </strong>
-
-                                </td>
-
-                                <td>
-
-                                    <input
-                                        type="text"
-                                        id="total-brut-vendu"
-                                        class="form-control fw-bold"
-                                        readonly
-                                        value="0 FCFA"
-                                    >
-
-                                </td>
-
-                                <td>
-
-                                    <input
-                                        type="text"
-                                        id="total-net-vendu"
-                                        class="form-control fw-bold"
-                                        readonly
-                                        value="0 FCFA"
-                                    >
-
-                                </td>
-
-                                <td colspan="2"></td>
-
-                            </tr>
-
-                        </tfoot>
-
                     </table>
+
+                </div>
+
+                <div class="row g-3 mt-3">
+
+                    <div class="col-md-4">
+
+                        <div class="border rounded p-3 h-100">
+
+                            <small>
+                                Montant total net distribué
+                            </small>
+
+                            <h5
+                                class="mb-0"
+                                id="total-net-distribue"
+                            >
+                                0 FCFA
+                            </h5>
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="border rounded p-3 h-100">
+
+                            <small>
+                                Montant total net restant
+                            </small>
+
+                            <h5
+                                class="mb-0"
+                                id="total-net-restant"
+                            >
+                                0 FCFA
+                            </h5>
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="border rounded p-3 h-100">
+
+                            <small>
+                                Montant total net vendu
+                            </small>
+
+                            <h5
+                                class="mb-0"
+                                id="total-net-vendu"
+                            >
+                                0 FCFA
+                            </h5>
+
+                        </div>
+
+                    </div>
 
                 </div>
 
@@ -720,7 +714,7 @@
 {% load static %}
 
 <script
-    src="{% static 'js/situations.js' %}?v=manquant-auto-20260816"
+    src="{% static 'js/situations.js' %}?v=restants-20260821"
 ></script>
 
 {% endblock %}

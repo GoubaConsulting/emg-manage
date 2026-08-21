@@ -84,8 +84,6 @@ Produits
 
             <th>Prix</th>
 
-            <th>Compagnie</th>
-
             <th width="180">Actions</th>
 
         </tr>
@@ -94,12 +92,32 @@ Produits
 
     <tbody>
 
-        {% for produit in page_obj %}
+        {% for groupe in groupes_produits %}
+
+        <tr class="table-secondary">
+
+            <td colspan="4">
+
+                <strong>
+                    {{ groupe.compagnie.designation|upper }}
+                </strong>
+
+                <span class="text-muted">
+                    -
+                    {{ groupe.produits|length }}
+                    produit(s)
+                </span>
+
+            </td>
+
+        </tr>
+
+        {% for produit in groupe.produits %}
 
         <tr>
 
             <td>
-                {{ forloop.counter }}
+                {{ produit.rang }}
             </td>
 
             <td>
@@ -108,10 +126,6 @@ Produits
 
             <td>
                 {{ produit.prix }}
-            </td>
-
-            <td>
-                {{ produit.compagnie.designation }}
             </td>
 
             <td>
@@ -134,11 +148,13 @@ Produits
 
         </tr>
 
+        {% endfor %}
+
         {% empty %}
 
         <tr>
 
-            <td colspan="5" class="text-center">
+            <td colspan="4" class="text-center">
 
                 Aucun produit trouvé.
 

@@ -79,11 +79,11 @@ function initialiser() {
 
             "change",
 
-            actualiserQuantitesInitiales
+            actualiserMontantsInitiaux
 
         );
 
-        actualiserQuantitesInitiales();
+        actualiserMontantsInitiaux();
 
     }
 
@@ -91,16 +91,22 @@ function initialiser() {
 
 
 // ======================================================
-// Affichage des reliquats du destinataire
+// Affichage des montants initiaux du destinataire
 // ======================================================
 
-function actualiserQuantitesInitiales() {
+function actualiserMontantsInitiaux() {
 
-    const reliquats = window.reliquatsParDistributeur || {};
+    const reliquats = (
+        window.montantsInitiauxParDistributeur
+        ||
+        window.reliquatsParDistributeur
+        ||
+        {}
+    );
 
     const distributeur = selectDistributeur.value;
 
-    const quantites = reliquats[distributeur] || {};
+    const montants = reliquats[distributeur] || {};
 
     lignes.forEach(function (ligne) {
 
@@ -108,7 +114,7 @@ function actualiserQuantitesInitiales() {
 
         const champ = ligne.querySelector(
 
-            ".quantite-initiale"
+            ".montant-initial"
 
         );
 
@@ -118,29 +124,31 @@ function actualiserQuantitesInitiales() {
 
         }
 
-        const quantiteInitiale = Number(
+        const donneesInitiales = (
+            montants[produit] || 0
+        );
 
-            String(
+        const montantInitial = lireMontantInitialNet(
+            donneesInitiales
+        );
 
-                quantites[produit] || 0
+        const montantInitialBrut = lireMontantInitialBrut(
+            donneesInitiales
+        );
 
-            ).replace(",", ".")
+        ligne.dataset.initialNet = montantInitial;
 
-        ) || 0;
+        ligne.dataset.initialBrut = montantInitialBrut;
 
-        champ.textContent = quantiteInitiale;
+        champ.textContent = formaterMontant(
+            montantInitial
+        );
 
         appliquerReliquatLigne(
 
             ligne,
 
-            quantiteInitiale
-
-        );
-
-        actualiserQuantiteTotale(
-
-            ligne
+            montantInitial
 
         );
 
@@ -165,7 +173,7 @@ function actualiserQuantitesInitiales() {
 
 function appliquerReliquatLigne(
     ligne,
-    quantiteInitiale
+    montantInitial
 ) {
 
     const check = ligne.querySelector(
@@ -180,7 +188,7 @@ function appliquerReliquatLigne(
 
     }
 
-    if (quantiteInitiale > 0) {
+    if (montantInitial > 0) {
 
         activerLigne(
 
@@ -276,12 +284,6 @@ function desactiverLigne(ligne) {
 
     ligne.querySelector(
 
-        ".quantite"
-
-    ).value = 0;
-
-    ligne.querySelector(
-
         ".remise"
 
     ).value = 0;
@@ -296,48 +298,6 @@ function desactiverLigne(ligne) {
 
         "table-success"
 
-    );
-
-    actualiserQuantiteTotale(
-
-        ligne
-
-    );
-
-}
-
-// ======================================================
-// Total a suivre = reliquat + nouvelle distribution
-// ======================================================
-
-function actualiserQuantiteTotale(ligne) {
-
-    const initiale = Number(
-        String(
-            ligne.querySelector(".quantite-initiale")?.textContent || "0"
-        ).replace(",", ".")
-    ) || 0;
-
-    const quantite = Number(
-        String(
-            ligne.querySelector(".quantite")?.value || "0"
-        ).replace(",", ".")
-    ) || 0;
-
-    const champTotal = ligne.querySelector(
-        ".quantite-totale"
-    );
-
-    if (!champTotal) {
-
-        return;
-
-    }
-
-    champTotal.value = (
-        initiale
-        +
-        quantite
     );
 
 }
@@ -444,12 +404,6 @@ function initialiserLigne(ligne) {
 
     );
 
-    actualiserQuantiteTotale(
-
-        ligne
-
-    );
-
 }
 
 // ======================================================
@@ -468,10 +422,6 @@ function recalculerLigne(ligne) {
 
     const montantInput = ligne.querySelector(
         ".montant"
-    );
-
-    const quantiteInput = ligne.querySelector(
-        ".quantite"
     );
 
     const tauxInput = ligne.querySelector(
@@ -553,18 +503,8 @@ function recalculerLigne(ligne) {
         )
         +
         calculerMontantNetInitial(
-            ligne,
-            prix,
-            taux
+            ligne
         )
-    );
-
-    quantiteInput.value = quantite;
-
-    actualiserQuantiteTotale(
-
-        ligne
-
     );
 
     remiseInput.value = montantRemise.toFixed(0);
@@ -675,15 +615,23 @@ function recalculerTotaux() {
 
         }
 
-        brut += Number(
+        brut += (
+            calculerMontantBrutInitial(
+                ligne
+            )
+            +
+            (
+                Number(
 
-            ligne.querySelector(
+                    ligne.querySelector(
 
-                ".montant"
+                        ".montant"
 
-            ).value
+                    ).value
 
-        ) || 0;
+                ) || 0
+            )
+        );
 
         net += Number(
 
@@ -740,21 +688,95 @@ function calculerMontantNet(
 }
 
 
-function calculerMontantNetInitial(
-    ligne,
-    prix,
-    taux
-) {
+function calculerMontantNetInitial(ligne) {
 
-    const quantiteInitiale = Number(
-        String(
-            ligne.querySelector(".quantite-initiale")?.textContent || "0"
-        ).replace(",", ".")
-    ) || 0;
+    return lireNombre(
+        ligne.dataset.initialNet
+        ||
+        ligne.querySelector(".montant-initial")?.textContent
+    );
 
-    return calculerMontantNet(
-        quantiteInitiale * prix,
-        taux
+}
+
+
+function calculerMontantBrutInitial(ligne) {
+
+    return lireNombre(
+        ligne.dataset.initialBrut
+    );
+
+}
+
+
+function lireMontantInitialNet(donneesInitiales) {
+
+    if (
+        donneesInitiales
+        &&
+        typeof donneesInitiales === "object"
+    ) {
+
+        return lireNombre(
+            donneesInitiales.net
+        );
+
+    }
+
+    return lireNombre(
+        donneesInitiales
+    );
+
+}
+
+
+function lireMontantInitialBrut(donneesInitiales) {
+
+    if (
+        donneesInitiales
+        &&
+        typeof donneesInitiales === "object"
+    ) {
+
+        return lireNombre(
+            donneesInitiales.brut
+        );
+
+    }
+
+    return lireNombre(
+        donneesInitiales
+    );
+
+}
+
+
+function lireNombre(valeur) {
+
+    const nombre = Number(
+        String(valeur || "0")
+            .replace(/\s/g, "")
+            .replace(/[^\d,.-]/g, "")
+            .replace(",", ".")
+    );
+
+    if (Number.isNaN(nombre)) {
+
+        return 0;
+
+    }
+
+    return nombre;
+
+}
+
+
+function formaterMontant(valeur) {
+
+    return (
+        lireNombre(valeur)
+        .toLocaleString("fr-FR")
+        +
+        " FCFA"
     );
 
 }

@@ -13,7 +13,7 @@ nécessaires aux situations journalières.
 
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db.models import Sum
+from django.db.models import Q, Sum
 
 from distributions.models import Distribution
 from referentiel.models import Distributeur
@@ -276,6 +276,60 @@ def gerants_distribues_par_directeur(utilisateur):
     )
 
 
+def perimetre_situations_directeur(utilisateur):
+    """
+    Retourne le filtre des personnes suivies par le
+    Directeur dans les situations et les manquants.
+
+    Le Directeur suit tous les gerants, quel que soit
+    leur point de vente, et les distributeurs directs de
+    son propre point de vente. Les clients directs sont
+    exclus de ce perimetre.
+    """
+
+    return (
+        Q(
+            distributeur__categorie=(
+                Distributeur.CATEGORIE_GERANT
+            )
+        )
+        |
+        Q(
+            distributeur__categorie=(
+                Distributeur.CATEGORIE_DISTRIBUTEUR
+            ),
+            distributeur__point_vente=(
+                utilisateur.profil.point_vente
+            ),
+        )
+    )
+
+
+def perimetre_manquants_directeur(utilisateur):
+    """
+    Retourne le meme perimetre Directeur pour les
+    reglements, dont le distributeur est porte par
+    manquant__distributeur.
+    """
+
+    return (
+        Q(
+            manquant__distributeur__categorie=(
+                Distributeur.CATEGORIE_GERANT
+            )
+        )
+        |
+        Q(
+            manquant__distributeur__categorie=(
+                Distributeur.CATEGORIE_DISTRIBUTEUR
+            ),
+            manquant__distributeur__point_vente=(
+                utilisateur.profil.point_vente
+            ),
+        )
+    )
+
+
 # ==========================================================
 # VISIBILITE
 # ==========================================================
@@ -294,14 +348,9 @@ def situations_visibles(utilisateur):
     if est_directeur(utilisateur):
 
         return queryset.filter(
-            distributeur_id__in=(
-                gerants_distribues_par_directeur(
-                    utilisateur
-                )
-            ),
-            distributeur__categorie=(
-                Distributeur.CATEGORIE_GERANT
-            ),
+            perimetre_situations_directeur(
+                utilisateur
+            )
         )
 
     if est_gerant(utilisateur):
@@ -333,14 +382,9 @@ def manquants_visibles(utilisateur):
     if est_directeur(utilisateur):
 
         return queryset.filter(
-            distributeur_id__in=(
-                gerants_distribues_par_directeur(
-                    utilisateur
-                )
-            ),
-            distributeur__categorie=(
-                Distributeur.CATEGORIE_GERANT
-            ),
+            perimetre_situations_directeur(
+                utilisateur
+            )
         )
 
     if est_gerant(utilisateur):
@@ -373,14 +417,9 @@ def reglements_manquants_visibles(utilisateur):
     if est_directeur(utilisateur):
 
         return queryset.filter(
-            manquant__distributeur_id__in=(
-                gerants_distribues_par_directeur(
-                    utilisateur
-                )
-            ),
-            manquant__distributeur__categorie=(
-                Distributeur.CATEGORIE_GERANT
-            ),
+            perimetre_manquants_directeur(
+                utilisateur
+            )
         )
 
     if est_gerant(utilisateur):

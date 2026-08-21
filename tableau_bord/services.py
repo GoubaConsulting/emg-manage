@@ -15,7 +15,7 @@ from calendar import monthrange
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.utils import timezone
 
 from commandes.models import (
@@ -40,6 +40,7 @@ from situations.models import (
     Manquant,
     SituationJournaliere,
 )
+from situations.services import calculer_valeur_nette_quantite
 from stocks.models import (
     Stock,
     TYPE_NORMAL,
@@ -674,34 +675,10 @@ def gerants_disponibles():
 
 def personnes_directeur(point_vente):
     """
-    Liste les gerants et les distributeurs directs du Directeur.
+    Liste les gerants suivis dans le tableau Directeur.
     """
 
-    return list(
-        Distributeur.objects
-        .filter(
-            actif=True,
-        )
-        .filter(
-            Q(
-                categorie=Distributeur.CATEGORIE_GERANT,
-            )
-            |
-            Q(
-                categorie=Distributeur.CATEGORIE_DISTRIBUTEUR,
-                point_vente=point_vente,
-            )
-        )
-        .select_related(
-            "point_vente"
-        )
-        .order_by(
-            "categorie",
-            "point_vente__designation",
-            "nom",
-            "prenom",
-        )
-    )
+    return gerants_disponibles()
 
 
 def distributeurs_disponibles(point_vente):
@@ -853,6 +830,412 @@ def _montants_distribues_distributeur(
     return {
         ligne["produit_id"]: _decimal(ligne["total"])
         for ligne in lignes
+    }
+
+
+CHAMPS_TOTAUX_SITUATION = [
+    "montant_net_distribue",
+    "montant_net_vendu",
+    "ecart",
+]
+
+
+def _montants_distribues_destinataire(
+    personne,
+    date_debut,
+    date_fin,
+    types_distribution,
+    point_vente_source=None,
+):
+    """
+    Montants nets distribues par produit pour un destinataire.
+    """
+
+    if personne is None:
+
+        return {}
+
+    filtres = {
+        "distribution__actif": True,
+        "distribution__distributeur": personne,
+        "distribution__type_distribution__in": types_distribution,
+    }
+
+    if point_vente_source is not None:
+
+        filtres["distribution__point_vente_source"] = (
+            point_vente_source
+        )
+
+    lignes = _filtrer_intervalle(
+        LigneDistribution.objects.filter(
+            **filtres
+        ),
+        "distribution__date_distribution",
+        date_debut,
+        date_fin,
+    )
+    lignes = (
+        lignes
+        .values(
+            "produit_id"
+        )
+        .annotate(
+            total=Sum("montant_net")
+        )
+    )
+
+    return {
+        ligne["produit_id"]: _decimal(ligne["total"])
+        for ligne in lignes
+    }
+
+
+def _montants_vendus_par_produit(
+    personne,
+    date_debut,
+    date_fin,
+):
+    """
+    Montants nets vendus issus des lignes de situation.
+    """
+
+    montants = defaultdict(
+        lambda: Decimal("0.00")
+    )
+
+    if personne is None:
+
+        return montants
+
+    lignes = _filtrer_intervalle(
+        LigneSituationJournaliere.objects
+        .filter(
+            situation__actif=True,
+            situation__etat=SituationJournaliere.ETAT_CLOTUREE,
+            situation__distributeur=personne,
+        )
+        .select_related(
+            "produit",
+            "produit__compagnie",
+        ),
+        "situation__date_situation",
+        date_debut,
+        date_fin,
+    )
+
+    for ligne in lignes:
+
+        montants[ligne.produit_id] += (
+            calculer_valeur_nette_quantite(
+                ligne.quantite_vendue,
+                ligne.prix_unitaire,
+                ligne.taux_remise,
+            )
+        )
+
+    return montants
+
+
+def _lignes_situation_produits(
+    montant_distribue_map,
+    montant_vendu_map,
+):
+    """
+    Construit les lignes produit du tableau de situation.
+    """
+
+    produit_ids = set(
+        montant_distribue_map.keys()
+    ) | set(
+        montant_vendu_map.keys()
+    )
+
+    produits = (
+        Produit.objects
+        .filter(
+            pk__in=produit_ids
+        )
+        .select_related(
+            "compagnie"
+        )
+        .order_by(
+            "compagnie__designation",
+            "designation",
+        )
+    )
+
+    lignes = []
+
+    for produit in produits:
+
+        montant_distribue = _decimal(
+            montant_distribue_map.get(
+                produit.pk
+            )
+        )
+
+        montant_vendu = _decimal(
+            montant_vendu_map.get(
+                produit.pk
+            )
+        )
+
+        lignes.append({
+            "produit": produit,
+            "montant_net_distribue": montant_distribue,
+            "montant_net_vendu": montant_vendu,
+            "ecart": (
+                montant_distribue
+                -
+                montant_vendu
+            ),
+        })
+
+    return lignes
+
+
+def _synthese_situation_destinataire(
+    personne,
+    titre,
+    montant_distribue_map,
+    date_debut,
+    date_fin,
+):
+    """
+    Synthese produit d'un gerant ou distributeur.
+    """
+
+    montant_vendu_map = _montants_vendus_par_produit(
+        personne,
+        date_debut,
+        date_fin,
+    )
+
+    lignes = _lignes_situation_produits(
+        montant_distribue_map,
+        montant_vendu_map,
+    )
+
+    return {
+        "personne": personne,
+        "titre": titre,
+        "groupes": _grouper_par_compagnie(
+            lignes,
+            CHAMPS_TOTAUX_SITUATION,
+        ),
+        "totaux": _totaux_lignes(
+            lignes,
+            CHAMPS_TOTAUX_SITUATION,
+        ),
+    }
+
+
+def _synthese_non_vide(synthese):
+    """
+    Indique si une synthese contient des lignes affichables.
+    """
+
+    return bool(
+        synthese["groupes"]
+    )
+
+
+def _totaux_situation_destinataires(destinataires):
+    """
+    Additionne les totaux de plusieurs destinataires.
+    """
+
+    return {
+        champ: sum(
+            (
+                _decimal(
+                    destinataire["totaux"].get(champ)
+                )
+                for destinataire in destinataires
+            ),
+            Decimal("0.00")
+        )
+        for champ in CHAMPS_TOTAUX_SITUATION
+    }
+
+
+def _totaux_situation_blocs(blocs):
+    """
+    Additionne les totaux de tous les blocs situation.
+    """
+
+    return {
+        champ: sum(
+            (
+                _decimal(
+                    bloc["totaux"].get(champ)
+                )
+                for bloc in blocs
+            ),
+            Decimal("0.00")
+        )
+        for champ in CHAMPS_TOTAUX_SITUATION
+    }
+
+
+def synthese_situations_gerant_directeur(
+    gerant,
+    point_vente_directeur,
+    date_debut,
+    date_fin,
+):
+    """
+    Situations suivies par le Directeur pour un gerant.
+    """
+
+    if gerant is None:
+
+        return {
+            "blocs": [],
+            "totaux": _totaux_situation_blocs([]),
+        }
+
+    destinataires = []
+
+    synthese_gerant = _synthese_situation_destinataire(
+        gerant,
+        f"Gérant : {gerant.nom} {gerant.prenom}",
+        _montants_distribues_destinataire(
+            gerant,
+            date_debut,
+            date_fin,
+            [
+                Distribution.TYPE_COMMANDE_GERANT,
+            ],
+            point_vente_directeur,
+        ),
+        date_debut,
+        date_fin,
+    )
+
+    if _synthese_non_vide(
+        synthese_gerant
+    ):
+
+        destinataires.append(
+            synthese_gerant
+        )
+
+    distributeurs = (
+        Distributeur.objects
+        .filter(
+            actif=True,
+            point_vente=gerant.point_vente,
+            categorie=Distributeur.CATEGORIE_DISTRIBUTEUR,
+        )
+        .order_by(
+            "nom",
+            "prenom",
+        )
+    )
+
+    for distributeur in distributeurs:
+
+        synthese_distributeur = _synthese_situation_destinataire(
+            distributeur,
+            (
+                "Distributeur : "
+                f"{distributeur.nom} {distributeur.prenom}"
+            ),
+            _montants_distribues_destinataire(
+                distributeur,
+                date_debut,
+                date_fin,
+                [
+                    Distribution.TYPE_DISTRIBUTEUR,
+                ],
+                gerant.point_vente,
+            ),
+            date_debut,
+            date_fin,
+        )
+
+        if _synthese_non_vide(
+            synthese_distributeur
+        ):
+
+            destinataires.append(
+                synthese_distributeur
+            )
+
+    blocs = []
+
+    if destinataires:
+
+        blocs.append({
+            "titre": f"Gérant : {gerant.nom} {gerant.prenom}",
+            "destinataires": destinataires,
+            "totaux": _totaux_situation_destinataires(
+                destinataires
+            ),
+        })
+
+    return {
+        "blocs": blocs,
+        "totaux": _totaux_situation_blocs(
+            blocs
+        ),
+    }
+
+
+def synthese_situations_distributeur_gerant(
+    distributeur,
+    point_vente,
+    date_debut,
+    date_fin,
+):
+    """
+    Situations suivies par un gerant pour un distributeur.
+    """
+
+    if distributeur is None:
+
+        return {
+            "blocs": [],
+            "totaux": _totaux_situation_blocs([]),
+        }
+
+    synthese = _synthese_situation_destinataire(
+        distributeur,
+        f"Distributeur : {distributeur.nom} {distributeur.prenom}",
+        _montants_distribues_destinataire(
+            distributeur,
+            date_debut,
+            date_fin,
+            [
+                Distribution.TYPE_DISTRIBUTEUR,
+            ],
+            point_vente,
+        ),
+        date_debut,
+        date_fin,
+    )
+
+    blocs = []
+
+    if _synthese_non_vide(
+        synthese
+    ):
+
+        blocs.append({
+            "titre": "",
+            "destinataires": [
+                synthese
+            ],
+            "totaux": synthese["totaux"],
+        })
+
+    return {
+        "blocs": blocs,
+        "totaux": _totaux_situation_blocs(
+            blocs
+        ),
     }
 
 
@@ -1219,13 +1602,6 @@ def donnees_dashboard(
             personne_id,
         )
 
-        montant_reference_map = _montants_reference_directeur(
-            personne_selectionnee,
-            point_vente,
-            date_debut,
-            date_fin,
-        )
-
         distribution_synthese = synthese_distributions(
             point_vente,
             date_debut,
@@ -1244,11 +1620,11 @@ def donnees_dashboard(
             )
         )
 
-        situation_synthese = synthese_situations_personne(
+        situation_synthese = synthese_situations_gerant_directeur(
             personne_selectionnee,
+            point_vente,
             date_debut,
             date_fin,
-            montant_reference_map,
         )
 
         manquants_synthese = tableau_manquants(
@@ -1288,10 +1664,10 @@ def donnees_dashboard(
             ),
             "personnes": personnes,
             "personne_selectionnee": personne_selectionnee,
-            "personne_label": "Gérant / Distributeur",
-            "montant_reference_label": "Montant net à justifier",
-            "situation_groupes": situation_synthese[
-                "groupes"
+            "personne_label": "Gérant",
+            "situation_titre": "Situations par gérant",
+            "situation_blocs": situation_synthese[
+                "blocs"
             ],
             "situation_totaux": situation_synthese[
                 "totaux"
@@ -1321,13 +1697,6 @@ def donnees_dashboard(
             personne_id,
         )
 
-        montant_reference_map = _montants_distribues_distributeur(
-            personne_selectionnee,
-            point_vente,
-            date_debut,
-            date_fin,
-        )
-
         distribution_synthese = synthese_distributions(
             point_vente,
             date_debut,
@@ -1346,11 +1715,11 @@ def donnees_dashboard(
             )
         )
 
-        situation_synthese = synthese_situations_personne(
+        situation_synthese = synthese_situations_distributeur_gerant(
             personne_selectionnee,
+            point_vente,
             date_debut,
             date_fin,
-            montant_reference_map,
         )
 
         manquants_synthese = tableau_manquants(
@@ -1386,9 +1755,9 @@ def donnees_dashboard(
             "personnes": personnes,
             "personne_selectionnee": personne_selectionnee,
             "personne_label": "Distributeur",
-            "montant_reference_label": "Montant net distribué",
-            "situation_groupes": situation_synthese[
-                "groupes"
+            "situation_titre": "Situations par distributeur",
+            "situation_blocs": situation_synthese[
+                "blocs"
             ],
             "situation_totaux": situation_synthese[
                 "totaux"

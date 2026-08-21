@@ -1069,7 +1069,7 @@ def ajouter_situation(request):
             )
 
             # ----------------------------------------------
-            # RECUPERATION DES MONTANTS VENDUS
+            # RECUPERATION DES MONTANTS RESTANTS
             #
             # IMPORTANT :
             # On utilise maintenant l'ID DU PRODUIT
@@ -1084,9 +1084,9 @@ def ajouter_situation(request):
                     str(ligne.idlignesituation)
                 ] = {
 
-                    "montant_vendu": request.POST.get(
+                    "montant_restant": request.POST.get(
 
-                        f"montant_vendu_"
+                        f"montant_restant_"
                         f"{ligne.produit.idproduit}",
 
                         "0"

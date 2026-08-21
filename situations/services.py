@@ -338,10 +338,17 @@ def construire_donnees_lignes_situation(
                 "produit": ligne.produit,
                 "prix_unitaire": ligne.prix_unitaire,
                 "taux_remise": ligne.taux_remise,
-                "taux_distribution": Decimal("0.00"),
+                "taux_distribution": ligne.taux_remise,
                 "quantite_initiale": ligne.quantite_restante,
                 "quantite_jour": Decimal("0.00"),
                 "quantite_distribuee": ligne.quantite_restante,
+                "montant_net_distribue": (
+                    calculer_valeur_nette_quantite(
+                        ligne.quantite_restante,
+                        ligne.prix_unitaire,
+                        ligne.taux_remise,
+                    )
+                ),
             }
 
     for distribution in distributions:
@@ -363,11 +370,16 @@ def construire_donnees_lignes_situation(
                     "quantite_initiale": Decimal("0.00"),
                     "quantite_jour": Decimal("0.00"),
                     "quantite_distribuee": Decimal("0.00"),
+                    "montant_net_distribue": Decimal("0.00"),
                 }
 
             produits[produit_id]["quantite_jour"] += ligne.quantite
 
             produits[produit_id]["quantite_distribuee"] += ligne.quantite
+
+            produits[produit_id]["montant_net_distribue"] += (
+                ligne.montant_net
+            )
 
             if produits[produit_id]["taux_distribution"] == Decimal("0.00"):
 
@@ -406,6 +418,7 @@ def construire_lignes_affichage_situation(
                 quantite_initiale=donnees["quantite_initiale"],
                 quantite_jour=donnees["quantite_jour"],
                 quantite_distribuee=donnees["quantite_distribuee"],
+                montant_net_distribue=donnees["montant_net_distribue"],
                 quantite_vendue=Decimal("0.00"),
                 quantite_restante=donnees["quantite_distribuee"],
                 taux_distribution=donnees["taux_distribution"],
@@ -455,6 +468,15 @@ def annoter_lignes_reliquat(
         ligne.taux_distribution = donnees.get(
             "taux_distribution",
             Decimal("0.00")
+        )
+
+        ligne.montant_net_distribue = donnees.get(
+            "montant_net_distribue",
+            calculer_valeur_nette_quantite(
+                ligne.quantite_distribuee,
+                ligne.prix_unitaire,
+                ligne.taux_remise,
+            )
         )
 
     return lignes
@@ -935,16 +957,16 @@ def cloturer_situation(
     """
     Clôture une situation journalière.
 
-    Le montant vendu saisi pour chaque produit
-    correspond au montant brut vendu.
-
-    La quantité vendue est calculée automatiquement :
-
-        montant brut vendu / prix unitaire
+    Le montant restant saisi pour chaque produit
+    correspond au montant brut restant.
 
     La quantité restante est calculée automatiquement :
 
-        quantité distribuée - quantité vendue
+        montant brut restant / prix unitaire
+
+    La quantité vendue est calculée automatiquement :
+
+        quantité distribuée - quantité restante
     """
 
     # ======================================================
@@ -1017,22 +1039,22 @@ def cloturer_situation(
             )
 
         # --------------------------------------------------
-        # MONTANT BRUT VENDU SAISI
+        # MONTANT BRUT RESTANT SAISI
         # --------------------------------------------------
 
-        montant_vendu = Decimal(
+        montant_restant = Decimal(
             str(
                 donnees.get(
-                    "montant_vendu",
+                    "montant_restant",
                     "0"
                 )
             )
         )
 
-        if montant_vendu < 0:
+        if montant_restant < 0:
 
             raise ValueError(
-                f"Le montant vendu du produit "
+                f"Le montant restant du produit "
                 f"« {ligne.produit.designation} » "
                 f"ne peut pas être négatif."
             )
@@ -1057,37 +1079,13 @@ def cloturer_situation(
         # VERIFICATION DU MULTIPLE
         # --------------------------------------------------
 
-        if montant_vendu % prix != 0:
+        if montant_restant % prix != 0:
 
             raise ValueError(
-                f"Le montant vendu du produit "
+                f"Le montant restant du produit "
                 f"« {ligne.produit.designation} » "
                 f"doit être un multiple de "
                 f"{prix} FCFA."
-            )
-
-        # --------------------------------------------------
-        # CALCUL DE LA QUANTITE VENDUE
-        # --------------------------------------------------
-
-        quantite_vendue = (
-            montant_vendu / prix
-        )
-
-        # --------------------------------------------------
-        # VERIFICATION DE LA QUANTITE
-        # --------------------------------------------------
-
-        if (
-            quantite_vendue
-            >
-            ligne.quantite_distribuee
-        ):
-
-            raise ValueError(
-                f"La quantité vendue du produit "
-                f"« {ligne.produit.designation} » "
-                f"dépasse la quantité distribuée."
             )
 
         # --------------------------------------------------
@@ -1095,9 +1093,33 @@ def cloturer_situation(
         # --------------------------------------------------
 
         quantite_restante = (
+            montant_restant / prix
+        )
+
+        # --------------------------------------------------
+        # VERIFICATION DE LA QUANTITE
+        # --------------------------------------------------
+
+        if (
+            quantite_restante
+            >
+            ligne.quantite_distribuee
+        ):
+
+            raise ValueError(
+                f"La quantité restante du produit "
+                f"« {ligne.produit.designation} » "
+                f"dépasse la quantité distribuée."
+            )
+
+        # --------------------------------------------------
+        # CALCUL DE LA QUANTITE VENDUE
+        # --------------------------------------------------
+
+        quantite_vendue = (
             ligne.quantite_distribuee
             -
-            quantite_vendue
+            quantite_restante
         )
 
         # --------------------------------------------------

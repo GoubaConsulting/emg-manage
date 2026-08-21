@@ -324,25 +324,13 @@ Distribution Directeur
 
                             <th class="text-end" width="140">
 
-                                Quantite initiale
+                                Montant initial
 
                             </th>
 
                             <th width="170">
 
                                 Montant
-
-                            </th>
-
-                            <th width="120">
-
-                                Quantité
-
-                            </th>
-
-                            <th class="text-end" width="140">
-
-                                Total a suivre
 
                             </th>
 
@@ -360,7 +348,7 @@ Distribution Directeur
 
                             <th width="170">
 
-                                Montant net
+                                Montant net a suivre
 
                             </th>
 
@@ -372,7 +360,7 @@ Distribution Directeur
 
                         <tr>
 
-                            <td colspan="9" class="text-center">
+                            <td colspan="7" class="text-center">
 
                                 Sélectionnez une commande.
 
@@ -488,6 +476,6 @@ const commandes = {{ context_commandes|safe }};
 
 </script>
 
-<script src="{% static 'js/distributions_directeur.js' %}"></script>
+<script src="{% static 'js/distributions_directeur.js' %}?v=totaux-initiaux-brut-20260821"></script>
 
 {% endblock %}

@@ -67,26 +67,26 @@ function initialiserSituation() {
 
     document.addEventListener(
         "input",
-        gererSaisieMontantVendu
+        gererSaisieMontantRestant
     );
 
     document.addEventListener(
         "change",
-        gererSaisieMontantVendu
+        gererSaisieMontantRestant
     );
 
 }
 
 
 // ==========================================================
-// ECOUTE GLOBALE DES MONTANTS BRUTS
+// ECOUTE GLOBALE DES MONTANTS BRUTS RESTANTS
 // ==========================================================
 
-function gererSaisieMontantVendu(evenement) {
+function gererSaisieMontantRestant(evenement) {
 
     if (
         !evenement.target.classList.contains(
-            "montant-vendu"
+            "montant-restant"
         )
     ) {
 
@@ -104,7 +104,7 @@ function gererSaisieMontantVendu(evenement) {
 
     }
 
-    calculerQuantites(ligne);
+    calculerMontants(ligne);
 
 }
 
@@ -115,11 +115,11 @@ function gererSaisieMontantVendu(evenement) {
 
 function initialiserLigne(ligne) {
 
-    const montantVendu = ligne.querySelector(
-        ".montant-vendu"
+    const montantRestant = ligne.querySelector(
+        ".montant-restant"
     );
 
-    if (!montantVendu) {
+    if (!montantRestant) {
         return;
     }
 
@@ -127,18 +127,18 @@ function initialiserLigne(ligne) {
     // Calcul initial
     // ------------------------------------------------------
 
-    calculerQuantites(ligne);
+    calculerMontants(ligne);
 
 
     // ------------------------------------------------------
     // Recalcul à chaque modification
     // ------------------------------------------------------
 
-    montantVendu.addEventListener(
+    montantRestant.addEventListener(
         "input",
         function () {
 
-            calculerQuantites(ligne);
+            calculerMontants(ligne);
 
         }
     );
@@ -147,21 +147,17 @@ function initialiserLigne(ligne) {
 
 
 // ==========================================================
-// CALCUL DES QUANTITES
+// CALCUL DES MONTANTS
 // ==========================================================
 
-function calculerQuantites(ligne) {
+function calculerMontants(ligne) {
 
-    const montantVendu = ligne.querySelector(
-        ".montant-vendu"
+    const montantRestant = ligne.querySelector(
+        ".montant-restant"
     );
 
-    const quantiteVendue = ligne.querySelector(
-        ".quantite-vendue"
-    );
-
-    const quantiteRestante = ligne.querySelector(
-        ".quantite-restante"
+    const montantNetRestant = ligne.querySelector(
+        ".montant-net-restant"
     );
 
     const montantNetVendu = ligne.querySelector(
@@ -181,12 +177,12 @@ function calculerQuantites(ligne) {
         ligne.dataset.taux
     );
 
-    const quantiteDistribuee = convertirNombre(
-        ligne.dataset.distribuee
+    const montantNetDistribue = convertirNombre(
+        ligne.dataset.netDistribue
     );
 
-    const montant = convertirNombre(
-        montantVendu.value
+    const montantBrutRestant = convertirNombre(
+        montantRestant.value
     );
 
 
@@ -196,22 +192,23 @@ function calculerQuantites(ligne) {
 
     if (
         prix <= 0 ||
-        quantiteDistribuee < 0 ||
-        montant < 0
+        montantNetDistribue < 0 ||
+        montantBrutRestant < 0
     ) {
 
-        quantiteVendue.value = "0";
+        if (montantNetRestant) {
 
-        if (montantNetVendu) {
-
-            montantNetVendu.value = "0 FCFA";
+            montantNetRestant.value = "0 FCFA";
 
         }
 
-        quantiteRestante.value =
-            formaterNombre(
-                quantiteDistribuee
+        if (montantNetVendu) {
+
+            montantNetVendu.value = formaterMontant(
+                Math.max(0, montantNetDistribue)
             );
+
+        }
 
         recalculerSousTotauxNets();
 
@@ -221,43 +218,42 @@ function calculerQuantites(ligne) {
 
 
     // ------------------------------------------------------
-    // CALCUL DE LA QUANTITE VENDUE
+    // CALCUL DU MONTANT NET RESTANT
     // ------------------------------------------------------
 
-    const quantite = montant / prix;
-
-    const montantNet = calculerMontantNet(
-        montant,
+    const netRestant = calculerMontantNet(
+        montantBrutRestant,
         taux
     );
 
 
     // ------------------------------------------------------
-    // CALCUL DE LA QUANTITE RESTANTE
+    // CALCUL DU MONTANT NET VENDU
     // ------------------------------------------------------
 
-    const restante =
-        quantiteDistribuee - quantite;
+    const netVendu = Math.max(
+        0,
+        montantNetDistribue - netRestant
+    );
 
 
     // ------------------------------------------------------
     // AFFICHAGE
     // ------------------------------------------------------
 
-    quantiteVendue.value =
-        formaterNombre(quantite);
+    if (montantNetRestant) {
+
+        montantNetRestant.value =
+            formaterMontant(netRestant);
+
+    }
 
     if (montantNetVendu) {
 
         montantNetVendu.value =
-            formaterMontant(montantNet);
+            formaterMontant(netVendu);
 
     }
-
-    quantiteRestante.value =
-        formaterNombre(
-            Math.max(0, restante)
-        );
 
     recalculerSousTotauxNets();
 
@@ -272,9 +268,11 @@ function recalculerSousTotauxNets() {
 
     const sousTotaux = {};
 
-    let totalBrut = 0;
+    let totalNetDistribue = 0;
 
-    let totalNet = 0;
+    let totalNetRestant = 0;
+
+    let totalNetVendu = 0;
 
     document.querySelectorAll(
         ".ligne-situation"
@@ -288,27 +286,41 @@ function recalculerSousTotauxNets() {
 
         }
 
-        const montantBrut = convertirNombre(
-            ligne.querySelector(".montant-vendu").value
+        const montantNetDistribue = convertirNombre(
+            ligne.dataset.netDistribue
         );
 
         const taux = convertirNombre(
             ligne.dataset.taux
         );
 
-        const montantNet = calculerMontantNet(
-            montantBrut,
+        const montantBrutRestant = convertirNombre(
+            ligne.querySelector(".montant-restant")?.value
+        );
+
+        const montantNetRestant = calculerMontantNet(
+            montantBrutRestant,
             taux
         );
 
-        totalBrut += Math.max(
+        const montantNetVendu = Math.max(
             0,
-            montantBrut
+            montantNetDistribue - montantNetRestant
         );
 
-        totalNet += Math.max(
+        totalNetDistribue += Math.max(
             0,
-            montantNet
+            montantNetDistribue
+        );
+
+        totalNetRestant += Math.max(
+            0,
+            montantNetRestant
+        );
+
+        totalNetVendu += Math.max(
+            0,
+            montantNetVendu
         );
 
         if (!(compagnie in sousTotaux)) {
@@ -319,7 +331,7 @@ function recalculerSousTotauxNets() {
 
         sousTotaux[compagnie] += Math.max(
             0,
-            montantNet
+            montantNetVendu
         );
 
     });
@@ -336,33 +348,43 @@ function recalculerSousTotauxNets() {
 
     });
 
-    const champTotalBrut = document.getElementById(
-        "total-brut-vendu"
+    const champTotalDistribue = document.getElementById(
+        "total-net-distribue"
     );
 
-    const champTotalNet = document.getElementById(
+    const champTotalRestant = document.getElementById(
+        "total-net-restant"
+    );
+
+    const champTotalVendu = document.getElementById(
         "total-net-vendu"
     );
 
-    if (champTotalBrut) {
+    if (champTotalDistribue) {
 
-        champTotalBrut.value = formaterMontant(
-            totalBrut
+        champTotalDistribue.textContent = formaterMontant(
+            totalNetDistribue
         );
 
     }
 
-    if (champTotalNet) {
+    if (champTotalRestant) {
 
-        champTotalNet.value = formaterMontant(
-            totalNet
+        champTotalRestant.textContent = formaterMontant(
+            totalNetRestant
         );
 
     }
 
-    actualiserManquantAuto(
-        totalNet
-    );
+    if (champTotalVendu) {
+
+        champTotalVendu.textContent = formaterMontant(
+            totalNetVendu
+        );
+
+    }
+
+    actualiserManquantAuto();
 
 }
 
@@ -371,7 +393,7 @@ function recalculerSousTotauxNets() {
 // MANQUANT AUTOMATIQUE
 // ==========================================================
 
-function actualiserManquantAuto(totalNetCalcule) {
+function actualiserManquantAuto() {
 
     const champManquant = document.getElementById(
         "montant-manquant-auto"
@@ -383,20 +405,17 @@ function actualiserManquantAuto(totalNetCalcule) {
 
     }
 
-    let totalNet = totalNetCalcule;
+    const totalNetDistribue = convertirNombre(
+        document.getElementById(
+            "total-net-distribue"
+        )?.textContent
+    );
 
-    if (
-        typeof totalNet !== "number" ||
-        !Number.isFinite(totalNet)
-    ) {
-
-        totalNet = convertirNombre(
-            document.getElementById(
-                "total-net-vendu"
-            )?.value
-        );
-
-    }
+    const totalNetRestant = convertirNombre(
+        document.getElementById(
+            "total-net-restant"
+        )?.textContent
+    );
 
     const montantVerse = convertirNombre(
         document.getElementById(
@@ -406,7 +425,7 @@ function actualiserManquantAuto(totalNetCalcule) {
 
     const manquant = Math.max(
         0,
-        totalNet - montantVerse
+        totalNetDistribue - montantVerse - totalNetRestant
     );
 
     champManquant.value = formaterMontant(
