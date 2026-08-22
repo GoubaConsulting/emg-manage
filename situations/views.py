@@ -248,6 +248,37 @@ def _situation_affichage_temporaire(
     )
 
 
+def _message_distributions_indisponibles(
+    distributeur,
+    date_situation,
+):
+    """
+    Retourne le message d'erreur adapte lorsque
+    aucune distribution ouverte n'est disponible.
+    """
+
+    toutes_distributions = distributions_du_jour(
+        distributeur,
+        date_situation,
+        inclure_cloturees=True
+    )
+
+    if toutes_distributions.exists():
+
+        return (
+            "Toutes les distributions de "
+            f"{distributeur.nom} {distributeur.prenom} "
+            "pour la date du "
+            f"{date_situation.strftime('%d/%m/%Y')} "
+            "sont clôturées."
+        )
+
+    return (
+        "Aucune distribution n'a été enregistrée "
+        "pour cette personne à la date sélectionnée."
+    )
+
+
 def _filtre_texte(request, nom):
     """
     Nettoie un filtre texte GET.
@@ -1002,9 +1033,10 @@ def ajouter_situation(request):
 
                 messages.error(
                     request,
-                    "Aucune distribution n'a été "
-                    "enregistrée pour cette personne "
-                    "à la date sélectionnée."
+                    _message_distributions_indisponibles(
+                        distributeur,
+                        date_situation
+                    )
                 )
 
                 return redirect(
@@ -1228,9 +1260,10 @@ def ajouter_situation(request):
 
                         None,
 
-                        "Aucune distribution n'a été "
-                        "enregistrée pour cette personne "
-                        "à la date sélectionnée."
+                        _message_distributions_indisponibles(
+                            distributeur,
+                            date_situation
+                        )
 
                     )
 
@@ -1323,6 +1356,18 @@ def ajouter_situation(request):
     # ======================================================
 
     groupes_compagnies = []
+
+    if situation is not None and distributions is not None:
+
+        situation.montant_total_distribue = calculer_total_distribue(
+            situation.distributeur,
+            situation.date_situation
+        )
+
+        situation.montant_credit = calculer_credit(
+            situation.montant_total_distribue,
+            situation.fond,
+        )
 
     if lignes:
 

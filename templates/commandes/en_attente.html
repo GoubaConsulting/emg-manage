@@ -97,12 +97,25 @@ Commandes en attente
                             Valider
                         </button>
 
-                        <a
-                            href="#"
-                            class="btn btn-danger btn-sm"
+                        <form
+                            method="post"
+                            action="{% url 'rejeter_commande_gerant' commande.idcommande %}"
+                            class="d-inline"
                         >
-                            Refuser
-                        </a>
+                            {% csrf_token %}
+                            <input
+                                type="hidden"
+                                name="retour"
+                                value="commandes_en_attente"
+                            >
+                            <button
+                                type="submit"
+                                class="btn btn-danger btn-sm"
+                                onclick="return confirm('Voulez-vous vraiment refuser cette commande ?');"
+                            >
+                                Refuser
+                            </button>
+                        </form>
 
                     </td>
 
@@ -280,7 +293,7 @@ Commandes en attente
 
                 <tr>
 
-                    <td colspan="6" class="text-center">
+                    <td colspan="7" class="text-center">
 
                         Aucune commande en attente.
 

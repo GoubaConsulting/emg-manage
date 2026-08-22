@@ -65,6 +65,28 @@ class Distribution(models.Model):
 
     ]
 
+    # ======================================================
+    # ETATS
+    # ======================================================
+
+    ETAT_OUVERTE = "OUVERTE"
+
+    ETAT_CLOTUREE = "CLOTUREE"
+
+    ETATS = [
+
+        (
+            ETAT_OUVERTE,
+            "Ouverte"
+        ),
+
+        (
+            ETAT_CLOTUREE,
+            "Clôturée"
+        ),
+
+    ]
+
     iddistribution = models.AutoField(
         primary_key=True
     )
@@ -137,6 +159,13 @@ class Distribution(models.Model):
         verbose_name="Montant net"
     )
 
+    etat = models.CharField(
+        max_length=20,
+        choices=ETATS,
+        default=ETAT_OUVERTE,
+        verbose_name="Etat"
+    )
+
     actif = models.BooleanField(
         default=True
     )
@@ -195,6 +224,13 @@ class Distribution(models.Model):
                 fields=[
                     "distributeur"
                 ]
+            ),
+
+            models.Index(
+                fields=[
+                    "etat"
+                ],
+                name="distribution_etat_idx"
             ),
 
         ]

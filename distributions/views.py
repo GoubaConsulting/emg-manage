@@ -1469,7 +1469,7 @@ def ajouter_distribution_directeur(request):
                 "quantite": float(ligne.quantite),
 
                 "montant_initial": float(
-                    donnees_initiales.get("net", 0)
+                    donnees_initiales.get("brut", 0)
                 ),
 
                 "montant_initial_brut": float(

@@ -91,7 +91,7 @@
                 <th class="text-end">Prix unitaire</th>
 
                 <th class="text-end" width="140">
-                    Montant initial
+                    Montant initial (brut)
                 </th>
 
                 <th width="180">Montant (FCFA)</th>
@@ -373,6 +373,6 @@
 window.montantsInitiauxParDistributeur = {{ reliquats_json|default:"{}"|safe }};
 </script>
 
-<script src="{% static 'js/distributions_gerant.js' %}?v=totaux-initiaux-brut-20260821"></script>
+<script src="{% static 'js/distributions_gerant.js' %}?v=montants-initiaux-brut-20260822"></script>
 
 {% endblock %}

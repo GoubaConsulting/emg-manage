@@ -35,6 +35,7 @@ from .selectors import (
     rechercher_commandes,
     paginer,
     commande_par_id,
+    commande_gerant_en_attente_par_id,
     commandes_en_attente,
 )
 
@@ -206,6 +207,17 @@ def liste_commandes(request):
         "numero"
     )
 
+    etat = filtre_texte(
+        request,
+        "etat"
+    )
+
+    if etat not in dict(
+        Commande.ETATS
+    ):
+
+        etat = ""
+
     (
         date_commande,
         date_debut,
@@ -227,7 +239,9 @@ def liste_commandes(request):
 
         date_debut=date_debut,
 
-        date_fin=date_fin
+        date_fin=date_fin,
+
+        etat=etat
 
     )
 
@@ -273,6 +287,12 @@ def liste_commandes(request):
             "date_debut": date_debut,
 
             "date_fin": date_fin,
+
+            "etat": etat,
+
+            "etats_commande": Commande.ETATS,
+
+            "afficher_filtre_etat": True,
 
             "pagination_querystring": querystring_pagination(request),
 
@@ -1720,7 +1740,10 @@ def liste_validation_commandes(request):
 @login_required
 def valider_commande_gerant_view(request, pk):
 
-    commande = commande_par_id(request.user, pk)
+    commande = commande_gerant_en_attente_par_id(
+        request.user,
+        pk
+    )
 
     try:
 
@@ -1776,7 +1799,22 @@ def valider_commande_gerant_view(request, pk):
 @login_required
 def rejeter_commande_gerant_view(request, pk):
 
-    commande = commande_par_id(request.user, pk)
+    commande = commande_gerant_en_attente_par_id(
+        request.user,
+        pk
+    )
+
+    retour = request.POST.get(
+        "retour",
+        ""
+    )
+
+    if retour not in [
+        "commandes_en_attente",
+        "liste_validation_commandes",
+    ]:
+
+        retour = "liste_validation_commandes"
 
     try:
 
@@ -1791,7 +1829,7 @@ def rejeter_commande_gerant_view(request, pk):
 
         messages.error(request, str(e))
 
-    return redirect("liste_validation_commandes")
+    return redirect(retour)
 
 
 @login_required

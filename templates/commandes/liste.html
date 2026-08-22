@@ -42,7 +42,7 @@ Liste des commandes
 
         <form method="get" class="row g-3 mb-4">
 
-            <div class="col-md-3">
+            <div class="col-md-2">
 
                 <label class="form-label">
 
@@ -75,6 +75,44 @@ Liste des commandes
                 >
 
             </div>
+
+            {% if afficher_filtre_etat %}
+
+            <div class="col-md-2">
+
+                <label class="form-label">
+
+                    Etat
+
+                </label>
+
+                <select
+                    name="etat"
+                    class="form-select"
+                >
+
+                    <option value="">
+                        Tous
+                    </option>
+
+                    {% for valeur, libelle in etats_commande %}
+
+                        <option
+                            value="{{ valeur }}"
+                            {% if etat == valeur %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ libelle }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            {% endif %}
 
             <div class="col-md-2">
 
@@ -225,6 +263,8 @@ Liste des commandes
 
                         <th>Date</th>
 
+                        <th>Etat</th>
+
                         <th class="text-end">
 
                             Montant brut
@@ -285,6 +325,16 @@ Liste des commandes
 
                         </td>
 
+                        <td>
+
+                            <span
+                                class="badge {% if commande.etat == commande.VALIDEE %}text-bg-success{% elif commande.etat == commande.REFUSEE %}text-bg-danger{% elif commande.etat == commande.VALIDEE_PARTIELLEMENT %}text-bg-warning{% else %}text-bg-secondary{% endif %}"
+                            >
+                                {{ commande.get_etat_display }}
+                            </span>
+
+                        </td>
+
                         <td class="text-end">
 
                             {{ commande.montant_brut }} FCFA
@@ -319,7 +369,7 @@ Liste des commandes
 
                         <td></td>
 
-                        <td colspan="5">
+                        <td colspan="6">
 
                             <div class="p-3 bg-light rounded">
 
@@ -592,7 +642,7 @@ Liste des commandes
 
                     <tr>
 
-                        <td colspan="6" class="text-center">
+                        <td colspan="7" class="text-center">
 
                             Aucune commande trouvée.
 

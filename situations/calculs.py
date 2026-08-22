@@ -145,19 +145,17 @@ def calculer_montant_produits_restants(
 
 def calculer_manquant(
     montant_total_distribue,
-    montant_vente_verse,
-    montant_produits_restants
+    montant_credit_verse,
+    montant_vente_verse
 ):
     """
     Calcule le montant manquant.
 
-    Le montant net distribue doit etre justifie par :
+    Le montant distribue doit etre justifie par :
 
-        montant net verse
-        +
-        valeur nette des produits restants
+        credit verse + ventes versees
 
-    Si cette somme est inferieure au net distribue,
+    Si cette somme est inferieure au montant distribue,
     la différence constitue un manquant.
     """
 
@@ -165,12 +163,12 @@ def calculer_manquant(
         str(montant_total_distribue)
     )
 
-    montant_vente_verse = Decimal(
-        str(montant_vente_verse)
+    montant_credit_verse = Decimal(
+        str(montant_credit_verse)
     )
 
-    montant_produits_restants = Decimal(
-        str(montant_produits_restants)
+    montant_vente_verse = Decimal(
+        str(montant_vente_verse)
     )
 
     manquant = (
@@ -179,11 +177,11 @@ def calculer_manquant(
 
         -
 
-        montant_vente_verse
+        montant_credit_verse
 
         -
 
-        montant_produits_restants
+        montant_vente_verse
 
     )
 

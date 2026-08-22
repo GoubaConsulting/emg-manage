@@ -221,7 +221,7 @@
                         <div class="border rounded p-3">
 
                             <small>
-                                Total net distribué
+                                Total distribué
                             </small>
 
                             <h5>
@@ -294,19 +294,23 @@
                                 </th>
 
                                 <th class="text-end">
-                                    Montant net distribué
+                                    Montant distribué
                                 </th>
 
                                 <th class="text-end">
-                                    Montant brut restant
+                                    Montant restant
                                 </th>
 
-                                <th width="180">
+                                <th class="d-none">
                                     Montant net restant
                                 </th>
 
-                                <th width="180">
+                                <th class="d-none">
                                     Montant net vendu
+                                </th>
+
+                                <th width="180">
+                                    Montant versé
                                 </th>
 
                             </tr>
@@ -323,7 +327,7 @@
 
                             <tr class="table-secondary">
 
-                                <td colspan="7">
+                                <td colspan="6">
 
                                     <strong>
 
@@ -348,6 +352,7 @@
                                 data-taux="{{ ligne.taux_distribution|default:0 }}"
                                 data-compagnie="{{ groupe.compagnie.idcompagnie }}"
                                 data-distribuee="{{ ligne.quantite_distribuee }}"
+                                data-montant-distribue="{{ ligne.montant_distribue|default:0 }}"
                                 data-net-distribue="{{ ligne.montant_net_distribue|default:0 }}"
                             >
 
@@ -372,7 +377,7 @@
 
                                 <td class="text-end fw-bold">
 
-                                    {{ ligne.montant_net_distribue|floatformat:2 }}
+                                    {{ ligne.montant_distribue|floatformat:2 }}
                                     FCFA
 
                                 </td>
@@ -390,7 +395,7 @@
 
                                 </td>
 
-                                <td>
+                                <td class="d-none">
 
                                     <input
                                         type="text"
@@ -401,7 +406,7 @@
 
                                 </td>
 
-                                <td>
+                                <td class="d-none">
 
                                     <input
                                         type="text"
@@ -412,16 +417,27 @@
 
                                 </td>
 
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control fw-bold montant-verse"
+                                        readonly
+                                        value="{{ ligne.montant_distribue|floatformat:2 }} FCFA"
+                                    >
+
+                                </td>
+
                             </tr>
 
                             {% endfor %}
 
                             <tr class="table-warning">
 
-                                <td colspan="6" class="text-end">
+                                <td colspan="5" class="text-end">
 
                                     <strong>
-                                        Sous-total net {{ groupe.compagnie.designation }}
+                                        Sous-total versé {{ groupe.compagnie.designation }}
                                     </strong>
 
                                 </td>
@@ -430,7 +446,7 @@
 
                                     <input
                                         type="text"
-                                        class="form-control fw-bold subtotal-net-compagnie"
+                                        class="form-control fw-bold subtotal-verse-compagnie"
                                         data-compagnie="{{ groupe.compagnie.idcompagnie }}"
                                         readonly
                                         value="0 FCFA"
@@ -452,14 +468,14 @@
 
                     <div class="col-md-4">
 
-                        <div class="border rounded p-3 h-100">
+                        <div class="border border-primary-subtle border-2 rounded-3 p-3 h-100 shadow-sm bg-primary-subtle">
 
-                            <small>
-                                Montant total net distribué
+                            <small class="text-primary-emphasis fw-semibold text-uppercase">
+                                Montant total distribué
                             </small>
 
                             <h5
-                                class="mb-0"
+                                class="mb-0 fs-3 fw-bold text-primary-emphasis"
                                 id="total-net-distribue"
                             >
                                 0 FCFA
@@ -471,14 +487,14 @@
 
                     <div class="col-md-4">
 
-                        <div class="border rounded p-3 h-100">
+                        <div class="border border-warning-subtle border-2 rounded-3 p-3 h-100 shadow-sm bg-warning-subtle">
 
-                            <small>
-                                Montant total net restant
+                            <small class="text-warning-emphasis fw-semibold text-uppercase">
+                                Montant total restant
                             </small>
 
                             <h5
-                                class="mb-0"
+                                class="mb-0 fs-3 fw-bold text-warning-emphasis"
                                 id="total-net-restant"
                             >
                                 0 FCFA
@@ -490,14 +506,14 @@
 
                     <div class="col-md-4">
 
-                        <div class="border rounded p-3 h-100">
+                        <div class="border border-success-subtle border-2 rounded-3 p-3 h-100 shadow-sm bg-success-subtle">
 
-                            <small>
-                                Montant total net vendu
+                            <small class="text-success-emphasis fw-semibold text-uppercase">
+                                Montant total vendu
                             </small>
 
                             <h5
-                                class="mb-0"
+                                class="mb-0 fs-3 fw-bold text-success-emphasis"
                                 id="total-net-vendu"
                             >
                                 0 FCFA
@@ -529,7 +545,9 @@
                             step="0.01"
                             min="0"
                             class="form-control"
+                            id="montant-credit-verse"
                             name="montant_credit_verse"
+                            data-montant-credit="{{ situation.montant_credit|default:0 }}"
                             value="{{ situation.montant_credit }}"
                         >
 
@@ -550,7 +568,7 @@
                             class="form-control"
                             id="montant-vente-verse"
                             name="montant_vente_verse"
-                            value="{{ situation.montant_vente_verse }}"
+                            value="0"
                         >
 
                     </div>

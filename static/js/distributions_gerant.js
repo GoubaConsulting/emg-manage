@@ -128,27 +128,21 @@ function actualiserMontantsInitiaux() {
             montants[produit] || 0
         );
 
-        const montantInitial = lireMontantInitialNet(
-            donneesInitiales
-        );
-
         const montantInitialBrut = lireMontantInitialBrut(
             donneesInitiales
         );
 
-        ligne.dataset.initialNet = montantInitial;
-
         ligne.dataset.initialBrut = montantInitialBrut;
 
         champ.textContent = formaterMontant(
-            montantInitial
+            montantInitialBrut
         );
 
         appliquerReliquatLigne(
 
             ligne,
 
-            montantInitial
+            montantInitialBrut
 
         );
 
@@ -494,16 +488,22 @@ function recalculerLigne(ligne) {
     // Calculs
     // ==========================================
 
-    const montantRemise = montant * taux / 100;
+    const montantBrutInitial = calculerMontantBrutInitial(
+        ligne
+    );
+
+    const montantBrutSuivi = (
+        montantBrutInitial
+        +
+        montant
+    );
+
+    const montantRemise = montantBrutSuivi * taux / 100;
 
     const montantNet = (
         calculerMontantNet(
-            montant,
+            montantBrutSuivi,
             taux
-        )
-        +
-        calculerMontantNetInitial(
-            ligne
         )
     );
 
@@ -688,42 +688,10 @@ function calculerMontantNet(
 }
 
 
-function calculerMontantNetInitial(ligne) {
-
-    return lireNombre(
-        ligne.dataset.initialNet
-        ||
-        ligne.querySelector(".montant-initial")?.textContent
-    );
-
-}
-
-
 function calculerMontantBrutInitial(ligne) {
 
     return lireNombre(
         ligne.dataset.initialBrut
-    );
-
-}
-
-
-function lireMontantInitialNet(donneesInitiales) {
-
-    if (
-        donneesInitiales
-        &&
-        typeof donneesInitiales === "object"
-    ) {
-
-        return lireNombre(
-            donneesInitiales.net
-        );
-
-    }
-
-    return lireNombre(
-        donneesInitiales
     );
 
 }

@@ -75,14 +75,15 @@ def types_distribution_pour_distributeur(distributeur):
 
 def recuperer_distributions_journee(
     distributeur,
-    date_situation
+    date_situation,
+    inclure_cloturees=False
 ):
     """
     Retourne toutes les distributions réalisées
     pour un distributeur à une date donnée.
 
-    Seules les distributions actives sont prises
-    en compte.
+    Seules les distributions actives et ouvertes sont
+    prises en compte par defaut.
     """
 
     types_distribution = types_distribution_pour_distributeur(
@@ -114,7 +115,31 @@ def recuperer_distributions_journee(
             type_distribution__in=types_distribution
         )
 
+    if not inclure_cloturees:
+
+        distributions = distributions.filter(
+            etat=Distribution.ETAT_OUVERTE
+        )
+
     return distributions
+
+
+def cloturer_distributions_situation(
+    situation
+):
+    """
+    Marque comme cloturees les distributions ouvertes
+    rattachees a la situation.
+    """
+
+    distributions = recuperer_distributions_journee(
+        situation.distributeur,
+        situation.date_situation
+    )
+
+    return distributions.update(
+        etat=Distribution.ETAT_CLOTUREE
+    )
 
 
 # ==========================================================
@@ -179,13 +204,28 @@ def calculer_valeur_nette_quantite(
     )
 
 
+def calculer_valeur_brute_quantite(
+    quantite,
+    prix_unitaire
+):
+    """
+    Valorise une quantite au prix brut.
+    """
+
+    return (
+        Decimal(str(quantite))
+        *
+        Decimal(str(prix_unitaire))
+    )
+
+
 def calculer_valeur_reliquat_precedent(
     distributeur,
     date_situation
 ):
     """
-    Calcule la valeur des quantites restantes de
-    la derniere situation cloturee.
+    Calcule la valeur brute des quantites restantes
+    de la derniere situation cloturee.
     """
 
     situation = derniere_situation_cloturee_avant(
@@ -205,10 +245,9 @@ def calculer_valeur_reliquat_precedent(
 
             continue
 
-        total += calculer_valeur_nette_quantite(
+        total += calculer_valeur_brute_quantite(
             ligne.quantite_restante,
             ligne.prix_unitaire,
-            ligne.taux_remise,
         )
 
     return total
@@ -219,7 +258,7 @@ def calculer_total_distribue(
     date_situation
 ):
     """
-    Calcule le montant net total de toutes les
+    Calcule le montant brut total de toutes les
     distributions du distributeur pour la journée.
     """
 
@@ -235,6 +274,7 @@ def calculer_total_distribue(
             distributeur=distributeur,
             date_distribution=date_situation,
             actif=True,
+            etat=Distribution.ETAT_OUVERTE,
         )
     )
 
@@ -248,7 +288,7 @@ def calculer_total_distribue(
         distributions
 
         .aggregate(
-            total=Sum("montant_net")
+            total=Sum("montant_brut")
         )["total"]
 
         or Decimal("0.00")
@@ -342,6 +382,12 @@ def construire_donnees_lignes_situation(
                 "quantite_initiale": ligne.quantite_restante,
                 "quantite_jour": Decimal("0.00"),
                 "quantite_distribuee": ligne.quantite_restante,
+                "montant_distribue": (
+                    calculer_valeur_brute_quantite(
+                        ligne.quantite_restante,
+                        ligne.prix_unitaire,
+                    )
+                ),
                 "montant_net_distribue": (
                     calculer_valeur_nette_quantite(
                         ligne.quantite_restante,
@@ -370,12 +416,17 @@ def construire_donnees_lignes_situation(
                     "quantite_initiale": Decimal("0.00"),
                     "quantite_jour": Decimal("0.00"),
                     "quantite_distribuee": Decimal("0.00"),
+                    "montant_distribue": Decimal("0.00"),
                     "montant_net_distribue": Decimal("0.00"),
                 }
 
             produits[produit_id]["quantite_jour"] += ligne.quantite
 
             produits[produit_id]["quantite_distribuee"] += ligne.quantite
+
+            produits[produit_id]["montant_distribue"] += (
+                ligne.montant
+            )
 
             produits[produit_id]["montant_net_distribue"] += (
                 ligne.montant_net
@@ -418,6 +469,7 @@ def construire_lignes_affichage_situation(
                 quantite_initiale=donnees["quantite_initiale"],
                 quantite_jour=donnees["quantite_jour"],
                 quantite_distribuee=donnees["quantite_distribuee"],
+                montant_distribue=donnees["montant_distribue"],
                 montant_net_distribue=donnees["montant_net_distribue"],
                 quantite_vendue=Decimal("0.00"),
                 quantite_restante=donnees["quantite_distribuee"],
@@ -468,6 +520,14 @@ def annoter_lignes_reliquat(
         ligne.taux_distribution = donnees.get(
             "taux_distribution",
             Decimal("0.00")
+        )
+
+        ligne.montant_distribue = donnees.get(
+            "montant_distribue",
+            calculer_valeur_brute_quantite(
+                ligne.quantite_distribuee,
+                ligne.prix_unitaire,
+            )
         )
 
         ligne.montant_net_distribue = donnees.get(
@@ -672,6 +732,10 @@ def synchroniser_situation_vente_directe(
         lignes
     )
 
+    distributions.update(
+        etat=Distribution.ETAT_CLOTUREE
+    )
+
     return situation
 
 
@@ -711,6 +775,19 @@ def creer_situation_journaliere(
     )
 
     if not distributions.exists():
+
+        toutes_distributions = recuperer_distributions_journee(
+            distributeur,
+            date_situation,
+            inclure_cloturees=True
+        )
+
+        if toutes_distributions.exists():
+
+            raise ValueError(
+                "Toutes les distributions de cette personne "
+                "pour la date sélectionnée sont clôturées."
+            )
 
         raise ValueError(
             "Aucune distribution n'a été enregistrée "
@@ -876,28 +953,18 @@ def calculer_manquant_situation(
     """
     Calcule le montant manquant d'une situation.
 
-    Le montant net distribue doit etre justifie par :
+    Le montant distribue doit etre justifie par :
 
-        montant net verse
-        +
-        valeur nette des produits restants.
+        credit verse + ventes versees.
     """
-
-    montant_produits_restants = (
-
-        calculer_valeur_produits_restants(
-            situation
-        )
-
-    )
 
     return calculer_manquant(
 
         situation.montant_total_distribue,
 
-        situation.montant_vente_verse,
+        situation.montant_credit_verse,
 
-        montant_produits_restants
+        situation.montant_vente_verse,
 
     )
 
@@ -1008,6 +1075,16 @@ def cloturer_situation(
             "Le montant des ventes versé "
             "ne peut pas être négatif."
         )
+
+    situation.montant_total_distribue = calculer_total_distribue(
+        situation.distributeur,
+        situation.date_situation
+    )
+
+    situation.montant_credit = calculer_credit(
+        situation.montant_total_distribue,
+        situation.fond
+    )
 
     # ======================================================
     # VERIFICATION DU CREDIT
@@ -1162,16 +1239,6 @@ def cloturer_situation(
     )
 
     # ======================================================
-    # VALEUR DES PRODUITS RESTANTS
-    # ======================================================
-
-    montant_produits_restants = (
-        calculer_valeur_produits_restants(
-            situation
-        )
-    )
-
-    # ======================================================
     # MANQUANT
     # ======================================================
 
@@ -1179,9 +1246,9 @@ def cloturer_situation(
 
         situation.montant_total_distribue,
 
-        situation.montant_vente_verse,
+        situation.montant_credit_verse,
 
-        montant_produits_restants
+        situation.montant_vente_verse,
 
     )
 
@@ -1224,6 +1291,10 @@ def cloturer_situation(
             utilisateur
 
         )
+
+    cloturer_distributions_situation(
+        situation
+    )
 
     # ======================================================
     # CLOTURE

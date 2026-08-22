@@ -60,8 +60,11 @@ from commandes.models import LigneCommande
 
 from stocks.services import ajouter_stock
 
-from stocks.models import TYPE_NORMAL
-from stocks.models import TYPE_TAMPON
+from stocks.models import (
+    Stock,
+    TYPE_NORMAL,
+    TYPE_TAMPON,
+)
 from .permissions import peut_modifier
 
 from distributions.models import Distribution
@@ -1429,7 +1432,7 @@ def rejeter_commande_gerant(commande):
             "Cette commande n'est plus en attente."
         )
 
-    commande.etat = Commande.REJETEE
+    commande.etat = Commande.REFUSEE
 
     commande.save(update_fields=["etat"])
 
@@ -1441,6 +1444,64 @@ from django.shortcuts import get_object_or_404
 from commandes.models import Commande
 
 
+def verifier_stock_commande_gerant(
+    commande,
+    point_vente_source,
+):
+    """
+    Verifie le stock normal du Directeur avant validation.
+    """
+
+    lignes = list(
+        LigneCommande.objects
+        .filter(
+            commande=commande
+        )
+        .select_related(
+            "produit__compagnie"
+        )
+        .order_by(
+            "produit__compagnie__designation",
+            "produit__designation",
+            "idlignecommande",
+        )
+    )
+
+    for ligne in lignes:
+
+        stock = (
+            Stock.objects
+            .select_for_update()
+            .filter(
+                point_vente=point_vente_source,
+                produit=ligne.produit,
+                type_stock=TYPE_NORMAL,
+            )
+            .first()
+        )
+
+        stock_disponible = (
+            stock.quantite
+            if stock is not None
+            else Decimal("0.00")
+        )
+
+        if stock_disponible < ligne.quantite:
+
+            compagnie = ligne.produit.compagnie.designation
+
+            raise Exception(
+                "Stock insuffisant pour le produit "
+                f"« {ligne.produit.designation} » "
+                f"de la compagnie « {compagnie} ». "
+                f"Stock disponible : {stock_disponible}. "
+                f"Quantité demandée : {ligne.quantite}."
+            )
+
+    return lignes
+
+
+@transaction.atomic
 def valider_commande_directeur_service(
     commande_id,
     utilisateur,
@@ -1465,6 +1526,13 @@ def valider_commande_directeur_service(
             "Cette commande a déjà été traitée."
         )
 
+    point_vente_source = utilisateur.profil.point_vente
+
+    lignes_commande = verifier_stock_commande_gerant(
+        commande,
+        point_vente_source,
+    )
+
     # ==========================================================
     # CREATION DE LA DISTRIBUTION
     # ==========================================================
@@ -1477,7 +1545,7 @@ def valider_commande_directeur_service(
 
         commande=commande,
 
-        point_vente_source=utilisateur.profil.point_vente,
+        point_vente_source=point_vente_source,
 
         point_vente_destination=commande.point_vente,
 
@@ -1495,10 +1563,6 @@ def valider_commande_directeur_service(
     # ==========================================================
     # CREATION DES LIGNES DE DISTRIBUTION
     # ==========================================================
-
-    lignes_commande = LigneCommande.objects.filter(
-        commande=commande
-    ).select_related("produit")
 
     for ligne in lignes_commande:
 
@@ -1567,3 +1631,5 @@ def valider_commande_directeur_service(
             "date_validation",
         ]
     )
+
+    return distribution

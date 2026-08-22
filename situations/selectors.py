@@ -40,11 +40,12 @@ from .services import (
 
 def distributions_du_jour(
     distributeur,
-    date_situation
+    date_situation,
+    inclure_cloturees=False
 ):
     """
-    Retourne toutes les distributions actives
-    d'un distributeur pour une date donnée.
+    Retourne les distributions actives d'un distributeur
+    pour une date donnée, ouvertes par defaut.
     """
 
     types_distribution = types_distribution_pour_distributeur(
@@ -83,6 +84,12 @@ def distributions_du_jour(
             type_distribution__in=types_distribution
         )
 
+    if not inclure_cloturees:
+
+        distributions = distributions.filter(
+            etat=Distribution.ETAT_OUVERTE
+        )
+
     return distributions
 
 
@@ -111,6 +118,7 @@ def total_distributions_du_jour(
             distributeur=distributeur,
             date_distribution=date_situation,
             actif=True,
+            etat=Distribution.ETAT_OUVERTE,
         )
     )
 

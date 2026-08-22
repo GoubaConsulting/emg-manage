@@ -312,6 +312,29 @@ def commande_par_id(
     )
 
 
+def commande_gerant_en_attente_par_id(
+    utilisateur,
+    pk
+):
+    """
+    Retourne une commande gerant en attente
+    visible dans le parcours de validation Directeur.
+    """
+
+    return get_object_or_404(
+
+        commandes_en_attente(
+            utilisateur
+        ).filter(
+            type_commande=Commande.TYPE_GERANT,
+            categorie_commande=Commande.CATEGORIE_NORMALE,
+        ),
+
+        pk=pk
+
+    )
+
+
 # ==========================================================
 # PAGINATION
 # ==========================================================

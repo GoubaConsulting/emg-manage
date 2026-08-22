@@ -163,18 +163,33 @@ function construireTableau(produits) {
 
         groupes[compagnie].forEach(function (produit) {
 
-            const montantInitial = lireNombre(
-                produit.montant_initial || 0
+            const montantInitialBrut = lireNombre(
+                produit.montant_initial_brut || produit.montant_initial || 0
             );
 
-            const montantInitialBrut = lireNombre(
-                produit.montant_initial_brut || 0
+            const montantBrutASuivre = (
+                montantInitialBrut
+                +
+                lireNombre(produit.montant)
+            );
+
+            const taux = lireNombre(
+                produit.taux
+            );
+
+            const montantRemiseASuivre = (
+                montantBrutASuivre
+                *
+                taux
+                /
+                100
             );
 
             const montantNetASuivre = (
-                montantInitial
-                +
-                lireNombre(produit.net)
+                calculerMontantNet(
+                    montantBrutASuivre,
+                    taux
+                )
             );
 
             sousTotal += montantNetASuivre;
@@ -191,7 +206,7 @@ function construireTableau(produits) {
 
                     data-compagnie="${produit.compagnie_id}"
 
-                    data-initiale="${montantInitial}"
+                    data-initiale="${montantInitialBrut}"
 
                     data-initiale-brut="${montantInitialBrut}"
 
@@ -211,7 +226,7 @@ function construireTableau(produits) {
 
                     <td class="text-end">
 
-                        ${formaterMontant(montantInitial)}
+                        ${formaterMontant(montantInitialBrut)}
 
                     </td>
 
@@ -281,7 +296,7 @@ function construireTableau(produits) {
 
                             class="form-control remise"
 
-                            value="${produit.montant_remise}"
+                            value="${montantRemiseASuivre.toFixed(0)}"
 
                             readonly
 
@@ -500,18 +515,27 @@ function recalculerLigne(ligne) {
     // Calculs
     // ==========================================
 
-    const montantInitial = Number(
-        ligne.dataset.initiale
-    ) || 0;
+    const montantInitialBrut = (
+        Number(ligne.dataset.initialeBrut)
+        ||
+        Number(ligne.dataset.initiale)
+        ||
+        0
+    );
 
-    const montantRemise = montant * taux / 100;
-
-    const montantNet = (
-        montantInitial
+    const montantBrutSuivi = (
+        montantInitialBrut
         +
         montant
-        -
-        montantRemise
+    );
+
+    const montantRemise = montantBrutSuivi * taux / 100;
+
+    const montantNet = (
+        calculerMontantNet(
+            montantBrutSuivi,
+            taux
+        )
     );
 
     remiseInput.value = montantRemise.toFixed(0);
@@ -601,6 +625,23 @@ function recalculerTotaux() {
 
         ) + " FCFA";
     
+}
+
+
+function calculerMontantNet(montantBrut, taux) {
+
+    return (
+        montantBrut
+        -
+        (
+            montantBrut
+            *
+            taux
+            /
+            100
+        )
+    );
+
 }
 
 
