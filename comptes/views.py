@@ -1,8 +1,15 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
-from tableau_bord.services import donnees_dashboard
+from django.http import (
+    HttpResponse,
+    HttpResponseForbidden,
+)
+from tableau_bord.services import (
+    donnees_apercu_directeur,
+    donnees_dashboard,
+    donnees_operations_directeur_gerant,
+)
 
 def connexion(request):
 
@@ -52,5 +59,47 @@ def dashboard(request):
     return render(
         request,
         'comptes/dashboard.html',
+        context
+    )
+
+
+@login_required
+def apercu_directeur(request):
+
+    if request.user.profil.role != "DIRECTEUR":
+
+        return HttpResponseForbidden()
+
+    context = donnees_apercu_directeur(
+        request.user,
+        request.GET.get("gerant"),
+        request.GET.get("date_debut"),
+        request.GET.get("date_fin"),
+    )
+
+    return render(
+        request,
+        "comptes/apercu.html",
+        context
+    )
+
+
+@login_required
+def operations_gerant_directeur(request):
+
+    if request.user.profil.role != "DIRECTEUR":
+
+        return HttpResponseForbidden()
+
+    context = donnees_operations_directeur_gerant(
+        request.user,
+        request.GET.get("gerant"),
+        request.GET.get("date_debut"),
+        request.GET.get("date_fin"),
+    )
+
+    return render(
+        request,
+        "comptes/operations_gerant.html",
         context
     )

@@ -473,6 +473,7 @@ def construire_lignes_affichage_situation(
                 montant_net_distribue=donnees["montant_net_distribue"],
                 quantite_vendue=Decimal("0.00"),
                 quantite_restante=donnees["quantite_distribuee"],
+                taux_remise=donnees["taux_remise"],
                 taux_distribution=donnees["taux_distribution"],
             )
         )
@@ -517,27 +518,52 @@ def annoter_lignes_reliquat(
             Decimal("0.00")
         )
 
+        taux_remise = donnees.get(
+            "taux_remise",
+            getattr(
+                ligne,
+                "taux_remise",
+                getattr(
+                    ligne,
+                    "taux_distribution",
+                    Decimal("0.00")
+                )
+            )
+        )
+
+        ligne.taux_remise = taux_remise
+
         ligne.taux_distribution = donnees.get(
             "taux_distribution",
-            Decimal("0.00")
+            taux_remise
         )
 
-        ligne.montant_distribue = donnees.get(
-            "montant_distribue",
-            calculer_valeur_brute_quantite(
+        montant_distribue = donnees.get(
+            "montant_distribue"
+        )
+
+        if montant_distribue is None:
+
+            montant_distribue = calculer_valeur_brute_quantite(
                 ligne.quantite_distribuee,
                 ligne.prix_unitaire,
             )
+
+        ligne.montant_distribue = montant_distribue
+
+        montant_net_distribue = donnees.get(
+            "montant_net_distribue"
         )
 
-        ligne.montant_net_distribue = donnees.get(
-            "montant_net_distribue",
-            calculer_valeur_nette_quantite(
+        if montant_net_distribue is None:
+
+            montant_net_distribue = calculer_valeur_nette_quantite(
                 ligne.quantite_distribuee,
                 ligne.prix_unitaire,
-                ligne.taux_remise,
+                taux_remise,
             )
-        )
+
+        ligne.montant_net_distribue = montant_net_distribue
 
     return lignes
 

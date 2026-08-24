@@ -152,6 +152,24 @@
                             <div class="accordion-body p-0">
                                 <div class="list-group list-group-flush">
                                     <a
+                                        class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'apercu_directeur' %}active{% endif %}"
+                                        href="{% url 'apercu_directeur' %}"
+                                    >
+                                        <span>Aperçu</span>
+                                        <span class="badge rounded-pill {% if request.resolver_match.url_name == 'apercu_directeur' %}text-bg-light text-primary{% else %}text-bg-success{% endif %}">
+                                            Live
+                                        </span>
+                                    </a>
+                                    <a
+                                        class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'operations_gerant_directeur' %}active{% endif %}"
+                                        href="{% url 'operations_gerant_directeur' %}"
+                                    >
+                                        <span>Opérations gérants</span>
+                                        <span class="badge rounded-pill {% if request.resolver_match.url_name == 'operations_gerant_directeur' %}text-bg-light text-primary{% else %}text-bg-dark{% endif %}">
+                                            Action
+                                        </span>
+                                    </a>
+                                    <a
                                         class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'liste_objectif' %}active{% endif %}"
                                         href="{% url 'liste_objectif' %}"
                                     >

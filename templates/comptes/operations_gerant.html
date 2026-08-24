@@ -1,0 +1,705 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Opérations gérants
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="mb-1">
+            Opérations gérants
+        </h3>
+        <p class="text-muted mb-0">
+            Actions et suivi des opérations entre le Directeur et le gérant sélectionné {{ periode.libelle }}.
+        </p>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">
+                    Du
+                </label>
+                <input
+                    type="date"
+                    name="date_debut"
+                    class="form-control"
+                    value="{{ periode.date_debut_iso }}"
+                >
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">
+                    Au
+                </label>
+                <input
+                    type="date"
+                    name="date_fin"
+                    class="form-control"
+                    value="{{ periode.date_fin_iso }}"
+                >
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">
+                    Gérant
+                </label>
+                <select
+                    name="gerant"
+                    class="form-select"
+                    {% if not gerants %}disabled{% endif %}
+                >
+                    {% for gerant in gerants %}
+                        <option
+                            value="{{ gerant.pk }}"
+                            {% if gerant_selectionne and gerant.pk == gerant_selectionne.pk %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ gerant.nom }} {{ gerant.prenom }} - {{ gerant.point_vente.designation }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2 d-flex gap-2">
+                <button
+                    type="submit"
+                    class="btn btn-primary flex-fill"
+                    {% if not gerants %}disabled{% endif %}
+                >
+                    Rechercher
+                </button>
+                <a
+                    href="{% url 'operations_gerant_directeur' %}"
+                    class="btn btn-outline-secondary"
+                >
+                    Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if not gerant_selectionne %}
+
+    <div class="alert alert-warning">
+        Aucun gérant actif n'est rattaché à un point de vente actif.
+    </div>
+
+{% else %}
+
+<div class="alert alert-light border d-flex flex-column flex-md-row justify-content-between gap-2">
+    <div>
+        <strong>
+            {{ gerant_selectionne.nom }} {{ gerant_selectionne.prenom }}
+        </strong>
+        <span class="text-muted">
+            - {{ gerant_selectionne.point_vente.designation }}
+        </span>
+    </div>
+    <div class="text-muted">
+        Période : {{ periode.libelle }}
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-stretch">
+            <div class="col-md-3">
+                <a
+                    href="{% url 'distributions:ajouter_distribution_directeur' %}?distributeur={{ gerant_selectionne.pk }}"
+                    class="btn btn-primary w-100 h-100 d-flex align-items-center justify-content-center"
+                >
+                    Nouvelle distribution
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a
+                    href="{% url 'situations:ajouter_situation' %}?distributeur={{ gerant_selectionne.pk }}"
+                    class="btn btn-success w-100 h-100 d-flex align-items-center justify-content-center"
+                >
+                    Nouveau versement
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a
+                    href="{% url 'situations:liste_manquants' %}"
+                    class="btn btn-outline-danger w-100 h-100 d-flex align-items-center justify-content-center"
+                >
+                    Suivi des manquants
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a
+                    href="{% url 'situations:liste_reglements_manquants' %}"
+                    class="btn btn-outline-secondary w-100 h-100 d-flex align-items-center justify-content-center"
+                >
+                    Règlements manquants
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="operationsGerantTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="commandes-tab" data-bs-toggle="tab" data-bs-target="#commandes" type="button" role="tab">
+            Commandes
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="distributions-tab" data-bs-toggle="tab" data-bs-target="#distributions" type="button" role="tab">
+            Distributions reçues
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="versements-tab" data-bs-toggle="tab" data-bs-target="#versements" type="button" role="tab">
+            Versements
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="manquants-tab" data-bs-toggle="tab" data-bs-target="#manquants" type="button" role="tab">
+            Manquants
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="reglements-tab" data-bs-toggle="tab" data-bs-target="#reglements" type="button" role="tab">
+            Règlements manquants
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+    <div class="tab-pane fade show active" id="commandes" role="tabpanel" aria-labelledby="commandes-tab">
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card border-primary shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        Nombre de commandes
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ commandes_totaux.nombre }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-warning shadow-sm h-100">
+                    <div class="card-header bg-warning">
+                        Montant brut
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ commandes_totaux.brut|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-success shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        Montant net
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ commandes_totaux.net|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-header-emg">
+                            <tr>
+                                <th width="50"></th>
+                                <th>Numéro</th>
+                                <th>Date</th>
+                                <th>Catégorie</th>
+                                <th>Etat</th>
+                                <th class="text-end">Montant brut</th>
+                                <th class="text-end">Montant net</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for commande in commandes %}
+                            <tr>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#operationCmd{{ commande.idcommande }}">
+                                        ▼
+                                    </button>
+                                </td>
+                                <td>{{ commande.numero }}</td>
+                                <td>{{ commande.date_commande|date:"d/m/Y" }}</td>
+                                <td>{{ commande.get_categorie_commande_display }}</td>
+                                <td>
+                                    <span class="badge {% if commande.etat == commande.VALIDEE %}text-bg-success{% elif commande.etat == commande.REFUSEE %}text-bg-danger{% elif commande.etat == commande.VALIDEE_PARTIELLEMENT %}text-bg-warning{% else %}text-bg-secondary{% endif %}">
+                                        {{ commande.get_etat_display }}
+                                    </span>
+                                </td>
+                                <td class="text-end">{{ commande.montant_brut|floatformat:2 }} FCFA</td>
+                                <td class="text-end">{{ commande.montant_net|floatformat:2 }} FCFA</td>
+                            </tr>
+                            <tr class="collapse" id="operationCmd{{ commande.idcommande }}">
+                                <td colspan="7">
+                                    <div class="p-3 bg-light rounded">
+                                        <div class="row mb-3">
+                                            <div class="col-md-4">
+                                                <strong>Point de vente :</strong>
+                                                {{ commande.point_vente.designation }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                <strong>Utilisateur :</strong>
+                                                {{ commande.utilisateur.get_full_name|default:commande.utilisateur.username }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                <strong>Catégorie :</strong>
+                                                {{ commande.get_categorie_commande_display }}
+                                            </div>
+                                        </div>
+
+                                        <table class="table table-sm table-bordered">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th>Produit</th>
+                                                    <th class="text-end">Prix</th>
+                                                    <th class="text-end">Montant</th>
+                                                    <th class="text-end">Quantité</th>
+                                                    <th class="text-end">Remise %</th>
+                                                    <th class="text-end">Montant remise</th>
+                                                    <th class="text-end">Net</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for groupe in commande.groupes_compagnies %}
+                                                    <tr class="table-primary">
+                                                        <td colspan="7">
+                                                            <strong>{{ groupe.compagnie.designation }}</strong>
+                                                        </td>
+                                                    </tr>
+                                                    {% for ligne in groupe.lignes %}
+                                                    <tr>
+                                                        <td>{{ ligne.produit.designation }}</td>
+                                                        <td class="text-end">{{ ligne.prix_unitaire|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.quantite|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.taux_remise|floatformat:2 }} %</td>
+                                                        <td class="text-end">{{ ligne.montant_remise|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant_net|floatformat:2 }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                    <tr class="table-warning">
+                                                        <td colspan="6" class="text-end">
+                                                            <strong>Sous-total {{ groupe.compagnie.designation }}</strong>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <strong>{{ groupe.sous_total_net|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                    </tr>
+                                                {% empty %}
+                                                    <tr>
+                                                        <td colspan="7" class="text-center">Aucun produit.</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr class="table-success">
+                                                    <th colspan="6" class="text-end">TOTAL COMMANDE</th>
+                                                    <th class="text-end">{{ commande.montant_net|floatformat:2 }} FCFA</th>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center">Aucune commande trouvée.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="distributions" role="tabpanel" aria-labelledby="distributions-tab">
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card border-primary shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        Distributions reçues
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ distributions_recues_totaux.nombre }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-warning shadow-sm h-100">
+                    <div class="card-header bg-warning">
+                        Montant brut
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ distributions_recues_totaux.brut|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-success shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        Montant net
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ distributions_recues_totaux.net|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% include "comptes/partials/apercu_distributions_table.html" with distributions=distributions_recues empty_message="Aucune distribution reçue du Directeur." prefix="operationsRecues" %}
+    </div>
+
+    <div class="tab-pane fade" id="versements" role="tabpanel" aria-labelledby="versements-tab">
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card border-primary shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        Montant distribué
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ situations_totaux.distribue|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-success shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        Montant versé
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ situations_totaux.verse|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-danger shadow-sm h-100">
+                    <div class="card-header bg-danger text-white">
+                        Manquants
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ situations_totaux.manquant|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="50"></th>
+                                <th>Numéro</th>
+                                <th>Date</th>
+                                <th>Gérant</th>
+                                <th class="text-end">Distribué</th>
+                                <th class="text-end">Crédit versé</th>
+                                <th class="text-end">Ventes versées</th>
+                                <th class="text-end">Manquant</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for situation in situations %}
+                            <tr>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#operationSituation{{ situation.idsituation }}">
+                                        ▼
+                                    </button>
+                                </td>
+                                <td>{{ situation.numero }}</td>
+                                <td>{{ situation.date_situation|date:"d/m/Y" }}</td>
+                                <td>{{ situation.distributeur.nom }} {{ situation.distributeur.prenom }}</td>
+                                <td class="text-end">{{ situation.montant_total_distribue|floatformat:2 }}</td>
+                                <td class="text-end">{{ situation.montant_credit_verse|floatformat:2 }}</td>
+                                <td class="text-end">{{ situation.montant_vente_verse|floatformat:2 }}</td>
+                                <td class="text-end">{{ situation.montant_manquant|floatformat:2 }}</td>
+                            </tr>
+                            <tr class="collapse" id="operationSituation{{ situation.idsituation }}">
+                                <td colspan="8">
+                                    <div class="p-3 bg-light">
+                                        <div class="row mb-3">
+                                            <div class="col-md-3"><strong>Point de vente :</strong> {{ situation.point_vente.designation }}</div>
+                                            <div class="col-md-3"><strong>Fond :</strong> {{ situation.fond|floatformat:2 }} FCFA</div>
+                                            <div class="col-md-3"><strong>Crédit :</strong> {{ situation.montant_credit|floatformat:2 }} FCFA</div>
+                                            <div class="col-md-3"><strong>Total versé :</strong> {{ situation.montant_total_verse|floatformat:2 }} FCFA</div>
+                                        </div>
+
+                                        {% for groupe in situation.groupes_compagnies %}
+                                            <h6 class="mt-3">{{ groupe.compagnie.designation }}</h6>
+                                            <table class="table table-sm table-bordered">
+                                                <thead class="table-secondary">
+                                                    <tr>
+                                                        <th>Produit</th>
+                                                        <th class="text-end">Prix</th>
+                                                        <th class="text-end">Distribuée</th>
+                                                        <th class="text-end">Vendue</th>
+                                                        <th class="text-end">Restante</th>
+                                                        <th class="text-end">Montant vendu</th>
+                                                        <th class="text-end">Valeur restante</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for ligne in groupe.lignes %}
+                                                    <tr>
+                                                        <td>{{ ligne.produit.designation }}</td>
+                                                        <td class="text-end">{{ ligne.prix_unitaire|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.quantite_distribuee|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.quantite_vendue|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.quantite_restante|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant_vendu|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant_restant|floatformat:2 }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center">Aucun versement clôturé trouvé.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="manquants" role="tabpanel" aria-labelledby="manquants-tab">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="card border-danger shadow-sm h-100">
+                    <div class="card-header bg-danger text-white">
+                        Total manquants
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ manquants_totaux.manquant|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-warning shadow-sm h-100">
+                    <div class="card-header bg-warning">
+                        Reste à payer
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ manquants_totaux.reste|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="50"></th>
+                                <th>Numéro</th>
+                                <th>Date situation</th>
+                                <th>Gérant</th>
+                                <th class="text-end">Montant</th>
+                                <th class="text-end">Reste à payer</th>
+                                <th>Statut</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for manquant in manquants_apercu %}
+                            <tr>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#operationManquant{{ manquant.idmanquant }}">
+                                        ▼
+                                    </button>
+                                </td>
+                                <td>{{ manquant.numero }}</td>
+                                <td>{{ manquant.situation.date_situation|date:"d/m/Y" }}</td>
+                                <td>{{ manquant.distributeur.nom }} {{ manquant.distributeur.prenom }}</td>
+                                <td class="text-end">{{ manquant.montant|floatformat:2 }}</td>
+                                <td class="text-end">{{ manquant.reste_a_payer|floatformat:2 }}</td>
+                                <td>{{ manquant.get_statut_display }}</td>
+                                <td>
+                                    {% if manquant.reste_a_payer %}
+                                        <a
+                                            href="{% url 'situations:regler_manquant' manquant.pk %}"
+                                            class="btn btn-sm btn-outline-success"
+                                        >
+                                            Régler
+                                        </a>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr class="collapse" id="operationManquant{{ manquant.idmanquant }}">
+                                <td colspan="8">
+                                    <div class="p-3 bg-light">
+                                        <div class="row mb-3">
+                                            <div class="col-md-3"><strong>Situation :</strong> {{ manquant.situation.numero }}</div>
+                                            <div class="col-md-3"><strong>Total réglé :</strong> {{ manquant.total_regle|floatformat:2 }} FCFA</div>
+                                            <div class="col-md-3"><strong>Créé le :</strong> {{ manquant.date_creation|date:"d/m/Y H:i" }}</div>
+                                            <div class="col-md-3"><strong>Utilisateur :</strong> {{ manquant.utilisateur.get_full_name|default:manquant.utilisateur.username }}</div>
+                                        </div>
+
+                                        <h6>Règlements</h6>
+                                        <table class="table table-sm table-bordered">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th>Numéro</th>
+                                                    <th>Date</th>
+                                                    <th class="text-end">Montant</th>
+                                                    <th>Utilisateur</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for reglement in manquant.reglements_liste %}
+                                                <tr>
+                                                    <td>{{ reglement.numero }}</td>
+                                                    <td>{{ reglement.date_reglement|date:"d/m/Y" }}</td>
+                                                    <td class="text-end">{{ reglement.montant|floatformat:2 }}</td>
+                                                    <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr>
+                                                    <td colspan="4" class="text-center">Aucun règlement enregistré.</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center">Aucun manquant trouvé.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="reglements" role="tabpanel" aria-labelledby="reglements-tab">
+        <div class="card border-success shadow-sm mb-3">
+            <div class="card-header bg-success text-white">
+                Total réglé
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">{{ reglements_totaux.regle|floatformat:2 }} FCFA</h4>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="50"></th>
+                                <th>Règlement</th>
+                                <th>Date règlement</th>
+                                <th>Manquant</th>
+                                <th>Situation</th>
+                                <th>Gérant</th>
+                                <th class="text-end">Montant réglé</th>
+                                <th class="text-end">Reste à payer</th>
+                                <th>Utilisateur</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reglement in reglements_manquants %}
+                            <tr>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#operationReglement{{ reglement.idreglement }}">
+                                        ▼
+                                    </button>
+                                </td>
+                                <td>{{ reglement.numero }}</td>
+                                <td>{{ reglement.date_reglement|date:"d/m/Y" }}</td>
+                                <td>{{ reglement.manquant.numero }}</td>
+                                <td>{{ reglement.manquant.situation.numero }}</td>
+                                <td>{{ reglement.manquant.distributeur.nom }} {{ reglement.manquant.distributeur.prenom }}</td>
+                                <td class="text-end">{{ reglement.montant|floatformat:2 }}</td>
+                                <td class="text-end">{{ reglement.manquant.reste_a_payer|floatformat:2 }}</td>
+                                <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
+                            </tr>
+                            <tr class="collapse" id="operationReglement{{ reglement.idreglement }}">
+                                <td colspan="9">
+                                    <div class="p-3 bg-light">
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-md-3"><strong>Date situation :</strong> {{ reglement.manquant.situation.date_situation|date:"d/m/Y" }}</div>
+                                            <div class="col-md-3"><strong>Point de vente :</strong> {{ reglement.manquant.distributeur.point_vente.designation }}</div>
+                                            <div class="col-md-3"><strong>Montant manquant :</strong> {{ reglement.manquant.montant|floatformat:2 }} FCFA</div>
+                                            <div class="col-md-3"><strong>Total réglé :</strong> {{ reglement.manquant.total_regle|floatformat:2 }} FCFA</div>
+                                            <div class="col-md-3"><strong>Statut :</strong> {{ reglement.manquant.get_statut_display }}</div>
+                                            <div class="col-md-3"><strong>Créé le :</strong> {{ reglement.date_creation|date:"d/m/Y H:i" }}</div>
+                                        </div>
+
+                                        <h6>Historique des règlements du manquant</h6>
+                                        <table class="table table-sm table-bordered">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th>Numéro</th>
+                                                    <th>Date</th>
+                                                    <th class="text-end">Montant</th>
+                                                    <th>Utilisateur</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in reglement.manquant.reglements_liste %}
+                                                <tr {% if item.pk == reglement.pk %}class="table-success"{% endif %}>
+                                                    <td>{{ item.numero }}</td>
+                                                    <td>{{ item.date_reglement|date:"d/m/Y" }}</td>
+                                                    <td class="text-end">{{ item.montant|floatformat:2 }}</td>
+                                                    <td>{{ item.utilisateur.get_full_name|default:item.utilisateur.username }}</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr>
+                                                    <td colspan="4" class="text-center">Aucun règlement enregistré.</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center">Aucun règlement de manquant trouvé.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endif %}
+
+{% endblock %}

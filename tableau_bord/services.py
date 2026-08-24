@@ -14,6 +14,7 @@ from collections import defaultdict
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal
+from itertools import groupby
 
 from django.db.models import Sum
 from django.utils import timezone
@@ -22,6 +23,7 @@ from commandes.models import (
     Commande,
     LigneCommande,
 )
+from commandes.presentation import preparer_affichage_commande
 from comptes.utils import (
     est_directeur,
     est_gerant,
@@ -38,6 +40,7 @@ from referentiel.models import (
 from situations.models import (
     LigneSituationJournaliere,
     Manquant,
+    ReglementManquant,
     SituationJournaliere,
 )
 from situations.services import calculer_valeur_nette_quantite
@@ -1550,6 +1553,1025 @@ def synthese_ventes_directes(
             lignes,
             champs_totaux,
         ),
+    }
+
+
+def _gerants_apercu_directeur():
+    """
+    Gerants actifs proposes dans la page Apercu Directeur.
+    """
+
+    return list(
+        Distributeur.objects
+        .filter(
+            actif=True,
+            point_vente__actif=True,
+            categorie=Distributeur.CATEGORIE_GERANT,
+        )
+        .select_related(
+            "point_vente"
+        )
+        .order_by(
+            "point_vente__designation",
+            "nom",
+            "prenom",
+        )
+    )
+
+
+def _destinataires_du_gerant(gerant):
+    """
+    Destinataires visibles dans le perimetre du gerant.
+    """
+
+    if gerant is None:
+
+        return Distributeur.objects.none()
+
+    return (
+        Distributeur.objects
+        .filter(
+            actif=True,
+            point_vente=gerant.point_vente,
+            categorie__in=[
+                Distributeur.CATEGORIE_DISTRIBUTEUR,
+                Distributeur.CATEGORIE_CLIENT,
+            ],
+        )
+        .select_related(
+            "point_vente"
+        )
+        .order_by(
+            "categorie",
+            "nom",
+            "prenom",
+        )
+    )
+
+
+def _totaux_brut_net(queryset):
+    """
+    Totaux communs aux commandes et distributions.
+    """
+
+    totaux = queryset.aggregate(
+        total_brut=Sum("montant_brut"),
+        total_net=Sum("montant_net"),
+    )
+
+    return {
+        "nombre": queryset.count(),
+        "brut": _decimal(
+            totaux["total_brut"]
+        ),
+        "net": _decimal(
+            totaux["total_net"]
+        ),
+    }
+
+
+def _preparer_groupes_distribution(distributions):
+    """
+    Regroupe les lignes de chaque distribution par compagnie.
+    """
+
+    for distribution in distributions:
+
+        lignes = sorted(
+            distribution.lignes.all(),
+            key=lambda ligne: (
+                ligne.produit.compagnie.designation,
+                ligne.produit.designation,
+            )
+        )
+
+        groupes = []
+
+        for compagnie, lignes_compagnie in groupby(
+            lignes,
+            key=lambda ligne: ligne.produit.compagnie
+        ):
+
+            lignes_compagnie = list(
+                lignes_compagnie
+            )
+
+            groupes.append({
+                "compagnie": compagnie,
+                "lignes": lignes_compagnie,
+                "total_brut": sum(
+                    (
+                        ligne.montant
+                        for ligne in lignes_compagnie
+                    ),
+                    Decimal("0.00")
+                ),
+                "total_net": sum(
+                    (
+                        ligne.montant_net
+                        for ligne in lignes_compagnie
+                    ),
+                    Decimal("0.00")
+                ),
+            })
+
+        distribution.groupes_compagnies = groupes
+
+
+def _preparer_details_situation_apercu(situation):
+    """
+    Prepare le collapse produit d'une situation.
+    """
+
+    lignes = []
+
+    total_vendu = Decimal("0.00")
+
+    total_restant = Decimal("0.00")
+
+    for ligne in situation.lignes.all():
+
+        ligne.montant_vendu = calculer_valeur_nette_quantite(
+            ligne.quantite_vendue,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+        ligne.montant_restant = calculer_valeur_nette_quantite(
+            ligne.quantite_restante,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+        total_vendu += ligne.montant_vendu
+
+        total_restant += ligne.montant_restant
+
+        lignes.append(
+            ligne
+        )
+
+    lignes = sorted(
+        lignes,
+        key=lambda ligne: (
+            ligne.produit.compagnie.designation,
+            ligne.produit.designation,
+        )
+    )
+
+    situation.total_vendu_produits = total_vendu
+
+    situation.total_restant_produits = total_restant
+
+    situation.groupes_compagnies = []
+
+    for compagnie, lignes_compagnie in groupby(
+        lignes,
+        key=lambda ligne: ligne.produit.compagnie
+    ):
+
+        situation.groupes_compagnies.append({
+            "compagnie": compagnie,
+            "lignes": list(lignes_compagnie),
+        })
+
+
+def _preparer_reglements_manquant(manquant):
+    """
+    Attache l'historique et le total regle d'un manquant.
+    """
+
+    reglements = list(
+        manquant.reglements.all()
+    )
+
+    manquant.reglements_liste = reglements
+
+    manquant.total_regle = sum(
+        (
+            reglement.montant
+            for reglement in reglements
+        ),
+        Decimal("0.00")
+    )
+
+
+def _apercu_commandes_gerant(gerant, date_debut, date_fin):
+    """
+    Commandes normales vues comme le gerant selectionne.
+    """
+
+    if gerant is None:
+
+        return {
+            "lignes": [],
+            "totaux": {
+                "nombre": 0,
+                "brut": Decimal("0.00"),
+                "net": Decimal("0.00"),
+            },
+        }
+
+    queryset = _filtrer_intervalle(
+        Commande.objects
+        .filter(
+            actif=True,
+            point_vente=gerant.point_vente,
+            type_commande=Commande.TYPE_GERANT,
+            categorie_commande=Commande.CATEGORIE_NORMALE,
+        )
+        .select_related(
+            "point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        )
+        .order_by(
+            "-date_commande",
+            "-idcommande",
+        ),
+        "date_commande",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = _totaux_brut_net(
+        queryset
+    )
+
+    commandes = list(
+        queryset
+    )
+
+    for commande in commandes:
+
+        commande.groupes_compagnies = preparer_affichage_commande(
+            commande
+        )
+
+    return {
+        "lignes": commandes,
+        "totaux": totaux,
+    }
+
+
+def _apercu_distributions_gerant(gerant, date_debut, date_fin):
+    """
+    Distributions terrain vues comme le gerant selectionne.
+    """
+
+    if gerant is None:
+
+        return {
+            "sous": [],
+            "clients": [],
+            "totaux_sous": {
+                "nombre": 0,
+                "brut": Decimal("0.00"),
+                "net": Decimal("0.00"),
+            },
+            "totaux_clients": {
+                "nombre": 0,
+                "brut": Decimal("0.00"),
+                "net": Decimal("0.00"),
+            },
+        }
+
+    base = _filtrer_intervalle(
+        Distribution.objects
+        .filter(
+            actif=True,
+            point_vente_source=gerant.point_vente,
+            type_distribution__in=[
+                Distribution.TYPE_DISTRIBUTEUR,
+                Distribution.TYPE_CLIENT_DIRECT,
+            ],
+        )
+        .select_related(
+            "commande",
+            "point_vente_source",
+            "point_vente_destination",
+            "distributeur",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        ),
+        "date_distribution",
+        date_debut,
+        date_fin,
+    )
+
+    distributions_sous_qs = base.filter(
+        type_distribution=Distribution.TYPE_DISTRIBUTEUR
+    ).order_by(
+        "-date_distribution",
+        "-iddistribution",
+    )
+
+    distributions_clients_qs = base.filter(
+        type_distribution=Distribution.TYPE_CLIENT_DIRECT
+    ).order_by(
+        "-date_distribution",
+        "-iddistribution",
+    )
+
+    distributions_sous = list(
+        distributions_sous_qs
+    )
+
+    distributions_clients = list(
+        distributions_clients_qs
+    )
+
+    _preparer_groupes_distribution(
+        distributions_sous
+    )
+
+    _preparer_groupes_distribution(
+        distributions_clients
+    )
+
+    return {
+        "sous": distributions_sous,
+        "clients": distributions_clients,
+        "totaux_sous": _totaux_brut_net(
+            distributions_sous_qs
+        ),
+        "totaux_clients": _totaux_brut_net(
+            distributions_clients_qs
+        ),
+    }
+
+
+def _apercu_situations_gerant(gerant, date_debut, date_fin):
+    """
+    Versements des distributeurs du gerant selectionne.
+    """
+
+    destinataires = _destinataires_du_gerant(
+        gerant
+    )
+
+    queryset = _filtrer_intervalle(
+        SituationJournaliere.objects
+        .filter(
+            actif=True,
+            etat=SituationJournaliere.ETAT_CLOTUREE,
+            distributeur__in=destinataires,
+        )
+        .select_related(
+            "distributeur",
+            "point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        )
+        .order_by(
+            "-date_situation",
+            "-idsituation",
+        ),
+        "date_situation",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = queryset.aggregate(
+        total_distribue=Sum("montant_total_distribue"),
+        total_verse=Sum("montant_total_verse"),
+        total_manquant=Sum("montant_manquant"),
+    )
+
+    situations = list(
+        queryset
+    )
+
+    for situation in situations:
+
+        _preparer_details_situation_apercu(
+            situation
+        )
+
+    return {
+        "lignes": situations,
+        "totaux": {
+            "nombre": len(situations),
+            "distribue": _decimal(
+                totaux["total_distribue"]
+            ),
+            "verse": _decimal(
+                totaux["total_verse"]
+            ),
+            "manquant": _decimal(
+                totaux["total_manquant"]
+            ),
+        },
+    }
+
+
+def _apercu_manquants_gerant(gerant, date_debut, date_fin):
+    """
+    Manquants des distributeurs du gerant selectionne.
+    """
+
+    destinataires = _destinataires_du_gerant(
+        gerant
+    )
+
+    queryset = _filtrer_intervalle(
+        Manquant.objects
+        .filter(
+            distributeur__in=destinataires,
+        )
+        .select_related(
+            "situation",
+            "distributeur",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "reglements"
+        )
+        .order_by(
+            "-date_creation",
+            "-idmanquant",
+        ),
+        "situation__date_situation",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = queryset.aggregate(
+        total_manquant=Sum("montant"),
+        total_reste=Sum("reste_a_payer"),
+    )
+
+    manquants = list(
+        queryset
+    )
+
+    for manquant in manquants:
+
+        _preparer_reglements_manquant(
+            manquant
+        )
+
+    return {
+        "lignes": manquants,
+        "totaux": {
+            "nombre": len(manquants),
+            "manquant": _decimal(
+                totaux["total_manquant"]
+            ),
+            "reste": _decimal(
+                totaux["total_reste"]
+            ),
+        },
+    }
+
+
+def _apercu_reglements_manquants_gerant(
+    gerant,
+    date_debut,
+    date_fin
+):
+    """
+    Reglements de manquants du gerant selectionne.
+    """
+
+    destinataires = _destinataires_du_gerant(
+        gerant
+    )
+
+    queryset = _filtrer_intervalle(
+        ReglementManquant.objects
+        .filter(
+            manquant__distributeur__in=destinataires,
+        )
+        .select_related(
+            "manquant",
+            "manquant__situation",
+            "manquant__distributeur",
+            "manquant__distributeur__point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "manquant__reglements"
+        )
+        .order_by(
+            "-date_reglement",
+            "-idreglement",
+        ),
+        "date_reglement",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = queryset.aggregate(
+        total_regle=Sum("montant")
+    )
+
+    reglements = list(
+        queryset
+    )
+
+    for reglement in reglements:
+
+        _preparer_reglements_manquant(
+            reglement.manquant
+        )
+
+    return {
+        "lignes": reglements,
+        "totaux": {
+            "nombre": len(reglements),
+            "regle": _decimal(
+                totaux["total_regle"]
+            ),
+        },
+    }
+
+
+def _apercu_distributions_recues_gerant(gerant, date_debut, date_fin):
+    """
+    Distributions recues du Directeur par le gerant connecte.
+    """
+
+    if gerant is None:
+
+        return {
+            "lignes": [],
+            "totaux": {
+                "nombre": 0,
+                "brut": Decimal("0.00"),
+                "net": Decimal("0.00"),
+            },
+        }
+
+    queryset = _filtrer_intervalle(
+        Distribution.objects
+        .filter(
+            actif=True,
+            distributeur=gerant,
+            type_distribution=Distribution.TYPE_COMMANDE_GERANT,
+        )
+        .select_related(
+            "commande",
+            "point_vente_source",
+            "point_vente_destination",
+            "distributeur",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        )
+        .order_by(
+            "-date_distribution",
+            "-iddistribution",
+        ),
+        "date_distribution",
+        date_debut,
+        date_fin,
+    )
+
+    distributions = list(
+        queryset
+    )
+
+    _preparer_groupes_distribution(
+        distributions
+    )
+
+    return {
+        "lignes": distributions,
+        "totaux": _totaux_brut_net(
+            queryset
+        ),
+    }
+
+
+def _apercu_versements_directeur_gerant(gerant, date_debut, date_fin):
+    """
+    Versements clotures du gerant vers le Directeur.
+    """
+
+    if gerant is None:
+
+        return {
+            "lignes": [],
+            "totaux": {
+                "nombre": 0,
+                "distribue": Decimal("0.00"),
+                "verse": Decimal("0.00"),
+                "manquant": Decimal("0.00"),
+            },
+        }
+
+    queryset = _filtrer_intervalle(
+        SituationJournaliere.objects
+        .filter(
+            actif=True,
+            etat=SituationJournaliere.ETAT_CLOTUREE,
+            distributeur=gerant,
+        )
+        .select_related(
+            "distributeur",
+            "point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        )
+        .order_by(
+            "-date_situation",
+            "-idsituation",
+        ),
+        "date_situation",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = queryset.aggregate(
+        total_distribue=Sum("montant_total_distribue"),
+        total_verse=Sum("montant_total_verse"),
+        total_manquant=Sum("montant_manquant"),
+    )
+
+    situations = list(
+        queryset
+    )
+
+    for situation in situations:
+
+        _preparer_details_situation_apercu(
+            situation
+        )
+
+    return {
+        "lignes": situations,
+        "totaux": {
+            "nombre": len(situations),
+            "distribue": _decimal(
+                totaux["total_distribue"]
+            ),
+            "verse": _decimal(
+                totaux["total_verse"]
+            ),
+            "manquant": _decimal(
+                totaux["total_manquant"]
+            ),
+        },
+    }
+
+
+def _apercu_manquants_directeur_gerant(gerant, date_debut, date_fin):
+    """
+    Manquants constates sur les versements du gerant.
+    """
+
+    if gerant is None:
+
+        return {
+            "lignes": [],
+            "totaux": {
+                "nombre": 0,
+                "manquant": Decimal("0.00"),
+                "reste": Decimal("0.00"),
+            },
+        }
+
+    queryset = _filtrer_intervalle(
+        Manquant.objects
+        .filter(
+            distributeur=gerant,
+        )
+        .select_related(
+            "situation",
+            "distributeur",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "reglements"
+        )
+        .order_by(
+            "-date_creation",
+            "-idmanquant",
+        ),
+        "situation__date_situation",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = queryset.aggregate(
+        total_manquant=Sum("montant"),
+        total_reste=Sum("reste_a_payer"),
+    )
+
+    manquants = list(
+        queryset
+    )
+
+    for manquant in manquants:
+
+        _preparer_reglements_manquant(
+            manquant
+        )
+
+    return {
+        "lignes": manquants,
+        "totaux": {
+            "nombre": len(manquants),
+            "manquant": _decimal(
+                totaux["total_manquant"]
+            ),
+            "reste": _decimal(
+                totaux["total_reste"]
+            ),
+        },
+    }
+
+
+def _apercu_reglements_directeur_gerant(gerant, date_debut, date_fin):
+    """
+    Reglements des manquants du gerant connecte.
+    """
+
+    if gerant is None:
+
+        return {
+            "lignes": [],
+            "totaux": {
+                "nombre": 0,
+                "regle": Decimal("0.00"),
+            },
+        }
+
+    queryset = _filtrer_intervalle(
+        ReglementManquant.objects
+        .filter(
+            manquant__distributeur=gerant,
+        )
+        .select_related(
+            "manquant",
+            "manquant__situation",
+            "manquant__distributeur",
+            "manquant__distributeur__point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "manquant__reglements"
+        )
+        .order_by(
+            "-date_reglement",
+            "-idreglement",
+        ),
+        "date_reglement",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = queryset.aggregate(
+        total_regle=Sum("montant")
+    )
+
+    reglements = list(
+        queryset
+    )
+
+    for reglement in reglements:
+
+        _preparer_reglements_manquant(
+            reglement.manquant
+        )
+
+    return {
+        "lignes": reglements,
+        "totaux": {
+            "nombre": len(reglements),
+            "regle": _decimal(
+                totaux["total_regle"]
+            ),
+        },
+    }
+
+
+def _apercu_toutes_commandes_directeur_gerant(
+    gerant,
+    date_debut,
+    date_fin,
+):
+    """
+    Toutes les commandes emises par le gerant vers le Directeur.
+    """
+
+    if gerant is None:
+
+        return {
+            "lignes": [],
+            "totaux": {
+                "nombre": 0,
+                "brut": Decimal("0.00"),
+                "net": Decimal("0.00"),
+            },
+        }
+
+    queryset = _filtrer_intervalle(
+        Commande.objects
+        .filter(
+            actif=True,
+            point_vente=gerant.point_vente,
+            type_commande=Commande.TYPE_GERANT,
+        )
+        .select_related(
+            "point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        )
+        .order_by(
+            "-date_commande",
+            "-idcommande",
+        ),
+        "date_commande",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = _totaux_brut_net(
+        queryset
+    )
+
+    commandes = list(
+        queryset
+    )
+
+    for commande in commandes:
+
+        commande.groupes_compagnies = preparer_affichage_commande(
+            commande
+        )
+
+    return {
+        "lignes": commandes,
+        "totaux": totaux,
+    }
+
+
+def donnees_operations_directeur_gerant(
+    utilisateur,
+    gerant_id=None,
+    date_debut=None,
+    date_fin=None,
+):
+    """
+    Construit le contexte de la page operationnelle Directeur / Gerant.
+    """
+
+    periode = periode_dashboard(
+        date_debut,
+        date_fin,
+    )
+
+    gerants = _gerants_apercu_directeur()
+
+    gerant_selectionne = _selectionner_personne(
+        gerants,
+        gerant_id,
+    )
+
+    date_debut = periode["date_debut"]
+
+    date_fin = periode["date_fin"]
+
+    commandes = _apercu_toutes_commandes_directeur_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    distributions = _apercu_distributions_recues_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    situations = _apercu_versements_directeur_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    manquants = _apercu_manquants_directeur_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    reglements = _apercu_reglements_directeur_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    return {
+        "titre": "Opérations gérants",
+        "periode": periode,
+        "gerants": gerants,
+        "gerant_selectionne": gerant_selectionne,
+        "est_directeur": est_directeur(utilisateur),
+        "commandes": commandes["lignes"],
+        "commandes_totaux": commandes["totaux"],
+        "distributions_recues": distributions["lignes"],
+        "distributions_recues_totaux": distributions["totaux"],
+        "situations": situations["lignes"],
+        "situations_totaux": situations["totaux"],
+        "manquants_apercu": manquants["lignes"],
+        "manquants_totaux": manquants["totaux"],
+        "reglements_manquants": reglements["lignes"],
+        "reglements_totaux": reglements["totaux"],
+    }
+
+
+def donnees_apercu_directeur(
+    utilisateur,
+    gerant_id=None,
+    date_debut=None,
+    date_fin=None,
+):
+    """
+    Construit le contexte de la page Apercu Directeur.
+    """
+
+    periode = periode_dashboard(
+        date_debut,
+        date_fin,
+    )
+
+    gerants = _gerants_apercu_directeur()
+
+    gerant_selectionne = _selectionner_personne(
+        gerants,
+        gerant_id,
+    )
+
+    date_debut = periode["date_debut"]
+
+    date_fin = periode["date_fin"]
+
+    commandes = _apercu_commandes_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    distributions = _apercu_distributions_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    situations = _apercu_situations_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    manquants = _apercu_manquants_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    reglements = _apercu_reglements_manquants_gerant(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
+    return {
+        "titre": "Aperçu",
+        "periode": periode,
+        "gerants": gerants,
+        "gerant_selectionne": gerant_selectionne,
+        "est_directeur": est_directeur(utilisateur),
+        "commandes": commandes["lignes"],
+        "commandes_totaux": commandes["totaux"],
+        "distributions_sous": distributions["sous"],
+        "distributions_clients": distributions["clients"],
+        "distributions_sous_totaux": distributions[
+            "totaux_sous"
+        ],
+        "distributions_clients_totaux": distributions[
+            "totaux_clients"
+        ],
+        "situations": situations["lignes"],
+        "situations_totaux": situations["totaux"],
+        "manquants_apercu": manquants["lignes"],
+        "manquants_totaux": manquants["totaux"],
+        "reglements_manquants": reglements["lignes"],
+        "reglements_totaux": reglements["totaux"],
     }
 
 

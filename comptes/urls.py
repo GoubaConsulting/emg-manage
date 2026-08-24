@@ -27,4 +27,22 @@ urlpatterns = [
         name="dashboard"
     ),
 
+    path(
+        "apercu/",
+        views.apercu_directeur,
+        name="apercu_directeur"
+    ),
+
+    path(
+        "operations-gerants/",
+        views.operations_gerant_directeur,
+        name="operations_gerant_directeur"
+    ),
+
+    path(
+        "mes-operations/",
+        RedirectView.as_view(pattern_name="dashboard", permanent=False),
+        name="mes_operations_redirect"
+    ),
+
 ]
