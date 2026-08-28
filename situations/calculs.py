@@ -146,14 +146,15 @@ def calculer_montant_produits_restants(
 def calculer_manquant(
     montant_total_distribue,
     montant_credit_verse,
-    montant_vente_verse
+    montant_vente_verse,
+    montant_restant=0
 ):
     """
     Calcule le montant manquant.
 
     Le montant distribue doit etre justifie par :
 
-        credit verse + ventes versees
+        credit verse + ventes versees + montant restant
 
     Si cette somme est inferieure au montant distribue,
     la différence constitue un manquant.
@@ -171,6 +172,10 @@ def calculer_manquant(
         str(montant_vente_verse)
     )
 
+    montant_restant = Decimal(
+        str(montant_restant)
+    )
+
     manquant = (
 
         montant_total_distribue
@@ -182,6 +187,10 @@ def calculer_manquant(
         -
 
         montant_vente_verse
+
+        -
+
+        montant_restant
 
     )
 

@@ -184,6 +184,31 @@ class SelectionSituationForm(forms.Form):
 
 
 # ==========================================================
+# FORMULAIRE : CALCUL SITUATION GERANT
+# ==========================================================
+
+class SituationGerantDateForm(forms.Form):
+    """
+    Permet au gerant de choisir la date a calculer.
+    """
+
+    date_situation = forms.DateField(
+
+        label="Date de situation",
+
+        initial=timezone.localdate,
+
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        )
+
+    )
+
+
+# ==========================================================
 # FORMULAIRE : REGLEMENT D'UN MANQUANT
 # ==========================================================
 

@@ -20,6 +20,16 @@ urlpatterns = [
 
     path(
 
+        "gerant/",
+
+        views.liste_situations_gerant,
+
+        name="liste_situations_gerant"
+
+    ),
+
+    path(
+
         "",
 
         views.liste_situations,

@@ -396,6 +396,15 @@
                             <div class="accordion-body p-0">
                                 <div class="list-group list-group-flush">
                                     <a
+                                        class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'liste_situations_gerant' %}active{% endif %}"
+                                        href="{% url 'situations:liste_situations_gerant' %}"
+                                    >
+                                        <span>Situations gérant</span>
+                                        <span class="badge rounded-pill {% if request.resolver_match.url_name == 'liste_situations_gerant' %}text-bg-light text-primary{% else %}text-bg-primary{% endif %}">
+                                            Mois
+                                        </span>
+                                    </a>
+                                    <a
                                         class="list-group-item list-group-item-action sidebar-item {% if request.resolver_match.url_name == 'liste_situations' %}active{% endif %}"
                                         href="{% url 'situations:liste_situations' %}"
                                     >

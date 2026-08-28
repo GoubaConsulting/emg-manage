@@ -36,6 +36,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 ligne.classList.add("table-success");
 
+                calculerTotaux();
+                calculerSousTotauxCompagnies();
+
                 montant.focus();
 
             }
@@ -78,6 +81,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("form-commande").addEventListener("submit", verifierFormulaire);
 
     calculerSousTotauxCompagnies();
+    calculerTotaux();
 
 });
 
@@ -87,19 +91,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
 function calculerLigne(ligne) {
 
-    const prix = parseFloat(ligne.dataset.prix) || 0;
+    const prix = lireNombre(ligne.dataset.prix);
 
-    const montant = parseFloat(
+    const montant = lireNombre(
 
         ligne.querySelector(".montant").value
 
-    ) || 0;
+    );
 
-    const taux = parseFloat(
+    const taux = lireNombre(
 
         ligne.querySelector(".taux").value
 
-    ) || 0;
+    );
 
     let quantite = 0;
 
@@ -143,23 +147,106 @@ function calculerTotaux() {
 
         }
 
-        brut += parseFloat(
+        brut += lireNombre(
 
             ligne.querySelector(".montant").value
 
-        ) || 0;
+        );
 
-        net += parseFloat(
+        net += lireNombre(
 
             ligne.querySelector(".net").value
 
-        ) || 0;
+        );
 
     });
 
     document.getElementById("total-brut").innerText = formater(brut);
 
     document.getElementById("total-net").innerText = formater(net);
+
+    actualiserSyntheseGerant(brut);
+
+}
+
+// ======================================================
+// Synthese du gerant
+// ======================================================
+
+function calculerTotalMontantsInitiaux() {
+
+    let total = 0;
+
+    document.querySelectorAll(".ligne-produit").forEach(function (ligne) {
+
+        total += lireNombre(ligne.dataset.montantInitial);
+
+    });
+
+    const champTotal = document.getElementById("total-montants-initiaux");
+
+    if (champTotal) {
+
+        champTotal.innerText = formater(total);
+
+    }
+
+    return total;
+
+}
+
+
+function actualiserSyntheseGerant(totalBrut) {
+
+    const champFond = document.getElementById("fond-gerant");
+    const champDifference = document.getElementById("difference-fond");
+    const champCredit = document.getElementById("credit-fond");
+
+    if (!champFond || !champDifference || !champCredit) {
+
+        return;
+
+    }
+
+    const fond = lireNombre(champFond.dataset.fond);
+    const totalInitial = calculerTotalMontantsInitiaux();
+    const totalEngage = lireNombre(totalBrut) + totalInitial;
+    const difference = fond - totalEngage;
+    const credit = Math.max(totalEngage - fond, 0);
+
+    champFond.innerText = formater(fond);
+    champDifference.innerText = formater(difference);
+    champCredit.innerText = formater(credit);
+
+    champDifference.classList.toggle("text-danger", difference < 0);
+    champDifference.classList.toggle("text-success", difference >= 0);
+    champCredit.classList.toggle("text-danger", credit > 0);
+    champCredit.classList.toggle("text-success", credit <= 0);
+
+    const carte = document.getElementById("carte-difference-fond");
+    const entete = document.getElementById("entete-difference-fond");
+    const carteCredit = document.getElementById("carte-credit-fond");
+    const enteteCredit = document.getElementById("entete-credit-fond");
+
+    if (!carte || !entete || !carteCredit || !enteteCredit) {
+
+        return;
+
+    }
+
+    carte.classList.toggle("border-danger", difference < 0);
+    carte.classList.toggle("border-success", difference >= 0);
+    carte.classList.toggle("border-secondary", false);
+
+    entete.classList.toggle("bg-danger", difference < 0);
+    entete.classList.toggle("bg-success", difference >= 0);
+    entete.classList.toggle("bg-secondary", false);
+
+    carteCredit.classList.toggle("border-danger", credit > 0);
+    carteCredit.classList.toggle("border-success", credit <= 0);
+
+    enteteCredit.classList.toggle("bg-danger", credit > 0);
+    enteteCredit.classList.toggle("bg-success", credit <= 0);
 
 }
 
@@ -183,9 +270,9 @@ function calculerSousTotauxCompagnies() {
 
         const compagnie = ligne.dataset.compagnie;
 
-        const net = parseFloat(
+        const net = lireNombre(
             ligne.querySelector(".net").value
-        ) || 0;
+        );
 
         if (!(compagnie in sousTotaux)) {
 
@@ -220,6 +307,23 @@ function calculerSousTotauxCompagnies() {
 // ======================================================
 // Formatage
 // ======================================================
+
+function lireNombre(valeur) {
+
+    if (valeur === undefined || valeur === null) {
+
+        return 0;
+
+    }
+
+    const valeurTexte = String(valeur)
+        .replace(/\s/g, "")
+        .replace(",", ".");
+
+    return parseFloat(valeurTexte) || 0;
+
+}
+
 
 function formater(nombre) {
 
@@ -262,17 +366,17 @@ function verifierFormulaire(e) {
 
         auMoinsUn = true;
 
-        const montant = parseFloat(
+        const montant = lireNombre(
 
             ligne.querySelector(".montant").value
 
-        ) || 0;
+        );
 
-        const taux = parseFloat(
+        const taux = lireNombre(
 
             ligne.querySelector(".taux").value
 
-        ) || 0;
+        );
 
         if (montant <= 0) {
 

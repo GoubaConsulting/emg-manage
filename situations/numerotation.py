@@ -14,6 +14,7 @@ from django.db.models import Max
 
 from .models import (
     SituationJournaliere,
+    SituationGerant,
     Manquant,
     ReglementManquant,
 )
@@ -40,6 +41,29 @@ def generer_numero_situation():
     )
 
     return f"SIT-{numero:06d}"
+
+
+# ==========================================================
+# NUMERO SITUATION GERANT
+# ==========================================================
+
+def generer_numero_situation_gerant():
+
+    dernier = (
+        SituationGerant.objects
+        .aggregate(
+            maximum=Max("idsituationgerant")
+        )
+        ["maximum"]
+    )
+
+    numero = (
+        dernier + 1
+        if dernier
+        else 1
+    )
+
+    return f"SGE-{numero:06d}"
 
 
 # ==========================================================

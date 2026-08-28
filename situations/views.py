@@ -18,6 +18,8 @@ from django.contrib import messages
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
+from django.http import HttpResponseForbidden
+from django.urls import reverse
 
 from django.shortcuts import (
     render,
@@ -28,6 +30,7 @@ from referentiel.models import Distributeur
 
 from .forms import (
     SelectionSituationForm,
+    SituationGerantDateForm,
     ReglementManquantForm,
 )
 
@@ -44,14 +47,17 @@ from .services import (
     annoter_lignes_reliquat,
     calculer_valeur_nette_quantite,
     calculer_total_distribue,
+    calculer_situation_gerant,
     construire_lignes_affichage_situation,
     creer_situation_journaliere,
     cloturer_situation,
+    preparer_affichage_situations_gerant,
     regler_manquant,
 )
 
 from .models import (
     SituationJournaliere,
+    SituationGerant,
     Manquant,
 )
 
@@ -499,6 +505,211 @@ def _preparer_details_reglements_manquants(reglements_page):
             ),
             Decimal("0.00")
         )
+
+
+# ==========================================================
+# LISTE DES SITUATIONS GERANT
+# ==========================================================
+
+@login_required
+def liste_situations_gerant(request):
+    """
+    Liste et calcule les situations journalieres du gerant.
+    """
+
+    if request.user.profil.role != "GERANT":
+
+        return HttpResponseForbidden()
+
+    point_vente = request.user.profil.point_vente
+
+    form_calcul = SituationGerantDateForm()
+
+    if request.method == "POST":
+
+        form_calcul = SituationGerantDateForm(
+            request.POST
+        )
+
+        if point_vente is None:
+
+            messages.error(
+                request,
+                "Votre compte gerant n'est rattache a aucun point de vente."
+            )
+
+        elif form_calcul.is_valid():
+
+            try:
+
+                situation = calculer_situation_gerant(
+                    request.user,
+                    form_calcul.cleaned_data["date_situation"],
+                )
+
+                messages.success(
+                    request,
+                    "Situation gerant calculee avec succes."
+                )
+
+                date_situation = (
+                    form_calcul.cleaned_data[
+                        "date_situation"
+                    ].isoformat()
+                )
+
+                return redirect(
+                    (
+                        f"{reverse('situations:liste_situations_gerant')}"
+                        f"?date_debut={date_situation}"
+                        f"&date_fin={date_situation}"
+                        f"&ouvrir={situation.pk}"
+                    )
+                )
+
+            except Exception as e:
+
+                form_calcul.add_error(
+                    None,
+                    str(e)
+                )
+
+    date_debut, date_fin = _filtres_dates(
+        request
+    )
+
+    situations = (
+        SituationGerant.objects
+        .filter(
+            actif=True,
+            point_vente=point_vente,
+        )
+        .select_related(
+            "gerant",
+            "point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        )
+    )
+
+    if date_debut:
+
+        situations = situations.filter(
+            date_situation__gte=date_debut
+        )
+
+    if date_fin:
+
+        situations = situations.filter(
+            date_situation__lte=date_fin
+        )
+
+    situations = situations.order_by(
+        "-date_situation",
+        "-idsituationgerant"
+    )
+
+    totaux = situations.aggregate(
+        montant_residuel=Sum(
+            "montant_residuel_j_1"
+        ),
+        montant_jour=Sum(
+            "montant_du_jour"
+        ),
+        total_jour=Sum(
+            "total_du_jour"
+        ),
+        montant_distribue=Sum(
+            "montant_distribue"
+        ),
+        montant_vendu=Sum(
+            "montant_vendu"
+        ),
+        montant_retour=Sum(
+            "montant_retour"
+        ),
+        total_vendu=Sum(
+            "total_vendu"
+        ),
+        total_restant=Sum(
+            "total_restant"
+        ),
+    )
+
+    page = paginer(
+        situations,
+        request.GET.get(
+            "page"
+        )
+    )
+
+    preparer_affichage_situations_gerant(
+        page
+    )
+
+    return render(
+        request,
+        "situations/situations_gerant.html",
+        {
+            "situations": page,
+            "form_calcul": form_calcul,
+            "date_debut": date_debut,
+            "date_fin": date_fin,
+            "ouvrir": request.GET.get(
+                "ouvrir",
+                ""
+            ),
+            "pagination_querystring": (
+                _querystring_pagination(
+                    request
+                )
+            ),
+            "totaux": {
+                "montant_residuel_j_1": (
+                    totaux["montant_residuel"]
+                    or
+                    Decimal("0.00")
+                ),
+                "montant_du_jour": (
+                    totaux["montant_jour"]
+                    or
+                    Decimal("0.00")
+                ),
+                "total_du_jour": (
+                    totaux["total_jour"]
+                    or
+                    Decimal("0.00")
+                ),
+                "montant_distribue": (
+                    totaux["montant_distribue"]
+                    or
+                    Decimal("0.00")
+                ),
+                "montant_vendu": (
+                    totaux["montant_vendu"]
+                    or
+                    Decimal("0.00")
+                ),
+                "montant_retour": (
+                    totaux["montant_retour"]
+                    or
+                    Decimal("0.00")
+                ),
+                "total_vendu": (
+                    totaux["total_vendu"]
+                    or
+                    Decimal("0.00")
+                ),
+                "total_restant": (
+                    totaux["total_restant"]
+                    or
+                    Decimal("0.00")
+                ),
+            },
+        }
+    )
 
 
 # ==========================================================

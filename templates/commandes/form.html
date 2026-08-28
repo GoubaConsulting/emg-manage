@@ -68,6 +68,10 @@
 
                 <th class="text-end">Prix unitaire</th>
 
+                {% if afficher_montant_initial %}
+                    <th width="180">Montant initial</th>
+                {% endif %}
+
                 <th width="180">Montant (FCFA)</th>
 
                 <th width="120">Quantité</th>
@@ -87,7 +91,7 @@
 
 <tr class="table-secondary">
 
-    <td colspan="7">
+    <td colspan="{% if afficher_montant_initial %}8{% else %}7{% endif %}">
 
         <strong>
 
@@ -105,6 +109,7 @@
     class="ligne-produit"
     data-prix="{{ produit.prix }}"
     data-compagnie="{{ produit.compagnie.idcompagnie }}"
+    data-montant-initial="{{ produit.montant_initial_commande_js|default:'0' }}"
 >
 
     <td class="text-center">
@@ -129,6 +134,19 @@
         {{ produit.prix }} FCFA
 
     </td>
+
+    {% if afficher_montant_initial %}
+    <td>
+
+        <input
+            type="text"
+            class="form-control"
+            readonly
+            value="{{ produit.montant_initial_commande|floatformat:2 }} FCFA"
+        >
+
+    </td>
+    {% endif %}
 
     <td>
 
@@ -186,7 +204,7 @@
 {% endfor %}
 <tr class="table-warning">
 
-    <td colspan="6" class="text-end">
+    <td colspan="{% if afficher_montant_initial %}7{% else %}6{% endif %}" class="text-end">
 
         <strong>
 
@@ -220,11 +238,11 @@
 
 <hr>
 
-<div class="row mt-4">
+<div class="row row-cols-1 row-cols-md-3 g-3 mt-4">
 
-    <div class="col-md-6">
+    <div class="col">
 
-        <div class="card border-primary shadow-sm">
+        <div class="card border-primary shadow-sm h-100">
 
             <div class="card-header bg-primary text-white">
 
@@ -254,9 +272,9 @@
     </div>
 
 
-    <div class="col-md-6">
+    <div class="col">
 
-        <div class="card border-success shadow-sm">
+        <div class="card border-success shadow-sm h-100">
 
             <div class="card-header bg-success text-white">
 
@@ -284,6 +302,148 @@
         </div>
 
     </div>
+
+    {% if afficher_montant_initial %}
+
+    <div class="col">
+
+        <div class="card border-info shadow-sm h-100">
+
+            <div class="card-header bg-info text-white">
+
+                <strong>
+
+                    Fond du gérant
+
+                </strong>
+
+            </div>
+
+            <div class="card-body text-center">
+
+                <h3
+                    id="fond-gerant"
+                    class="mb-0"
+                    data-fond="{{ fond_gerant_js|default:'0' }}"
+                >
+
+                    {{ fond_gerant|default:0|floatformat:2 }} FCFA
+
+                </h3>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col">
+
+        <div class="card border-warning shadow-sm h-100">
+
+            <div class="card-header bg-warning text-dark">
+
+                <strong>
+
+                    Montants initiaux
+
+                </strong>
+
+            </div>
+
+            <div class="card-body text-center">
+
+                <h3
+                    id="total-montants-initiaux"
+                    class="mb-0"
+                    data-total-initial="{{ total_montants_initiaux_js|default:'0' }}"
+                >
+
+                    {{ total_montants_initiaux|default:0|floatformat:2 }} FCFA
+
+                </h3>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col">
+
+        <div
+            id="carte-difference-fond"
+            class="card border-secondary shadow-sm h-100"
+        >
+
+            <div
+                id="entete-difference-fond"
+                class="card-header bg-secondary text-white"
+            >
+
+                <strong>
+
+                    Différence fond
+
+                </strong>
+
+            </div>
+
+            <div class="card-body text-center">
+
+                <h3
+                    id="difference-fond"
+                    class="mb-0"
+                >
+
+                    0 FCFA
+
+                </h3>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="col">
+
+        <div
+            id="carte-credit-fond"
+            class="card border-success shadow-sm h-100"
+        >
+
+            <div
+                id="entete-credit-fond"
+                class="card-header bg-success text-white"
+            >
+
+                <strong>
+
+                    Crédit
+
+                </strong>
+
+            </div>
+
+            <div class="card-body text-center">
+
+                <h3
+                    id="credit-fond"
+                    class="mb-0"
+                >
+
+                    0 FCFA
+
+                </h3>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endif %}
 
 </div>
 
@@ -325,6 +485,6 @@
 
 {% block scripts %}
 
-<script src="{% static 'js/commandes.js' %}"></script>
+<script src="{% static 'js/commandes.js' %}?v=20260828-credit"></script>
 
 {% endblock %}

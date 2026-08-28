@@ -478,6 +478,12 @@ function actualiserManquantAuto() {
         )?.textContent
     );
 
+    const totalRestant = convertirNombre(
+        document.getElementById(
+            "total-net-restant"
+        )?.textContent
+    );
+
     const creditVerse = convertirNombre(
         document.getElementById(
             "montant-credit-verse"
@@ -492,7 +498,7 @@ function actualiserManquantAuto() {
 
     const manquant = Math.max(
         0,
-        totalDistribue - creditVerse - ventesVersees
+        totalDistribue - creditVerse - ventesVersees - totalRestant
     );
 
     champManquant.value = formaterMontant(

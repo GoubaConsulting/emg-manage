@@ -79,8 +79,53 @@ body{
    TABLEAUX
 =========================== */
 
-.table th{
-    background-color: #f1f3f5;
+.table > thead,
+.table > thead.table-dark,
+.table > thead.table-light,
+.table > thead.table-secondary,
+.table > thead.table-header-emg,
+.table > thead > tr,
+.table > thead > tr > th,
+.table > thead > tr > td,
+.table > tfoot.table-dark,
+.table > tfoot.table-light,
+.table > tfoot.table-secondary,
+.table > tfoot.table-warning,
+.table > tfoot > tr,
+.table > tfoot > tr > th,
+.table > tfoot > tr > td{
+    --bs-table-color: #000;
+    --bs-table-bg: #f1f3f5;
+    --bs-table-border-color: #dee2e6;
+    --bs-table-striped-color: #000;
+    --bs-table-striped-bg: #f1f3f5;
+    --bs-table-active-color: #000;
+    --bs-table-active-bg: #e9ecef;
+    --bs-table-hover-color: #000;
+    --bs-table-hover-bg: #e9ecef;
+}
+
+.table th,
+.table thead th,
+.table thead td,
+.table thead tr th,
+.table thead tr td,
+.table tfoot th,
+.table tfoot td,
+.table tfoot tr th,
+.table tfoot tr td,
+.table-dark th,
+.table-dark td,
+.table-light th,
+.table-light td,
+.table-secondary th,
+.table-secondary td,
+.table-warning th,
+.table-warning td,
+.table-header-emg th,
+.table-header-emg td{
+    background-color: #f1f3f5 !important;
+    color: #000 !important;
 }
 
 .table td,

@@ -428,6 +428,312 @@ class LigneSituationJournaliere(models.Model):
 
 
 # ==========================================================
+# MODELE : SITUATION GERANT
+# ==========================================================
+
+class SituationGerant(models.Model):
+    """
+    Synthese journaliere des operations d'un gerant.
+    """
+
+    idsituationgerant = models.AutoField(
+        primary_key=True
+    )
+
+    numero = models.CharField(
+        max_length=30,
+        unique=True,
+        editable=False,
+        verbose_name="Numero"
+    )
+
+    date_situation = models.DateField(
+        verbose_name="Date de situation"
+    )
+
+    gerant = models.ForeignKey(
+        Distributeur,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="situations_gerant",
+        verbose_name="Gerant"
+    )
+
+    point_vente = models.ForeignKey(
+        PointVente,
+        on_delete=models.PROTECT,
+        related_name="situations_gerants",
+        verbose_name="Point de vente"
+    )
+
+    utilisateur = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="situations_gerants",
+        verbose_name="Utilisateur"
+    )
+
+    montant_residuel_j_1 = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant residuel J-1"
+    )
+
+    montant_du_jour = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant du jour"
+    )
+
+    total_du_jour = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Total du jour"
+    )
+
+    montant_distribue = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant distribue"
+    )
+
+    montant_vendu = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant vendu"
+    )
+
+    montant_retour = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant retour"
+    )
+
+    total_vendu = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Total vendu"
+    )
+
+    total_restant = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Total restant"
+    )
+
+    actif = models.BooleanField(
+        default=True
+    )
+
+    date_creation = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    date_modification = models.DateTimeField(
+        auto_now=True
+    )
+
+    class Meta:
+
+        db_table = "situationgerant"
+
+        verbose_name = "Situation gerant"
+
+        verbose_name_plural = "Situations gerants"
+
+        ordering = [
+
+            "-date_situation",
+
+            "-idsituationgerant"
+
+        ]
+
+        constraints = [
+
+            models.UniqueConstraint(
+
+                fields=[
+                    "point_vente",
+                    "date_situation",
+                ],
+
+                condition=models.Q(
+                    actif=True
+                ),
+
+                name="situation_gerant_unique_pointvente_date_active"
+
+            )
+
+        ]
+
+        indexes = [
+
+            models.Index(
+                fields=[
+                    "date_situation"
+                ]
+            ),
+
+            models.Index(
+                fields=[
+                    "point_vente"
+                ]
+            ),
+
+            models.Index(
+                fields=[
+                    "gerant"
+                ]
+            ),
+
+        ]
+
+    def __str__(self):
+
+        return self.numero
+
+
+# ==========================================================
+# MODELE : LIGNE SITUATION GERANT
+# ==========================================================
+
+class LigneSituationGerant(models.Model):
+    """
+    Detail produit d'une situation gerant.
+    """
+
+    idlignesituationgerant = models.AutoField(
+        primary_key=True
+    )
+
+    situation = models.ForeignKey(
+        SituationGerant,
+        on_delete=models.CASCADE,
+        related_name="lignes",
+        verbose_name="Situation gerant"
+    )
+
+    produit = models.ForeignKey(
+        Produit,
+        on_delete=models.PROTECT,
+        related_name="lignes_situations_gerants",
+        verbose_name="Produit"
+    )
+
+    prix_unitaire = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Prix unitaire"
+    )
+
+    montant_residuel_j_1 = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant residuel J-1"
+    )
+
+    montant_du_jour = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant du jour"
+    )
+
+    total_du_jour = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Total du jour"
+    )
+
+    montant_distribue = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant distribue"
+    )
+
+    montant_vendu = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant vendu"
+    )
+
+    montant_retour = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant retour"
+    )
+
+    total_vendu = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Total vendu"
+    )
+
+    total_restant = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        verbose_name="Total restant"
+    )
+
+    class Meta:
+
+        db_table = "lignesituationgerant"
+
+        verbose_name = "Ligne situation gerant"
+
+        verbose_name_plural = "Lignes situations gerants"
+
+        ordering = [
+
+            "produit__compagnie__designation",
+
+            "produit__designation",
+
+        ]
+
+        constraints = [
+
+            models.UniqueConstraint(
+
+                fields=[
+                    "situation",
+                    "produit",
+                ],
+
+                name="produit_unique_situation_gerant"
+
+            )
+
+        ]
+
+    def __str__(self):
+
+        return (
+            f"{self.situation.numero} - "
+            f"{self.produit.designation}"
+        )
+
+
+# ==========================================================
 # MODELE : MANQUANT
 # ==========================================================
 

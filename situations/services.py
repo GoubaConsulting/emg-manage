@@ -11,19 +11,36 @@ Services métier du module Situations.
 """
 
 from decimal import Decimal
-
 from types import SimpleNamespace
 
 from django.db import transaction
 from django.db.models import Sum
 
-from distributions.models import Distribution
+from commandes.models import (
+    Commande,
+    LigneCommande,
+)
 
-from referentiel.models import Distributeur
+from distributions.models import (
+    Distribution,
+    LigneDistribution,
+)
+
+from stocks.models import (
+    Stock,
+    TYPE_NORMAL,
+)
+
+from referentiel.models import (
+    Distributeur,
+    Produit,
+)
 
 from .models import (
     SituationJournaliere,
     LigneSituationJournaliere,
+    SituationGerant,
+    LigneSituationGerant,
     Manquant,
     ReglementManquant,
 )
@@ -37,9 +54,647 @@ from .calculs import (
 
 from .numerotation import (
     generer_numero_situation,
+    generer_numero_situation_gerant,
     generer_numero_manquant,
     generer_numero_reglement,
 )
+
+
+# ==========================================================
+# SERVICES : SITUATION GERANT
+# ==========================================================
+
+ZERO = Decimal("0.00")
+
+
+def _montant(valeur):
+    """
+    Normalise une valeur monetaire.
+    """
+
+    return valeur or ZERO
+
+
+def gerant_du_point_vente(point_vente):
+    """
+    Retourne le gerant actif rattache au point de vente.
+    """
+
+    if point_vente is None:
+
+        return None
+
+    return (
+        Distributeur.objects
+        .filter(
+            actif=True,
+            categorie=Distributeur.CATEGORIE_GERANT,
+            point_vente=point_vente,
+        )
+        .order_by(
+            "nom",
+            "prenom",
+        )
+        .first()
+    )
+
+
+def _ajouter_montant(dictionnaire, produit_id, montant):
+    """
+    Additionne un montant dans un dictionnaire par produit.
+    """
+
+    dictionnaire[produit_id] = (
+        dictionnaire.get(
+            produit_id,
+            ZERO
+        )
+        + _montant(
+            montant
+        )
+    )
+
+
+def _montants_commandes_gerant_par_produit(
+    point_vente,
+    date_situation,
+):
+    """
+    Total brut des commandes normales validees du gerant.
+    """
+
+    montants = {}
+
+    if point_vente is None:
+
+        return montants
+
+    lignes = (
+        LigneCommande.objects
+        .filter(
+            commande__actif=True,
+            commande__point_vente=point_vente,
+            commande__type_commande=Commande.TYPE_GERANT,
+            commande__categorie_commande=(
+                Commande.CATEGORIE_NORMALE
+            ),
+            commande__etat__in=[
+                Commande.VALIDEE,
+                Commande.VALIDEE_PARTIELLEMENT,
+            ],
+            commande__date_commande=date_situation,
+        )
+        .select_related(
+            "produit"
+        )
+    )
+
+    for ligne in lignes:
+
+        _ajouter_montant(
+            montants,
+            ligne.produit_id,
+            ligne.montant,
+        )
+
+    return montants
+
+
+def _montants_stock_normal_par_produit(point_vente):
+    """
+    Valorise le stock normal courant du point de vente.
+    """
+
+    montants = {}
+
+    if point_vente is None:
+
+        return montants
+
+    stocks = (
+        Stock.objects
+        .filter(
+            actif=True,
+            point_vente=point_vente,
+            type_stock=TYPE_NORMAL,
+            quantite__gt=0,
+        )
+        .select_related(
+            "produit"
+        )
+    )
+
+    for stock in stocks:
+
+        _ajouter_montant(
+            montants,
+            stock.produit_id,
+            (
+                _montant(stock.quantite)
+                *
+                _montant(stock.produit.prix)
+            ),
+        )
+
+    return montants
+
+
+def _montants_distributions_gerant_par_produit(
+    point_vente,
+    date_situation,
+    type_distribution,
+):
+    """
+    Total brut des distributions ou ventes faites par le gerant.
+    """
+
+    montants = {}
+
+    if point_vente is None:
+
+        return montants
+
+    lignes = (
+        LigneDistribution.objects
+        .filter(
+            distribution__actif=True,
+            distribution__point_vente_source=point_vente,
+            distribution__type_distribution=type_distribution,
+            distribution__date_distribution=date_situation,
+        )
+        .select_related(
+            "produit"
+        )
+    )
+
+    for ligne in lignes:
+
+        _ajouter_montant(
+            montants,
+            ligne.produit_id,
+            ligne.montant,
+        )
+
+    return montants
+
+
+def _montants_retours_distributeurs_par_produit(
+    point_vente,
+    date_situation,
+):
+    """
+    Somme brute des montants restants des versements distributeurs.
+    """
+
+    montants = {}
+
+    if point_vente is None:
+
+        return montants
+
+    lignes = (
+        LigneSituationJournaliere.objects
+        .filter(
+            situation__actif=True,
+            situation__etat=SituationJournaliere.ETAT_CLOTUREE,
+            situation__point_vente=point_vente,
+            situation__date_situation=date_situation,
+            situation__distributeur__categorie=(
+                Distributeur.CATEGORIE_DISTRIBUTEUR
+            ),
+        )
+        .select_related(
+            "produit"
+        )
+    )
+
+    for ligne in lignes:
+
+        _ajouter_montant(
+            montants,
+            ligne.produit_id,
+            (
+                _montant(ligne.quantite_restante)
+                *
+                _montant(ligne.prix_unitaire)
+            ),
+        )
+
+    return montants
+
+
+def _montants_derniere_situation_gerant_par_produit(
+    point_vente,
+    date_situation,
+):
+    """
+    Recupere le total restant de la derniere situation anterieure.
+    """
+
+    montants = {}
+
+    if point_vente is None:
+
+        return montants
+
+    derniere_situation = (
+        SituationGerant.objects
+        .filter(
+            actif=True,
+            point_vente=point_vente,
+            date_situation__lt=date_situation,
+        )
+        .prefetch_related(
+            "lignes"
+        )
+        .order_by(
+            "-date_situation",
+            "-idsituationgerant",
+        )
+        .first()
+    )
+
+    if derniere_situation is None:
+
+        return montants
+
+    for ligne in derniere_situation.lignes.all():
+
+        montants[ligne.produit_id] = _montant(
+            ligne.total_restant
+        )
+
+    return montants
+
+
+def _produits_situation_gerant(*dictionnaires):
+    """
+    Retourne les produits presents dans au moins un montant.
+    """
+
+    ids_produits = set()
+
+    for dictionnaire in dictionnaires:
+
+        ids_produits.update(
+            dictionnaire.keys()
+        )
+
+    return (
+        Produit.objects
+        .filter(
+            pk__in=ids_produits
+        )
+        .select_related(
+            "compagnie"
+        )
+        .order_by(
+            "compagnie__designation",
+            "designation",
+        )
+    )
+
+
+def _somme_lignes_situation_gerant(lignes, champ):
+    """
+    Additionne un champ monetaire sur des lignes.
+    """
+
+    return sum(
+        (
+            getattr(
+                ligne,
+                champ
+            )
+            for ligne in lignes
+        ),
+        ZERO
+    )
+
+
+def _sous_total_situation_gerant(lignes):
+    """
+    Calcule les sous-totaux d'un groupe de lignes.
+    """
+
+    return {
+        "montant_residuel_j_1": _somme_lignes_situation_gerant(
+            lignes,
+            "montant_residuel_j_1"
+        ),
+        "montant_du_jour": _somme_lignes_situation_gerant(
+            lignes,
+            "montant_du_jour"
+        ),
+        "total_du_jour": _somme_lignes_situation_gerant(
+            lignes,
+            "total_du_jour"
+        ),
+        "montant_distribue": _somme_lignes_situation_gerant(
+            lignes,
+            "montant_distribue"
+        ),
+        "montant_vendu": _somme_lignes_situation_gerant(
+            lignes,
+            "montant_vendu"
+        ),
+        "montant_retour": _somme_lignes_situation_gerant(
+            lignes,
+            "montant_retour"
+        ),
+        "total_vendu": _somme_lignes_situation_gerant(
+            lignes,
+            "total_vendu"
+        ),
+        "total_restant": _somme_lignes_situation_gerant(
+            lignes,
+            "total_restant"
+        ),
+    }
+
+
+def preparer_affichage_situations_gerant(situations):
+    """
+    Regroupe les lignes de situation gerant par compagnie.
+    """
+
+    for situation in situations:
+
+        groupes = {}
+
+        for ligne in situation.lignes.all():
+
+            compagnie = ligne.produit.compagnie
+
+            if compagnie.pk not in groupes:
+
+                groupes[compagnie.pk] = {
+                    "compagnie": compagnie,
+                    "lignes": [],
+                }
+
+            groupes[compagnie.pk]["lignes"].append(
+                ligne
+            )
+
+        for groupe in groupes.values():
+
+            groupe["sous_totaux"] = _sous_total_situation_gerant(
+                groupe["lignes"]
+            )
+
+        situation.groupes_compagnies = groupes.values()
+
+
+@transaction.atomic
+def calculer_situation_gerant(
+    utilisateur,
+    date_situation,
+):
+    """
+    Calcule ou recalcule la situation journaliere du gerant.
+    """
+
+    point_vente = utilisateur.profil.point_vente
+
+    gerant = gerant_du_point_vente(
+        point_vente
+    )
+
+    residuels_anterieurs = (
+        _montants_derniere_situation_gerant_par_produit(
+            point_vente,
+            date_situation,
+        )
+    )
+
+    commandes_jour = _montants_commandes_gerant_par_produit(
+        point_vente,
+        date_situation,
+    )
+
+    if not commandes_jour:
+
+        commandes_jour = _montants_stock_normal_par_produit(
+            point_vente
+        )
+
+    distributions_jour = _montants_distributions_gerant_par_produit(
+        point_vente,
+        date_situation,
+        Distribution.TYPE_DISTRIBUTEUR,
+    )
+
+    ventes_jour = _montants_distributions_gerant_par_produit(
+        point_vente,
+        date_situation,
+        Distribution.TYPE_CLIENT_DIRECT,
+    )
+
+    retours_jour = _montants_retours_distributeurs_par_produit(
+        point_vente,
+        date_situation,
+    )
+
+    produits = _produits_situation_gerant(
+        residuels_anterieurs,
+        commandes_jour,
+        distributions_jour,
+        ventes_jour,
+        retours_jour,
+    )
+
+    situation, created = (
+        SituationGerant.objects
+        .get_or_create(
+            point_vente=point_vente,
+            date_situation=date_situation,
+            actif=True,
+            defaults={
+                "numero": generer_numero_situation_gerant(),
+                "gerant": gerant,
+                "utilisateur": utilisateur,
+            }
+        )
+    )
+
+    if not created:
+
+        situation.gerant = gerant
+
+        situation.utilisateur = utilisateur
+
+        situation.lignes.all().delete()
+
+    lignes = []
+
+    for produit in produits:
+
+        produit_id = produit.pk
+
+        montant_residuel_j_1 = residuels_anterieurs.get(
+            produit_id,
+            ZERO
+        )
+
+        montant_du_jour = commandes_jour.get(
+            produit_id,
+            ZERO
+        )
+
+        montant_distribue = distributions_jour.get(
+            produit_id,
+            ZERO
+        )
+
+        montant_vendu = ventes_jour.get(
+            produit_id,
+            ZERO
+        )
+
+        montant_retour = retours_jour.get(
+            produit_id,
+            ZERO
+        )
+
+        total_vendu = (
+            montant_distribue
+            +
+            montant_vendu
+        )
+
+        lignes.append(
+            LigneSituationGerant(
+                situation=situation,
+                produit=produit,
+                prix_unitaire=produit.prix,
+                montant_residuel_j_1=montant_residuel_j_1,
+                montant_du_jour=montant_du_jour,
+                total_du_jour=(
+                    montant_residuel_j_1
+                    +
+                    montant_du_jour
+                ),
+                montant_distribue=montant_distribue,
+                montant_vendu=montant_vendu,
+                montant_retour=montant_retour,
+                total_vendu=total_vendu,
+                total_restant=(
+                    montant_retour
+                    +
+                    (
+                        montant_residuel_j_1
+                        +
+                        montant_du_jour
+                        -
+                        total_vendu
+                    )
+                ),
+            )
+        )
+
+    LigneSituationGerant.objects.bulk_create(
+        lignes
+    )
+
+    situation.montant_residuel_j_1 = _somme_lignes_situation_gerant(
+        lignes,
+        "montant_residuel_j_1"
+    )
+
+    situation.montant_du_jour = _somme_lignes_situation_gerant(
+        lignes,
+        "montant_du_jour"
+    )
+
+    situation.total_du_jour = _somme_lignes_situation_gerant(
+        lignes,
+        "total_du_jour"
+    )
+
+    situation.montant_distribue = _somme_lignes_situation_gerant(
+        lignes,
+        "montant_distribue"
+    )
+
+    situation.montant_vendu = _somme_lignes_situation_gerant(
+        lignes,
+        "montant_vendu"
+    )
+
+    situation.montant_retour = _somme_lignes_situation_gerant(
+        lignes,
+        "montant_retour"
+    )
+
+    situation.total_vendu = _somme_lignes_situation_gerant(
+        lignes,
+        "total_vendu"
+    )
+
+    situation.total_restant = _somme_lignes_situation_gerant(
+        lignes,
+        "total_restant"
+    )
+
+    situation.save(
+        update_fields=[
+            "gerant",
+            "utilisateur",
+            "montant_residuel_j_1",
+            "montant_du_jour",
+            "total_du_jour",
+            "montant_distribue",
+            "montant_vendu",
+            "montant_retour",
+            "total_vendu",
+            "total_restant",
+            "date_modification",
+        ]
+    )
+
+    return situation
+
+
+def montants_initiaux_commande_gerant(utilisateur):
+    """
+    Retourne le total restant par produit de la derniere situation gerant.
+    """
+
+    if utilisateur.profil.role != "GERANT":
+
+        return {}
+
+    point_vente = utilisateur.profil.point_vente
+
+    if point_vente is None:
+
+        return {}
+
+    situation = (
+        SituationGerant.objects
+        .filter(
+            actif=True,
+            point_vente=point_vente,
+        )
+        .prefetch_related(
+            "lignes"
+        )
+        .order_by(
+            "-date_situation",
+            "-idsituationgerant",
+        )
+        .first()
+    )
+
+    if situation is None:
+
+        return {}
+
+    return {
+        ligne.produit_id: ligne.total_restant
+        for ligne in situation.lignes.all()
+    }
 
 
 # ==========================================================
@@ -981,8 +1636,17 @@ def calculer_manquant_situation(
 
     Le montant distribue doit etre justifie par :
 
-        credit verse + ventes versees.
+        credit verse + ventes versees + montant restant.
     """
+
+    montant_restant = Decimal("0.00")
+
+    for ligne in situation.lignes.all():
+
+        montant_restant += calculer_valeur_brute_quantite(
+            ligne.quantite_restante,
+            ligne.prix_unitaire,
+        )
 
     return calculer_manquant(
 
@@ -991,6 +1655,8 @@ def calculer_manquant_situation(
         situation.montant_credit_verse,
 
         situation.montant_vente_verse,
+
+        montant_restant,
 
     )
 
@@ -1125,6 +1791,8 @@ def cloturer_situation(
     # MISE A JOUR DES LIGNES
     # ======================================================
 
+    montant_total_restant = Decimal("0.00")
+
     for ligne in situation.lignes.select_related(
         "produit"
     ):
@@ -1219,6 +1887,8 @@ def cloturer_situation(
         # CALCUL DE LA QUANTITE VENDUE
         # --------------------------------------------------
 
+        montant_total_restant += montant_restant
+
         quantite_vendue = (
             ligne.quantite_distribuee
             -
@@ -1275,6 +1945,8 @@ def cloturer_situation(
         situation.montant_credit_verse,
 
         situation.montant_vente_verse,
+
+        montant_total_restant,
 
     )
 

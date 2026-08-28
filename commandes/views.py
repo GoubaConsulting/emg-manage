@@ -67,6 +67,10 @@ from calendar import monthrange
 from datetime import date
 
 from .services import valider_commande_directeur_service
+from situations.services import (
+    gerant_du_point_vente,
+    montants_initiaux_commande_gerant,
+)
 
 type_commande=Commande.TYPE_DIRECTEUR,
 
@@ -1000,7 +1004,42 @@ def ajouter_commande_gerant(request):
 
         return HttpResponseForbidden()
 
-    produits = produits_actifs()
+    produits = list(
+        produits_actifs()
+    )
+
+    montants_initiaux = montants_initiaux_commande_gerant(
+        request.user
+    )
+
+    gerant = gerant_du_point_vente(
+        request.user.profil.point_vente
+    )
+
+    fond_gerant = (
+        gerant.fond
+        if gerant is not None
+        else Decimal("0.00")
+    )
+
+    total_montants_initiaux = Decimal("0.00")
+
+    for produit in produits:
+
+        montant_initial = (
+            montants_initiaux.get(
+                produit.pk,
+                Decimal("0.00")
+            )
+        )
+
+        produit.montant_initial_commande = montant_initial
+
+        produit.montant_initial_commande_js = str(
+            montant_initial
+        )
+
+        total_montants_initiaux += montant_initial
 
     if request.method == "POST":
 
@@ -1076,7 +1115,19 @@ def ajouter_commande_gerant(request):
 
             "produits": produits,
 
-            "titre": "Nouvelle commande gérant"
+            "titre": "Nouvelle commande gérant",
+
+            "afficher_montant_initial": True,
+
+            "fond_gerant": fond_gerant,
+
+            "fond_gerant_js": str(fond_gerant),
+
+            "total_montants_initiaux": total_montants_initiaux,
+
+            "total_montants_initiaux_js": str(
+                total_montants_initiaux
+            ),
 
         }
 
