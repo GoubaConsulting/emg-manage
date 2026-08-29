@@ -120,7 +120,11 @@ Distributeurs
 
             <th>Point de vente</th>
 
+            {% if request.user.profil.role != "GERANT" %}
+
             <th>Actions</th>
+
+            {% endif %}
 
         </tr>
 
@@ -149,6 +153,8 @@ Distributeurs
             <td>{{ distributeur.get_categorie_display }}</td>
 
             <td>{{ distributeur.point_vente.designation }}</td>
+
+            {% if request.user.profil.role != "GERANT" %}
 
             <td>
 
@@ -190,13 +196,15 @@ Distributeurs
 
             </td>
 
+            {% endif %}
+
         </tr>
 
         {% empty %}
 
         <tr>
 
-            <td colspan="9" class="text-center">
+            <td colspan="{% if request.user.profil.role == 'GERANT' %}8{% else %}9{% endif %}" class="text-center">
 
                 {{ message_vide|default:"Aucun distributeur trouv&eacute;." }}
 

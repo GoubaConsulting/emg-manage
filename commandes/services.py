@@ -490,6 +490,147 @@ def recalculer_totaux_commande(
         ]
     )
 
+
+def synchroniser_distribution_commande_gerant(
+    commande
+):
+    """
+    Aligne la distribution ouverte liee a une commande gerant
+    apres correction de la commande.
+    """
+
+    distributions = list(
+        commande.distributions.filter(
+            type_distribution=Distribution.TYPE_COMMANDE_GERANT
+        )
+        .prefetch_related(
+            "lignes__produit"
+        )
+    )
+
+    if not distributions:
+
+        return
+
+    distributions_cloturees = [
+        distribution
+        for distribution in distributions
+        if distribution.etat == Distribution.ETAT_CLOTUREE
+    ]
+
+    if distributions_cloturees:
+
+        raise Exception(
+            "Cette commande ne peut plus etre modifiee "
+            "car une distribution liee est deja cloturee."
+        )
+
+    if len(distributions) > 1:
+
+        raise Exception(
+            "Cette commande possede plusieurs distributions liees. "
+            "La correction automatique est impossible."
+        )
+
+    distribution = distributions[0]
+
+    anciennes_lignes = list(
+        distribution.lignes.select_related(
+            "produit"
+        )
+    )
+
+    for ligne in anciennes_lignes:
+
+        try:
+
+            retirer_stock(
+                point_vente=distribution.point_vente_destination,
+                produit=ligne.produit,
+                quantite=ligne.quantite,
+            )
+
+            ajouter_stock(
+                point_vente=distribution.point_vente_source,
+                produit=ligne.produit,
+                quantite=ligne.quantite,
+            )
+
+        except Exception as exc:
+
+            raise Exception(
+                "Impossible de modifier cette commande : "
+                "le stock du gerant ne permet pas d'annuler "
+                f"la distribution du produit {ligne.produit.designation}."
+            ) from exc
+
+    distribution.lignes.all().delete()
+
+    lignes_commande = list(
+        commande.lignes.select_related(
+            "produit"
+        )
+    )
+
+    for ligne in lignes_commande:
+
+        LigneDistribution.objects.create(
+            distribution=distribution,
+            produit=ligne.produit,
+            prix_unitaire=ligne.prix_unitaire,
+            montant=ligne.montant,
+            quantite=ligne.quantite,
+            taux_remise=ligne.taux_remise,
+            montant_remise=ligne.montant_remise,
+            montant_net=ligne.montant_net,
+        )
+
+        ligne.quantite_distribuee = ligne.quantite
+
+        ligne.save(
+            update_fields=[
+                "quantite_distribuee",
+            ]
+        )
+
+    distribution.montant_brut = commande.montant_brut
+    distribution.montant_net = commande.montant_net
+
+    distribution.save(
+        update_fields=[
+            "montant_brut",
+            "montant_net",
+            "date_modification",
+        ]
+    )
+
+    for ligne in distribution.lignes.select_related(
+        "produit"
+    ):
+
+        try:
+
+            retirer_stock(
+                point_vente=distribution.point_vente_source,
+                produit=ligne.produit,
+                quantite=ligne.quantite,
+            )
+
+            ajouter_stock(
+                point_vente=distribution.point_vente_destination,
+                produit=ligne.produit,
+                quantite=ligne.quantite,
+            )
+
+        except Exception as exc:
+
+            raise Exception(
+                "Impossible de modifier cette commande : "
+                "le stock du Directeur ne suffit pas pour "
+                f"la nouvelle quantite du produit {ligne.produit.designation}."
+            ) from exc
+
+
 # ==========================================================
 # MODIFICATION
 # ==========================================================
@@ -498,10 +639,17 @@ def recalculer_totaux_commande(
 def modifier_commande(
     commande,
     date_commande,
-    lignes
+    lignes,
+    utilisateur_action=None
 ):
+    utilisateur_permission = (
+        utilisateur_action
+        or
+        commande.utilisateur
+    )
+
     if not peut_modifier(
-        commande.utilisateur,
+        utilisateur_permission,
         commande
     ):
         raise Exception(
@@ -536,6 +684,12 @@ def modifier_commande(
     recalculer_totaux_commande(
         commande
     )
+
+    if commande.type_commande == Commande.TYPE_GERANT:
+
+        synchroniser_distribution_commande_gerant(
+            commande
+        )
 
     if commande.type_commande == Commande.TYPE_DIRECTEUR:
 

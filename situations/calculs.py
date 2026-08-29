@@ -143,6 +143,45 @@ def calculer_montant_produits_restants(
 # CALCUL DU MANQUANT
 # ==========================================================
 
+def convertir_montant_brut_en_net(
+    montant_brut,
+    total_brut_reference,
+    total_net_reference
+):
+    """
+    Convertit un montant brut global en equivalent net
+    avec le coefficient net de la situation.
+    """
+
+    montant_brut = Decimal(
+        str(montant_brut or "0")
+    )
+
+    total_brut_reference = Decimal(
+        str(total_brut_reference or "0")
+    )
+
+    total_net_reference = Decimal(
+        str(total_net_reference or "0")
+    )
+
+    if montant_brut <= 0:
+
+        return Decimal("0.00")
+
+    if total_brut_reference <= 0:
+
+        return montant_brut
+
+    return (
+        montant_brut
+        *
+        total_net_reference
+        /
+        total_brut_reference
+    )
+
+
 def calculer_manquant(
     montant_total_distribue,
     montant_credit_verse,
@@ -152,7 +191,9 @@ def calculer_manquant(
     """
     Calcule le montant manquant.
 
-    Le montant distribue doit etre justifie par :
+    Les montants transmis doivent etre sur la meme base
+    de calcul. Pour les versements, on utilise maintenant
+    la base nette.
 
         credit verse + ventes versees + montant restant
 

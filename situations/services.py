@@ -49,6 +49,7 @@ from .calculs import (
     calculer_credit,
     calculer_montant_total_verse,
     calculer_manquant,
+    convertir_montant_brut_en_net,
     verifier_versement_credit,
 )
 
@@ -1634,29 +1635,49 @@ def calculer_manquant_situation(
     """
     Calcule le montant manquant d'une situation.
 
-    Le montant distribue doit etre justifie par :
+    Le montant distribue net doit etre justifie par :
 
-        credit verse + ventes versees + montant restant.
+        credit verse net + ventes versees net + montant restant net.
     """
 
-    montant_restant = Decimal("0.00")
+    montant_total_distribue_brut = Decimal("0.00")
+    montant_total_distribue_net = Decimal("0.00")
+    montant_restant_net = Decimal("0.00")
 
     for ligne in situation.lignes.all():
 
-        montant_restant += calculer_valeur_brute_quantite(
-            ligne.quantite_restante,
+        montant_total_distribue_brut += calculer_valeur_brute_quantite(
+            ligne.quantite_distribuee,
             ligne.prix_unitaire,
         )
 
+        montant_total_distribue_net += calculer_valeur_nette_quantite(
+            ligne.quantite_distribuee,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+        montant_restant_net += calculer_valeur_nette_quantite(
+            ligne.quantite_restante,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+    montant_credit_verse_net = convertir_montant_brut_en_net(
+        situation.montant_credit_verse,
+        montant_total_distribue_brut,
+        montant_total_distribue_net,
+    )
+
     return calculer_manquant(
 
-        situation.montant_total_distribue,
+        montant_total_distribue_net,
 
-        situation.montant_credit_verse,
+        montant_credit_verse_net,
 
         situation.montant_vente_verse,
 
-        montant_restant,
+        montant_restant_net,
 
     )
 
@@ -1791,7 +1812,9 @@ def cloturer_situation(
     # MISE A JOUR DES LIGNES
     # ======================================================
 
-    montant_total_restant = Decimal("0.00")
+    montant_total_restant_net = Decimal("0.00")
+    montant_total_distribue_brut = Decimal("0.00")
+    montant_total_distribue_net = Decimal("0.00")
 
     for ligne in situation.lignes.select_related(
         "produit"
@@ -1887,7 +1910,22 @@ def cloturer_situation(
         # CALCUL DE LA QUANTITE VENDUE
         # --------------------------------------------------
 
-        montant_total_restant += montant_restant
+        montant_total_restant_net += calculer_valeur_nette_quantite(
+            quantite_restante,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+        montant_total_distribue_brut += calculer_valeur_brute_quantite(
+            ligne.quantite_distribuee,
+            ligne.prix_unitaire,
+        )
+
+        montant_total_distribue_net += calculer_valeur_nette_quantite(
+            ligne.quantite_distribuee,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
 
         quantite_vendue = (
             ligne.quantite_distribuee
@@ -1938,15 +1976,21 @@ def cloturer_situation(
     # MANQUANT
     # ======================================================
 
+    montant_credit_verse_net = convertir_montant_brut_en_net(
+        situation.montant_credit_verse,
+        montant_total_distribue_brut,
+        montant_total_distribue_net,
+    )
+
     montant_manquant = calculer_manquant(
 
-        situation.montant_total_distribue,
+        montant_total_distribue_net,
 
-        situation.montant_credit_verse,
+        montant_credit_verse_net,
 
         situation.montant_vente_verse,
 
-        montant_total_restant,
+        montant_total_restant_net,
 
     )
 

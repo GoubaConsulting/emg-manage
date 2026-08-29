@@ -26,6 +26,16 @@
 
             {% csrf_token %}
 
+            {% if next_url %}
+
+                <input
+                    type="hidden"
+                    name="next"
+                    value="{{ next_url }}"
+                >
+
+            {% endif %}
+
             {% if form.non_field_errors %}
 
                 <div class="alert alert-danger">
@@ -119,6 +129,7 @@
             class="form-check-input produit-check"
             name="produit_{{ produit.idproduit }}"
             value="1"
+            {% if produit.commande_selectionnee %}checked{% endif %}
         >
 
     </td>
@@ -156,8 +167,8 @@
             min="0"
             class="form-control montant"
             name="montant_{{ produit.idproduit }}"
-            disabled
-            value="0"
+            {% if not produit.commande_selectionnee %}disabled{% endif %}
+            value="{{ produit.montant_commande|default:0 }}"
         >
 
     </td>
@@ -168,7 +179,7 @@
             type="text"
             class="form-control quantite"
             readonly
-            value="0"
+            value="{{ produit.quantite_commande|default:0 }}"
         >
 
     </td>
@@ -182,8 +193,8 @@
             max="100"
             class="form-control taux"
             name="taux_{{ produit.idproduit }}"
-            disabled
-            value="0"
+            {% if not produit.commande_selectionnee %}disabled{% endif %}
+            value="{{ produit.taux_commande|default:0 }}"
         >
 
     </td>
@@ -194,7 +205,7 @@
             type="text"
             class="form-control net"
             readonly
-            value="0"
+            value="{{ produit.net_commande|default:0 }}"
         >
 
     </td>
@@ -451,7 +462,7 @@
 
     <a
 
-        href="{% url url_retour|default:'liste_commandes' %}"
+        href="{% if url_retour_direct %}{{ url_retour_direct }}{% else %}{% url url_retour|default:'liste_commandes' %}{% endif %}"
 
         class="btn btn-secondary"
 
@@ -485,6 +496,6 @@
 
 {% block scripts %}
 
-<script src="{% static 'js/commandes.js' %}?v=20260828-credit"></script>
+<script src="{% static 'js/commandes.js' %}?v=20260829-actions"></script>
 
 {% endblock %}

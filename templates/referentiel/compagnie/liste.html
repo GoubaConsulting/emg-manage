@@ -82,7 +82,11 @@ Compagnies
 
             <th>Désignation</th>
 
+            {% if request.user.profil.role != "GERANT" %}
+
             <th width="180">Actions</th>
+
+            {% endif %}
 
         </tr>
 
@@ -106,6 +110,8 @@ Compagnies
 
             </td>
 
+            {% if request.user.profil.role != "GERANT" %}
+
             <td>
 
                 <a
@@ -124,13 +130,15 @@ Compagnies
 
             </td>
 
+            {% endif %}
+
         </tr>
 
         {% empty %}
 
         <tr>
 
-            <td colspan="3" class="text-center">
+            <td colspan="{% if request.user.profil.role == 'GERANT' %}2{% else %}3{% endif %}" class="text-center">
 
                 Aucune compagnie trouvée.
 

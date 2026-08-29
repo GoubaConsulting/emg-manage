@@ -57,10 +57,47 @@ def peut_creer(utilisateur):
 # MODIFICATION
 # ==========================================================
 
+def commande_gerant_modifiable_par_directeur(commande):
+    """
+    Une commande gerant peut etre corrigee par le Directeur
+    tant qu'elle n'est pas rattachee a une distribution cloturee.
+    """
+
+    if (
+        commande.type_commande != Commande.TYPE_GERANT
+        or
+        commande.categorie_commande != Commande.CATEGORIE_NORMALE
+    ):
+
+        return False
+
+    if commande.etat == Commande.VALIDEE_PARTIELLEMENT:
+
+        return False
+
+    if not commande.pk:
+
+        return True
+
+    return not commande.distributions.filter(
+        etat="CLOTUREE"
+    ).exists()
+
+
 def peut_modifier(utilisateur, commande):
 
     if not peut_consulter(utilisateur):
         return False
+
+    if (
+        est_directeur(utilisateur)
+        and
+        commande.type_commande == Commande.TYPE_GERANT
+    ):
+
+        return commande_gerant_modifiable_par_directeur(
+            commande
+        )
 
     if commande.point_vente != point_vente_utilisateur(utilisateur):
         return False

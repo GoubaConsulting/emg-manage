@@ -84,7 +84,11 @@ Produits
 
             <th>Prix</th>
 
+            {% if request.user.profil.role != "GERANT" %}
+
             <th width="180">Actions</th>
+
+            {% endif %}
 
         </tr>
 
@@ -96,7 +100,7 @@ Produits
 
         <tr class="table-secondary">
 
-            <td colspan="4">
+            <td colspan="{% if request.user.profil.role == 'GERANT' %}3{% else %}4{% endif %}">
 
                 <strong>
                     {{ groupe.compagnie.designation|upper }}
@@ -128,6 +132,8 @@ Produits
                 {{ produit.prix }}
             </td>
 
+            {% if request.user.profil.role != "GERANT" %}
+
             <td>
 
                 <a
@@ -146,6 +152,8 @@ Produits
 
             </td>
 
+            {% endif %}
+
         </tr>
 
         {% endfor %}
@@ -154,7 +162,7 @@ Produits
 
         <tr>
 
-            <td colspan="4" class="text-center">
+            <td colspan="{% if request.user.profil.role == 'GERANT' %}3{% else %}4{% endif %}" class="text-center">
 
                 Aucun produit trouvé.
 

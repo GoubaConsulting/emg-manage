@@ -17,6 +17,7 @@ from django.shortcuts import (
     render,
     redirect
 )
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from referentiel.models import (
     Produit,
@@ -35,6 +36,7 @@ from .selectors import (
     rechercher_commandes,
     paginer,
     commande_par_id,
+    commande_pour_modification_par_id,
     commande_gerant_en_attente_par_id,
     commandes_en_attente,
 )
@@ -165,6 +167,34 @@ def filtre_texte(request, nom):
     return valeur
 
 
+def url_retour_securisee(request):
+    """
+    Retourne une URL de retour locale valide.
+    """
+
+    retour = (
+        request.POST.get("next")
+        or
+        request.GET.get("next")
+    )
+
+    if not retour:
+
+        return ""
+
+    if url_has_allowed_host_and_scheme(
+        url=retour,
+        allowed_hosts={
+            request.get_host()
+        },
+        require_https=request.is_secure(),
+    ):
+
+        return retour
+
+    return ""
+
+
 # ==========================================================
 # PRODUITS ACTIFS
 # ==========================================================
@@ -193,6 +223,57 @@ def produits_actifs():
         )
 
     )
+
+
+def annoter_produits_commande(
+    produits,
+    commande
+):
+    """
+    Ajoute les valeurs de lignes existantes
+    aux produits pour le formulaire de modification.
+    """
+
+    lignes = {
+        ligne.produit_id: ligne
+        for ligne in commande.lignes.all()
+    }
+
+    for produit in produits:
+
+        ligne = lignes.get(
+            produit.pk
+        )
+
+        produit.commande_selectionnee = (
+            ligne is not None
+        )
+
+        produit.montant_commande = (
+            ligne.montant
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.quantite_commande = (
+            ligne.quantite
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.taux_commande = (
+            ligne.taux_remise
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.net_commande = (
+            ligne.montant_net
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+    return produits
 
 
 # ==========================================================
@@ -1144,12 +1225,16 @@ def modifier_commande_view(
     pk
 ):
 
-    commande = commande_par_id(
+    commande = commande_pour_modification_par_id(
 
         request.user,
 
         pk
 
+    )
+
+    next_url = url_retour_securisee(
+        request
     )
 
     if not peut_modifier(
@@ -1165,14 +1250,25 @@ def modifier_commande_view(
             request,
 
             "Impossible de modifier cette commande. "
-            "Les commandes Directeur ne sont modifiables "
-            "que pendant les 3 jours suivant leur création."
+            "Elle n'est pas modifiable selon son état "
+            "ou sa période."
 
         )
 
+        if next_url:
+
+            return redirect(
+                next_url
+            )
+
         return redirect("liste_commandes")
 
-    produits = produits_actifs()
+    produits = annoter_produits_commande(
+        list(
+            produits_actifs()
+        ),
+        commande
+    )
 
     if request.method == "POST":
 
@@ -1202,7 +1298,9 @@ def modifier_commande_view(
                         "date_commande"
                     ],
 
-                    lignes=lignes
+                    lignes=lignes,
+
+                    utilisateur_action=request.user
 
                 )
 
@@ -1213,6 +1311,12 @@ def modifier_commande_view(
                     "Commande modifiée avec succès."
 
                 )
+
+                if next_url:
+
+                    return redirect(
+                        next_url
+                    )
 
                 return redirect(
 
@@ -1259,6 +1363,10 @@ def modifier_commande_view(
             "titre": "Modification d'une commande",
 
             "url_retour": "liste_commandes",
+
+            "url_retour_direct": next_url,
+
+            "next_url": next_url,
 
         }
 

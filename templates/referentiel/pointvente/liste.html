@@ -106,7 +106,11 @@
 
             <th>Adresse</th>
 
+            {% if request.user.profil.role != "GERANT" %}
+
             <th width="180">Actions</th>
+
+            {% endif %}
 
         </tr>
 
@@ -135,6 +139,8 @@
                 {{ pv.adresse }}
 
             </td>
+
+            {% if request.user.profil.role != "GERANT" %}
 
             <td>
 
@@ -176,13 +182,15 @@
 
             </td>
 
+            {% endif %}
+
         </tr>
 
         {% empty %}
 
         <tr>
 
-            <td colspan="4" class="text-center">
+            <td colspan="{% if request.user.profil.role == 'GERANT' %}3{% else %}4{% endif %}" class="text-center">
 
                 {{ message_vide|default:"Aucun point de vente trouv&eacute;." }}
 

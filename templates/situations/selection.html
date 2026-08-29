@@ -310,7 +310,15 @@
                                 </th>
 
                                 <th width="180">
-                                    Montant versé
+                                    Montant à versé
+                                </th>
+
+                                <th width="180">
+                                    Remise
+                                </th>
+
+                                <th width="180">
+                                    Montant net à versé
                                 </th>
 
                             </tr>
@@ -327,7 +335,7 @@
 
                             <tr class="table-secondary">
 
-                                <td colspan="6">
+                                <td colspan="8">
 
                                     <strong>
 
@@ -428,6 +436,28 @@
 
                                 </td>
 
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control fw-bold remise-verse"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control fw-bold montant-net-verse"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
                             </tr>
 
                             {% endfor %}
@@ -447,6 +477,30 @@
                                     <input
                                         type="text"
                                         class="form-control fw-bold subtotal-verse-compagnie"
+                                        data-compagnie="{{ groupe.compagnie.idcompagnie }}"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control fw-bold subtotal-remise-compagnie"
+                                        data-compagnie="{{ groupe.compagnie.idcompagnie }}"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control fw-bold subtotal-net-verse-compagnie"
                                         data-compagnie="{{ groupe.compagnie.idcompagnie }}"
                                         readonly
                                         value="0 FCFA"
@@ -523,6 +577,44 @@
 
                     </div>
 
+                    <div class="col-md-4">
+
+                        <div class="border border-info-subtle border-2 rounded-3 p-3 h-100 shadow-sm bg-info-subtle">
+
+                            <small class="text-info-emphasis fw-semibold text-uppercase">
+                                Total remise
+                            </small>
+
+                            <h5
+                                class="mb-0 fs-3 fw-bold text-info-emphasis"
+                                id="total-remise-verse"
+                            >
+                                0 FCFA
+                            </h5>
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="border border-secondary-subtle border-2 rounded-3 p-3 h-100 shadow-sm bg-secondary-subtle">
+
+                            <small class="text-secondary-emphasis fw-semibold text-uppercase">
+                                Total net à versé
+                            </small>
+
+                            <h5
+                                class="mb-0 fs-3 fw-bold text-secondary-emphasis"
+                                id="total-net-verse"
+                            >
+                                0 FCFA
+                            </h5>
+
+                        </div>
+
+                    </div>
+
                 </div>
 
 
@@ -536,7 +628,7 @@
 
                         <label class="form-label">
 
-                            Crédit versé
+                            Crédit à versé
 
                         </label>
 
@@ -557,7 +649,7 @@
 
                         <label class="form-label">
 
-                            Ventes versées
+                            Montant versé
 
                         </label>
 
@@ -732,7 +824,7 @@
 {% load static %}
 
 <script
-    src="{% static 'js/situations.js' %}?v=manquant-restant-20260828"
+    src="{% static 'js/situations.js' %}?v=remise-net-verse-20260829"
 ></script>
 
 {% endblock %}

@@ -23,6 +23,9 @@ from commandes.models import (
     Commande,
     LigneCommande,
 )
+from commandes.permissions import (
+    commande_gerant_modifiable_par_directeur,
+)
 from commandes.presentation import preparer_affichage_commande
 from comptes.utils import (
     est_directeur,
@@ -1808,6 +1811,11 @@ def _apercu_commandes_gerant(gerant, date_debut, date_fin):
 
         commande.groupes_compagnies = preparer_affichage_commande(
             commande
+        )
+        commande.modification_directeur_autorisee = (
+            commande_gerant_modifiable_par_directeur(
+                commande
+            )
         )
 
     return {

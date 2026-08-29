@@ -198,7 +198,11 @@ Suivi des manquants
                         <th class="text-end">Montant</th>
                         <th class="text-end">Reste à payer</th>
                         <th>Statut</th>
+                        {% if request.user.profil.role != "GERANT" %}
+
                         <th class="text-center">Actions</th>
+
+                        {% endif %}
                     </tr>
                 </thead>
 
@@ -226,6 +230,8 @@ Suivi des manquants
                         <td class="text-end">{{ manquant.montant|floatformat:2 }}</td>
                         <td class="text-end">{{ manquant.reste_a_payer|floatformat:2 }}</td>
                         <td>{{ manquant.get_statut_display }}</td>
+                        {% if request.user.profil.role != "GERANT" %}
+
                         <td class="text-center">
                             {% if manquant.statut == "EN_COURS" %}
                                 <a
@@ -240,10 +246,12 @@ Suivi des manquants
                                 </span>
                             {% endif %}
                         </td>
+
+                        {% endif %}
                     </tr>
 
                     <tr class="collapse" id="manquant{{ manquant.idmanquant }}">
-                        <td colspan="8">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}7{% else %}8{% endif %}">
 
                             <div class="p-3 bg-light">
 
@@ -305,7 +313,7 @@ Suivi des manquants
                     {% empty %}
 
                     <tr>
-                        <td colspan="8" class="text-center">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}7{% else %}8{% endif %}" class="text-center">
                             Aucun manquant trouvé.
                         </td>
                     </tr>

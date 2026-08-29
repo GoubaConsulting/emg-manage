@@ -307,9 +307,13 @@ Gestion des objectifs
 
                         {% endif %}
 
+                        {% if request.user.profil.role != "GERANT" %}
+
                         <th class="text-center">
                             Actions
                         </th>
+
+                        {% endif %}
 
                     </tr>
 
@@ -367,6 +371,8 @@ Gestion des objectifs
 
                         {% endif %}
 
+                        {% if request.user.profil.role != "GERANT" %}
+
                         <td class="text-center">
 
                             <a
@@ -395,6 +401,8 @@ Gestion des objectifs
 
                         </td>
 
+                        {% endif %}
+
                     </tr>
 
                     {% empty %}
@@ -403,7 +411,7 @@ Gestion des objectifs
 
                         {% if request.user.profil.role == "GERANT" %}
 
-                            <td colspan="7" class="text-center">
+                            <td colspan="6" class="text-center">
 
                         {% else %}
 

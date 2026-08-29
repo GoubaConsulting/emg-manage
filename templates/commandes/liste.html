@@ -277,11 +277,15 @@ Liste des commandes
 
                         </th>
 
+                        {% if request.user.profil.role != "GERANT" %}
+
                         <th width="120">
 
                             Actions
 
                         </th>
+
+                        {% endif %}
 
                     </tr>
 
@@ -347,6 +351,8 @@ Liste des commandes
 
                         </td>
 
+                        {% if request.user.profil.role != "GERANT" %}
+
                         <td>
 
                             <a
@@ -363,13 +369,15 @@ Liste des commandes
 
                         </td>
 
+                        {% endif %}
+
                     </tr>
 
                     <tr class="collapse" id="cmd{{ commande.idcommande }}">
 
                         <td></td>
 
-                        <td colspan="6">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}5{% else %}6{% endif %}">
 
                             <div class="p-3 bg-light rounded">
 
@@ -642,7 +650,7 @@ Liste des commandes
 
                     <tr>
 
-                        <td colspan="7" class="text-center">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}6{% else %}7{% endif %}" class="text-center">
 
                             Aucune commande trouvée.
 

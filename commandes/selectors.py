@@ -11,6 +11,7 @@ Fonctions de consultation des commandes.
 """
 
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from datetime import date
 
@@ -309,6 +310,52 @@ def commande_par_id(
 
         pk=pk
 
+    )
+
+
+def commande_pour_modification_par_id(
+    utilisateur,
+    pk
+):
+    """
+    Retourne une commande accessible depuis
+    un parcours de modification.
+    """
+
+    queryset = commandes_queryset()
+
+    if est_directeur(utilisateur):
+
+        queryset = queryset.filter(
+            Q(
+                point_vente=point_vente_utilisateur(
+                    utilisateur
+                )
+            )
+            |
+            Q(
+                type_commande=Commande.TYPE_GERANT,
+                categorie_commande=(
+                    Commande.CATEGORIE_NORMALE
+                ),
+            )
+        )
+
+    elif est_gerant(utilisateur):
+
+        queryset = queryset.filter(
+            point_vente=point_vente_utilisateur(
+                utilisateur
+            )
+        )
+
+    else:
+
+        queryset = queryset.none()
+
+    return get_object_or_404(
+        queryset,
+        pk=pk
     )
 
 

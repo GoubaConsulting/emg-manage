@@ -42,9 +42,13 @@
 
                         {% endif %}
 
+                        {% if request.user.profil.role != "GERANT" %}
+
                         <th style="width:150px;" class="text-center">
                             Actions
                         </th>
+
+                        {% endif %}
 
                     </tr>
 
@@ -126,6 +130,8 @@
 
                             {% endif %}
 
+                            {% if request.user.profil.role != "GERANT" %}
+
                             <td class="text-center">
 
                                 <a
@@ -154,13 +160,15 @@
 
                             </td>
 
+                            {% endif %}
+
                         </tr>
 
                     {% empty %}
 
                         <tr>
 
-                            <td colspan="8" class="text-center text-muted">
+                            <td colspan="{% if request.user.profil.role == 'GERANT' %}6{% else %}8{% endif %}" class="text-center text-muted">
 
                                 Aucun objectif trouvé.
 

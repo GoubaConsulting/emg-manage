@@ -16,15 +16,29 @@ document.addEventListener("DOMContentLoaded", function () {
         const check = ligne.querySelector(".produit-check");
         const montant = ligne.querySelector(".montant");
         const taux = ligne.querySelector(".taux");
+        const quantite = ligne.querySelector(".quantite");
+        const net = ligne.querySelector(".net");
+        const ligneSelectionnee = check.checked;
 
         // Etat initial
-        montant.disabled = true;
-        taux.disabled = true;
-        montant.value = "";
-        taux.value = "0";
+        montant.disabled = !ligneSelectionnee;
+        taux.disabled = !ligneSelectionnee;
 
-        ligne.querySelector(".quantite").value = "0";
-        ligne.querySelector(".net").value = "0";
+        if (ligneSelectionnee) {
+
+            ligne.classList.add("table-success");
+            calculerLigne(ligne);
+
+        }
+
+        else {
+
+            montant.value = "";
+            taux.value = "0";
+            quantite.value = "0";
+            net.value = "0";
+
+        }
 
         // Sélection / désélection
         check.addEventListener("change", function () {

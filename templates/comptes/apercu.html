@@ -183,6 +183,7 @@
                                 <th>Etat</th>
                                 <th class="text-end">Montant brut</th>
                                 <th class="text-end">Montant net</th>
+                                <th class="text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -202,9 +203,23 @@
                                 </td>
                                 <td class="text-end">{{ commande.montant_brut|floatformat:2 }} FCFA</td>
                                 <td class="text-end">{{ commande.montant_net|floatformat:2 }} FCFA</td>
+                                <td class="text-center">
+                                    {% if commande.modification_directeur_autorisee %}
+                                        <a
+                                            href="{% url 'modifier_commande' commande.idcommande %}?next={{ request.get_full_path|urlencode }}"
+                                            class="btn btn-sm btn-outline-warning"
+                                        >
+                                            Modifier
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            -
+                                        </span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr class="collapse" id="apercuCmd{{ commande.idcommande }}">
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="p-3 bg-light rounded">
                                         <div class="row mb-3">
                                             <div class="col-md-4">
@@ -277,7 +292,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="6" class="text-center">Aucune commande trouvée.</td>
+                                <td colspan="7" class="text-center">Aucune commande trouvée.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
