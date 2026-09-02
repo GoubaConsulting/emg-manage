@@ -89,9 +89,9 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
-# Sessions : expiration apres 5 minutes d'inactivite.
+# Sessions : expiration apres 15 minutes d'inactivite.
 SESSION_COOKIE_NAME = "emg_manage_sessionid"
-SESSION_COOKIE_AGE = 5 * 60
+SESSION_COOKIE_AGE = 15 * 60
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_HTTPONLY = True
