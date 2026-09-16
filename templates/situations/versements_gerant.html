@@ -1,0 +1,366 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Versements au Directeur
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <div>
+        <h3 class="mb-1">
+            Versements au Directeur
+        </h3>
+        {% if gerant %}
+            <div class="text-muted">
+                {{ gerant.nom }} {{ gerant.prenom }}
+            </div>
+        {% endif %}
+    </div>
+
+    <a
+        href="{% url 'situations:versement_gerant' %}?nouveau=1"
+        class="btn btn-primary"
+    >
+        Nouveau versement
+    </a>
+
+</div>
+
+<div class="card shadow mb-4">
+
+    <div class="card-header">
+        Recherche
+    </div>
+
+    <div class="card-body">
+
+        <form method="get">
+
+            <div class="row g-3">
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Du
+                    </label>
+                    <input
+                        type="date"
+                        name="date_debut"
+                        value="{{ date_debut }}"
+                        class="form-control"
+                    >
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Au
+                    </label>
+                    <input
+                        type="date"
+                        name="date_fin"
+                        value="{{ date_fin }}"
+                        class="form-control"
+                    >
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Etat
+                    </label>
+                    <select
+                        name="etat"
+                        class="form-select"
+                    >
+                        <option value="">
+                            Tous
+                        </option>
+
+                        {% for valeur, libelle in etats_versement %}
+                            {% if valeur != "OUVERTE" %}
+                                <option
+                                    value="{{ valeur }}"
+                                    {% if etat == valeur %}selected{% endif %}
+                                >
+                                    {{ libelle }}
+                                </option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3 align-self-end">
+                    <button
+                        type="submit"
+                        class="btn btn-success w-100"
+                    >
+                        Rechercher
+                    </button>
+                </div>
+
+            </div>
+
+            <div class="mt-3">
+                <a
+                    href="{% url 'situations:versement_gerant' %}"
+                    class="btn btn-secondary"
+                >
+                    Reinitialiser
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<div class="row mb-4">
+
+    <div class="col-md-4">
+        <div class="card border-primary shadow-sm">
+            <div class="card-header bg-primary text-white">
+                Montant distribue
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_distribue|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-success shadow-sm">
+            <div class="card-header bg-success text-white">
+                Montant verse
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_verse|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white">
+                Manquants
+            </div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">
+                    {{ total_manquant|floatformat:2 }} FCFA
+                </h4>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="card shadow">
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover align-middle">
+
+                <thead class="table-dark">
+                    <tr>
+                        <th width="50"></th>
+                        <th>Numero</th>
+                        <th>Date</th>
+                        <th>Statut</th>
+                        <th class="text-end">Distribue</th>
+                        <th class="text-end">Credit verse</th>
+                        <th class="text-end">Ventes versees</th>
+                        <th class="text-end">Total verse</th>
+                        <th class="text-end">Manquant</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for versement in versements %}
+
+                        <tr>
+                            <td class="text-center">
+                                <button
+                                    class="btn btn-sm btn-outline-secondary"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#versement{{ versement.idsituation }}"
+                                >
+                                    v
+                                </button>
+                            </td>
+                            <td>{{ versement.numero }}</td>
+                            <td>{{ versement.date_situation|date:"d/m/Y" }}</td>
+                            <td>
+                                {% if versement.etat == versement.ETAT_CLOTUREE %}
+                                    <span class="badge text-bg-success">
+                                        Valide
+                                    </span>
+                                {% elif versement.etat == versement.ETAT_REFUSEE %}
+                                    <span class="badge text-bg-danger">
+                                        Rejete
+                                    </span>
+                                {% elif versement.etat == versement.ETAT_ATTENTE_VALIDATION %}
+                                    <span class="badge text-bg-warning">
+                                        En attente
+                                    </span>
+                                {% else %}
+                                    <span class="badge text-bg-secondary">
+                                        {{ versement.get_etat_display }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {{ versement.montant_total_distribue|floatformat:2 }}
+                            </td>
+                            <td class="text-end">
+                                {{ versement.montant_credit_verse|floatformat:2 }}
+                            </td>
+                            <td class="text-end">
+                                {{ versement.montant_vente_verse|floatformat:2 }}
+                            </td>
+                            <td class="text-end">
+                                {{ versement.montant_total_verse|floatformat:2 }}
+                            </td>
+                            <td class="text-end">
+                                {{ versement.montant_manquant|floatformat:2 }}
+                            </td>
+                        </tr>
+
+                        <tr
+                            class="collapse"
+                            id="versement{{ versement.idsituation }}"
+                        >
+                            <td colspan="9">
+                                <div class="p-3 bg-light">
+
+                                    <div class="row mb-3">
+                                        <div class="col-md-3">
+                                            <strong>Point de vente :</strong>
+                                            {{ versement.point_vente.designation }}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Fond :</strong>
+                                            {{ versement.fond|floatformat:2 }} FCFA
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Credit :</strong>
+                                            {{ versement.montant_credit|floatformat:2 }} FCFA
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Reste net :</strong>
+                                            {{ versement.total_restant_produits|floatformat:2 }} FCFA
+                                        </div>
+                                    </div>
+
+                                    {% for groupe in versement.groupes_compagnies %}
+
+                                        <h6 class="mt-3">
+                                            {{ groupe.compagnie.designation }}
+                                        </h6>
+
+                                        <table class="table table-sm table-bordered">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th>Produit</th>
+                                                    <th class="text-end">Prix</th>
+                                                    <th class="text-end">Distribuee</th>
+                                                    <th class="text-end">Vendue</th>
+                                                    <th class="text-end">Restante</th>
+                                                    <th class="text-end">Montant vendu</th>
+                                                    <th class="text-end">Valeur restante</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for ligne in groupe.lignes %}
+                                                    <tr>
+                                                        <td>{{ ligne.produit.designation }}</td>
+                                                        <td class="text-end">{{ ligne.prix_unitaire|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.quantite_distribuee|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.quantite_vendue|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.quantite_restante|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant_vendu|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant_restant|floatformat:2 }}</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+
+                                    {% endfor %}
+
+                                    {% if versement.coupures %}
+                                        <div class="mt-3">
+                                            <strong>Coupures :</strong>
+                                            <pre class="mb-0">{{ versement.coupures }}</pre>
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+                            </td>
+                        </tr>
+
+                    {% empty %}
+
+                        <tr>
+                            <td colspan="9" class="text-center">
+                                Aucun versement trouve.
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% if versements.has_other_pages %}
+
+            <nav>
+                <ul class="pagination justify-content-center">
+
+                    {% if versements.has_previous %}
+                        <li class="page-item">
+                            <a
+                                class="page-link"
+                                href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ versements.previous_page_number }}"
+                            >
+                                Precedent
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            {{ versements.number }}
+                        </span>
+                    </li>
+
+                    {% if versements.has_next %}
+                        <li class="page-item">
+                            <a
+                                class="page-link"
+                                href="?{% if pagination_querystring %}{{ pagination_querystring }}&{% endif %}page={{ versements.next_page_number }}"
+                            >
+                                Suivant
+                            </a>
+                        </li>
+                    {% endif %}
+
+                </ul>
+            </nav>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

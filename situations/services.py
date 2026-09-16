@@ -60,6 +60,11 @@ from .numerotation import (
     generer_numero_reglement,
 )
 
+from .permissions import (
+    peut_modifier_reglement_manquant,
+    peut_modifier_situation,
+)
+
 
 # ==========================================================
 # SERVICES : SITUATION GERANT
@@ -659,7 +664,8 @@ def calculer_situation_gerant(
 
 def montants_initiaux_commande_gerant(utilisateur):
     """
-    Retourne le total restant par produit de la derniere situation gerant.
+    Retourne le montant restant brut par produit du dernier
+    versement gerant valide par le Directeur.
     """
 
     if utilisateur.profil.role != "GERANT":
@@ -672,18 +678,27 @@ def montants_initiaux_commande_gerant(utilisateur):
 
         return {}
 
+    gerant = gerant_du_point_vente(
+        point_vente
+    )
+
+    if gerant is None:
+
+        return {}
+
     situation = (
-        SituationGerant.objects
+        SituationJournaliere.objects
         .filter(
             actif=True,
-            point_vente=point_vente,
+            distributeur=gerant,
+            etat=SituationJournaliere.ETAT_CLOTUREE,
         )
         .prefetch_related(
             "lignes"
         )
         .order_by(
             "-date_situation",
-            "-idsituationgerant",
+            "-idsituation",
         )
         .first()
     )
@@ -693,8 +708,12 @@ def montants_initiaux_commande_gerant(utilisateur):
         return {}
 
     return {
-        ligne.produit_id: ligne.total_restant
+        ligne.produit_id: calculer_valeur_brute_quantite(
+            ligne.quantite_restante,
+            ligne.prix_unitaire,
+        )
         for ligne in situation.lignes.all()
+        if ligne.quantite_restante > 0
     }
 
 
@@ -755,8 +774,13 @@ def recuperer_distributions_journee(
             actif=True,
         )
 
+        .select_related(
+            "commande",
+        )
+
         .prefetch_related(
-            "lignes__produit",
+            "lignes__produit__compagnie",
+            "commande__lignes__produit__compagnie",
         )
 
         .order_by(
@@ -877,7 +901,8 @@ def calculer_valeur_brute_quantite(
 
 def calculer_valeur_reliquat_precedent(
     distributeur,
-    date_situation
+    date_situation,
+    produits_exclus=None
 ):
     """
     Calcule la valeur brute des quantites restantes
@@ -895,9 +920,19 @@ def calculer_valeur_reliquat_precedent(
 
     total = Decimal("0.00")
 
+    produits_exclus = set(
+        produits_exclus
+        or
+        []
+    )
+
     for ligne in situation.lignes.all():
 
         if ligne.quantite_restante <= 0:
+
+            continue
+
+        if ligne.produit_id in produits_exclus:
 
             continue
 
@@ -940,19 +975,76 @@ def calculer_total_distribue(
             type_distribution__in=types_distribution
         )
 
-    total = (
-        distributions
+    total = Decimal("0.00")
 
-        .aggregate(
-            total=Sum("montant_brut")
-        )["total"]
+    produits_initiaux_jour = set()
 
-        or Decimal("0.00")
-    )
+    for distribution in distributions.select_related(
+        "commande"
+    ).prefetch_related(
+        "lignes",
+        "commande__lignes",
+    ):
+
+        if (
+            distribution.type_distribution == Distribution.TYPE_COMMANDE_GERANT
+            and
+            distribution.commande_id
+        ):
+
+            total += (
+                distribution.montant_brut
+                or Decimal("0.00")
+            )
+
+            total += (
+                distribution.commande.montant_initial
+                or Decimal("0.00")
+            )
+
+            for ligne_commande in distribution.commande.lignes.all():
+
+                if ligne_commande.montant_initial > 0:
+
+                    produits_initiaux_jour.add(
+                        ligne_commande.produit_id
+                    )
+
+            continue
+
+        if (
+            distribution.type_distribution
+            ==
+            Distribution.TYPE_DISTRIBUTEUR
+        ):
+
+            total += (
+                distribution.montant_total_brut
+                or
+                distribution.montant_brut
+                or
+                Decimal("0.00")
+            )
+
+            for ligne in distribution.lignes.all():
+
+                if ligne.montant_initial > 0:
+
+                    produits_initiaux_jour.add(
+                        ligne.produit_id
+                    )
+
+            continue
+
+        total += (
+            distribution.montant_brut
+            or Decimal("0.00")
+        )
 
     total += calculer_valeur_reliquat_precedent(
         distributeur,
-        date_situation
+        date_situation,
+        produits_exclus=produits_initiaux_jour,
     )
 
     return total
@@ -1010,7 +1102,45 @@ def construire_donnees_lignes_situation(
             date_situation
         )
 
+    distributions = list(
+        distributions
+    )
+
     produits = {}
+
+    produits_initiaux_operations = set()
+
+    for distribution in distributions:
+
+        if (
+            distribution.type_distribution
+            ==
+            Distribution.TYPE_COMMANDE_GERANT
+            and
+            distribution.commande_id
+        ):
+
+            for ligne_commande in distribution.commande.lignes.all():
+
+                if ligne_commande.montant_initial > 0:
+
+                    produits_initiaux_operations.add(
+                        ligne_commande.produit_id
+                    )
+
+        if (
+            distribution.type_distribution
+            ==
+            Distribution.TYPE_DISTRIBUTEUR
+        ):
+
+            for ligne_distribution in distribution.lignes.all():
+
+                if ligne_distribution.montant_initial > 0:
+
+                    produits_initiaux_operations.add(
+                        ligne_distribution.produit_id
+                    )
 
     situation_precedente = derniere_situation_cloturee_avant(
         distributeur,
@@ -1025,6 +1155,10 @@ def construire_donnees_lignes_situation(
         ):
 
             if ligne.quantite_restante <= 0:
+
+                continue
+
+            if ligne.produit_id in produits_initiaux_operations:
 
                 continue
 
@@ -1055,6 +1189,77 @@ def construire_donnees_lignes_situation(
 
     for distribution in distributions:
 
+        if (
+            distribution.type_distribution == Distribution.TYPE_COMMANDE_GERANT
+            and
+            distribution.commande_id
+        ):
+
+            for ligne_commande in distribution.commande.lignes.select_related(
+                "produit",
+                "produit__compagnie",
+            ):
+
+                montant_initial = (
+                    ligne_commande.montant_initial
+                    or Decimal("0.00")
+                )
+
+                if montant_initial <= 0:
+
+                    continue
+
+                produit_id = ligne_commande.produit.idproduit
+                prix_unitaire = ligne_commande.prix_unitaire
+                taux_remise = ligne_commande.taux_remise
+
+                if produit_id not in produits:
+
+                    produits[produit_id] = {
+                        "produit": ligne_commande.produit,
+                        "prix_unitaire": prix_unitaire,
+                        "taux_remise": taux_remise,
+                        "taux_distribution": taux_remise,
+                        "quantite_initiale": Decimal("0.00"),
+                        "quantite_jour": Decimal("0.00"),
+                        "quantite_distribuee": Decimal("0.00"),
+                        "montant_distribue": Decimal("0.00"),
+                        "montant_net_distribue": Decimal("0.00"),
+                    }
+
+                quantite_initiale = Decimal("0.00")
+
+                if prix_unitaire > 0:
+
+                    quantite_initiale = (
+                        montant_initial
+                        /
+                        prix_unitaire
+                    )
+
+                produits[produit_id]["quantite_initiale"] += (
+                    quantite_initiale
+                )
+
+                produits[produit_id]["quantite_distribuee"] += (
+                    quantite_initiale
+                )
+
+                produits[produit_id]["montant_distribue"] += (
+                    montant_initial
+                )
+
+                produits[produit_id]["montant_net_distribue"] += (
+                    ligne_commande.montant_net_initial
+                    or Decimal("0.00")
+                )
+
+                if produits[produit_id]["taux_distribution"] == Decimal("0.00"):
+
+                    produits[produit_id]["taux_distribution"] = (
+                        taux_remise
+                    )
+
         for ligne in distribution.lignes.select_related(
             "produit",
             "produit__compagnie",
@@ -1075,6 +1280,51 @@ def construire_donnees_lignes_situation(
                     "montant_distribue": Decimal("0.00"),
                     "montant_net_distribue": Decimal("0.00"),
                 }
+
+            if (
+                distribution.type_distribution
+                ==
+                Distribution.TYPE_DISTRIBUTEUR
+            ):
+
+                montant_initial = (
+                    ligne.montant_initial
+                    or Decimal("0.00")
+                )
+
+                if montant_initial > 0:
+
+                    quantite_initiale = Decimal("0.00")
+
+                    if ligne.prix_unitaire > 0:
+
+                        quantite_initiale = (
+                            montant_initial
+                            /
+                            ligne.prix_unitaire
+                        )
+
+                    produits[produit_id]["quantite_initiale"] += (
+                        quantite_initiale
+                    )
+
+                    produits[produit_id]["quantite_distribuee"] += (
+                        quantite_initiale
+                    )
+
+                    produits[produit_id]["montant_distribue"] += (
+                        montant_initial
+                    )
+
+                    produits[produit_id]["montant_net_distribue"] += (
+                        ligne.montant_net_initial
+                        or
+                        calculer_valeur_nette_quantite(
+                            quantite_initiale,
+                            ligne.prix_unitaire,
+                            ligne.taux_remise,
+                        )
+                    )
 
             produits[produit_id]["quantite_jour"] += ligne.quantite
 
@@ -1722,6 +1972,392 @@ def creer_manquant_situation(
 
 
 # ==========================================================
+# SOUMISSION D'UN VERSEMENT GERANT AU DIRECTEUR
+# ==========================================================
+
+@transaction.atomic
+def soumettre_versement_gerant(
+    situation,
+    donnees_lignes,
+    montant_credit_verse,
+    montant_vente_verse,
+    coupures,
+    utilisateur,
+):
+    """
+    Enregistre le versement saisi par un gerant pour les
+    distributions recues du Directeur, sans le rendre effectif.
+
+    Les distributions restent ouvertes et aucun manquant n'est
+    cree tant que le Directeur n'a pas valide le versement.
+    """
+
+    if utilisateur.profil.role != "GERANT":
+
+        raise ValueError(
+            "Seul un gerant peut soumettre ce versement."
+        )
+
+    gerant = gerant_du_point_vente(
+        utilisateur.profil.point_vente
+    )
+
+    if (
+        gerant is None
+        or
+        gerant.pk != situation.distributeur_id
+    ):
+
+        raise ValueError(
+            "Ce versement ne correspond pas au gerant connecte."
+        )
+
+    if situation.etat == SituationJournaliere.ETAT_CLOTUREE:
+
+        raise ValueError(
+            "Cette situation est deja cloturee."
+        )
+
+    distributions = recuperer_distributions_journee(
+        situation.distributeur,
+        situation.date_situation
+    )
+
+    if not distributions.exists():
+
+        raise ValueError(
+            "Aucune distribution ouverte n'est disponible "
+            "pour cette date."
+        )
+
+    montant_credit_verse = Decimal(
+        str(montant_credit_verse or "0")
+    )
+
+    montant_vente_verse = Decimal(
+        str(montant_vente_verse or "0")
+    )
+
+    if montant_credit_verse < 0:
+
+        raise ValueError(
+            "Le montant du credit verse ne peut pas etre negatif."
+        )
+
+    if montant_vente_verse < 0:
+
+        raise ValueError(
+            "Le montant verse ne peut pas etre negatif."
+        )
+
+    situation.montant_total_distribue = calculer_total_distribue(
+        situation.distributeur,
+        situation.date_situation
+    )
+
+    situation.montant_credit = calculer_credit(
+        situation.montant_total_distribue,
+        situation.fond
+    )
+
+    verifier_versement_credit(
+        situation.montant_credit,
+        montant_credit_verse
+    )
+
+    montant_total_restant_net = Decimal("0.00")
+    montant_total_distribue_brut = Decimal("0.00")
+    montant_total_distribue_net = Decimal("0.00")
+
+    for ligne in situation.lignes.select_related(
+        "produit"
+    ):
+
+        donnees = donnees_lignes.get(
+            str(ligne.idlignesituation)
+        )
+
+        if not donnees:
+
+            raise ValueError(
+                f"Les donnees du produit "
+                f"'{ligne.produit.designation}' "
+                f"sont absentes."
+            )
+
+        montant_restant = Decimal(
+            str(
+                donnees.get(
+                    "montant_restant",
+                    "0"
+                )
+            )
+        )
+
+        if montant_restant < 0:
+
+            raise ValueError(
+                f"Le montant restant du produit "
+                f"'{ligne.produit.designation}' "
+                f"ne peut pas etre negatif."
+            )
+
+        prix = Decimal(
+            str(ligne.prix_unitaire)
+        )
+
+        if prix <= 0:
+
+            raise ValueError(
+                f"Le prix du produit "
+                f"'{ligne.produit.designation}' "
+                f"est invalide."
+            )
+
+        if montant_restant % prix != 0:
+
+            raise ValueError(
+                f"Le montant restant du produit "
+                f"'{ligne.produit.designation}' "
+                f"doit etre un multiple de {prix} FCFA."
+            )
+
+        quantite_restante = (
+            montant_restant
+            /
+            prix
+        )
+
+        if quantite_restante > ligne.quantite_distribuee:
+
+            raise ValueError(
+                f"La quantite restante du produit "
+                f"'{ligne.produit.designation}' "
+                f"depasse la quantite distribuee."
+            )
+
+        montant_total_restant_net += calculer_valeur_nette_quantite(
+            quantite_restante,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+        montant_total_distribue_brut += calculer_valeur_brute_quantite(
+            ligne.quantite_distribuee,
+            ligne.prix_unitaire,
+        )
+
+        montant_total_distribue_net += calculer_valeur_nette_quantite(
+            ligne.quantite_distribuee,
+            ligne.prix_unitaire,
+            ligne.taux_remise,
+        )
+
+        ligne.quantite_vendue = (
+            ligne.quantite_distribuee
+            -
+            quantite_restante
+        )
+
+        ligne.quantite_restante = quantite_restante
+
+        ligne.save(
+            update_fields=[
+                "quantite_vendue",
+                "quantite_restante",
+            ]
+        )
+
+    situation.montant_credit_verse = montant_credit_verse
+    situation.montant_vente_verse = montant_vente_verse
+
+    mettre_a_jour_total_verse(
+        situation
+    )
+
+    montant_credit_verse_net = convertir_montant_brut_en_net(
+        situation.montant_credit_verse,
+        montant_total_distribue_brut,
+        montant_total_distribue_net,
+    )
+
+    situation.montant_manquant = calculer_manquant(
+        montant_total_distribue_net,
+        montant_credit_verse_net,
+        situation.montant_vente_verse,
+        montant_total_restant_net,
+    )
+
+    if coupures:
+
+        situation.coupures = (
+            f"10000 x {coupures.get('10000', 0)}\n"
+            f"5000 x {coupures.get('5000', 0)}\n"
+            f"2000 x {coupures.get('2000', 0)}\n"
+            f"1000 x {coupures.get('1000', 0)}\n"
+            f"500 x {coupures.get('500', 0)}"
+        )
+
+    else:
+
+        situation.coupures = ""
+
+    situation.utilisateur = utilisateur
+    situation.etat = SituationJournaliere.ETAT_ATTENTE_VALIDATION
+
+    situation.save()
+
+    return situation
+
+
+# ==========================================================
+# VALIDATION / REJET D'UN VERSEMENT GERANT
+# ==========================================================
+
+def _verifier_directeur_validation(utilisateur):
+    """
+    Verifie que l'utilisateur peut traiter un versement
+    soumis par un gerant.
+    """
+
+    if utilisateur.profil.role != "DIRECTEUR":
+
+        raise ValueError(
+            "Seul le Directeur peut traiter ce versement."
+        )
+
+
+def _verifier_situation_gerant_en_attente(situation):
+    """
+    Controle qu'une situation est bien un versement gerant
+    en attente de validation.
+    """
+
+    if situation.etat != SituationJournaliere.ETAT_ATTENTE_VALIDATION:
+
+        raise ValueError(
+            "Ce versement n'est pas en attente de validation."
+        )
+
+    if situation.distributeur.categorie != Distributeur.CATEGORIE_GERANT:
+
+        raise ValueError(
+            "Ce versement ne concerne pas un gerant."
+        )
+
+
+@transaction.atomic
+def valider_versement_gerant(
+    situation,
+    utilisateur,
+):
+    """
+    Rend effectif un versement soumis par un gerant.
+
+    Effets definitifs :
+        - creation du manquant si necessaire ;
+        - cloture des distributions concernees ;
+        - passage de la situation a l'etat cloturee.
+    """
+
+    _verifier_directeur_validation(
+        utilisateur
+    )
+
+    _verifier_situation_gerant_en_attente(
+        situation
+    )
+
+    distributions = recuperer_distributions_journee(
+        situation.distributeur,
+        situation.date_situation
+    )
+
+    if not distributions.exists():
+
+        raise ValueError(
+            "Aucune distribution ouverte n'est disponible "
+            "pour valider ce versement."
+        )
+
+    montant_total_actuel = calculer_total_distribue(
+        situation.distributeur,
+        situation.date_situation
+    )
+
+    if montant_total_actuel != situation.montant_total_distribue:
+
+        raise ValueError(
+            "Les distributions ouvertes de cette date ont change "
+            "depuis la soumission du versement. Le gerant doit "
+            "mettre a jour et resoumettre son versement."
+        )
+
+    if situation.montant_manquant > 0:
+
+        manquant = getattr(
+            situation,
+            "manquant",
+            None
+        )
+
+        if manquant is None:
+
+            creer_manquant_situation(
+                situation,
+                situation.montant_manquant,
+                utilisateur,
+            )
+
+    cloturer_distributions_situation(
+        situation
+    )
+
+    situation.etat = SituationJournaliere.ETAT_CLOTUREE
+
+    situation.save(
+        update_fields=[
+            "etat",
+            "date_modification",
+        ]
+    )
+
+    return situation
+
+
+@transaction.atomic
+def rejeter_versement_gerant(
+    situation,
+    utilisateur,
+):
+    """
+    Refuse un versement soumis par un gerant.
+
+    Les distributions restent ouvertes afin que le gerant
+    puisse corriger puis resoumettre le versement.
+    """
+
+    _verifier_directeur_validation(
+        utilisateur
+    )
+
+    _verifier_situation_gerant_en_attente(
+        situation
+    )
+
+    situation.etat = SituationJournaliere.ETAT_REFUSEE
+
+    situation.save(
+        update_fields=[
+            "etat",
+            "date_modification",
+        ]
+    )
+
+    return situation
+
+
+# ==========================================================
 # CLOTURE D'UNE SITUATION JOURNALIERE
 # ==========================================================
 
@@ -2052,6 +2688,89 @@ def cloturer_situation(
 
 
 # ==========================================================
+# MODIFICATION D'UNE SITUATION CLOTUREE
+# ==========================================================
+
+@transaction.atomic
+def modifier_situation_cloturee(
+    situation,
+    donnees_lignes,
+    montant_credit_verse,
+    montant_vente_verse,
+    coupures,
+    utilisateur,
+):
+    """
+    Rejoue la cloture d'une situation recente.
+    """
+
+    if not peut_modifier_situation(
+        utilisateur,
+        situation
+    ):
+
+        raise ValueError(
+            "Cette situation n'est pas modifiable."
+        )
+
+    manquant = getattr(
+        situation,
+        "manquant",
+        None
+    )
+
+    if (
+        manquant is not None
+        and
+        manquant.reglements.exists()
+    ):
+
+        raise ValueError(
+            "Cette situation ne peut pas etre modifiee "
+            "car son manquant possede deja des reglements."
+        )
+
+    if manquant is not None:
+
+        manquant.delete()
+
+    distributions = recuperer_distributions_journee(
+        situation.distributeur,
+        situation.date_situation,
+        inclure_cloturees=True,
+    )
+
+    if not distributions.exists():
+
+        raise ValueError(
+            "Aucune distribution active n'est rattachee "
+            "a cette situation."
+        )
+
+    distributions.update(
+        etat=Distribution.ETAT_OUVERTE
+    )
+
+    situation.etat = SituationJournaliere.ETAT_OUVERTE
+
+    situation.save(
+        update_fields=[
+            "etat",
+            "date_modification",
+        ]
+    )
+
+    return cloturer_situation(
+        situation=situation,
+        donnees_lignes=donnees_lignes,
+        montant_credit_verse=montant_credit_verse,
+        montant_vente_verse=montant_vente_verse,
+        coupures=coupures,
+        utilisateur=utilisateur,
+    )
+
+
+# ==========================================================
 # REGLEMENT D'UN MANQUANT
 # ==========================================================
 
@@ -2127,6 +2846,117 @@ def regler_manquant(
             "statut",
             "date_modification",
         ]
+    )
+
+    return reglement
+
+
+def recalculer_reste_manquant(
+    manquant
+):
+    """
+    Recalcule le reste a payer depuis les reglements.
+    """
+
+    total_regle = (
+        manquant.reglements.aggregate(
+            total=Sum("montant")
+        )["total"]
+        or
+        Decimal("0.00")
+    )
+
+    reste = (
+        manquant.montant
+        -
+        total_regle
+    )
+
+    if reste <= 0:
+
+        reste = Decimal("0.00")
+
+        manquant.statut = Manquant.STATUT_SOLDE
+
+    else:
+
+        manquant.statut = Manquant.STATUT_EN_COURS
+
+    manquant.reste_a_payer = reste
+
+    manquant.save(
+        update_fields=[
+            "reste_a_payer",
+            "statut",
+            "date_modification",
+        ]
+    )
+
+    return manquant
+
+
+@transaction.atomic
+def modifier_reglement_manquant(
+    reglement,
+    date_reglement,
+    montant,
+    utilisateur,
+):
+    """
+    Modifie un reglement recent de manquant.
+    """
+
+    if not peut_modifier_reglement_manquant(
+        utilisateur,
+        reglement
+    ):
+
+        raise ValueError(
+            "Ce reglement n'est pas modifiable."
+        )
+
+    montant = Decimal(
+        str(montant or "0")
+    )
+
+    if montant <= 0:
+
+        raise ValueError(
+            "Le montant du reglement doit etre superieur a zero."
+        )
+
+    manquant = reglement.manquant
+
+    total_autres_reglements = (
+        manquant.reglements
+        .exclude(
+            pk=reglement.pk
+        )
+        .aggregate(
+            total=Sum("montant")
+        )["total"]
+        or
+        Decimal("0.00")
+    )
+
+    if total_autres_reglements + montant > manquant.montant:
+
+        raise ValueError(
+            "Le total des reglements depasse le montant du manquant."
+        )
+
+    reglement.date_reglement = date_reglement
+    reglement.montant = montant
+
+    reglement.save(
+        update_fields=[
+            "date_reglement",
+            "montant",
+        ]
+    )
+
+    recalculer_reste_manquant(
+        manquant
     )
 
     return reglement

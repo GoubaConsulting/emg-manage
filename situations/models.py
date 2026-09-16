@@ -43,6 +43,10 @@ class SituationJournaliere(models.Model):
 
     ETAT_OUVERTE = "OUVERTE"
 
+    ETAT_ATTENTE_VALIDATION = "ATTENTE_VALIDATION"
+
+    ETAT_REFUSEE = "REFUSEE"
+
     ETAT_CLOTUREE = "CLOTUREE"
 
     ETATS = [
@@ -50,6 +54,16 @@ class SituationJournaliere(models.Model):
         (
             ETAT_OUVERTE,
             "Ouverte"
+        ),
+
+        (
+            ETAT_ATTENTE_VALIDATION,
+            "En attente de validation"
+        ),
+
+        (
+            ETAT_REFUSEE,
+            "Refusee"
         ),
 
         (

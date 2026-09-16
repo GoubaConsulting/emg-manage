@@ -26,6 +26,16 @@
 
             {% csrf_token %}
 
+            {% if next_url %}
+
+                <input
+                    type="hidden"
+                    name="next"
+                    value="{{ next_url }}"
+                >
+
+            {% endif %}
+
             {% if form.non_field_errors %}
 
                 <div class="alert alert-danger">
@@ -147,6 +157,7 @@
             class="form-check-input produit-check"
             name="produit_{{ produit.idproduit }}"
             value="1"
+            {% if produit.distribution_selectionnee %}checked{% endif %}
         >
 
     </td>
@@ -169,8 +180,30 @@
             class="montant-initial"
             data-produit-id="{{ produit.idproduit }}"
         >
-            0 FCFA
+            {{ produit.montant_initial_distribution|default:0 }}
+            FCFA
         </span>
+
+        <input
+            type="hidden"
+            class="montant-initial-valeur"
+            name="montant_initial_{{ produit.idproduit }}"
+            value="{{ produit.montant_initial_distribution|default:0 }}"
+        >
+
+        <input
+            type="hidden"
+            class="montant-net-initial-valeur"
+            name="montant_net_initial_{{ produit.idproduit }}"
+            value="{{ produit.montant_net_initial_distribution|default:0 }}"
+        >
+
+        <input
+            type="hidden"
+            class="taux-initial-valeur"
+            name="taux_initial_{{ produit.idproduit }}"
+            value="{{ produit.taux_initial_distribution|default:0 }}"
+        >
 
     </td>
 
@@ -182,7 +215,8 @@
             min="0"
             class="form-control montant"
             name="montant_{{ produit.idproduit }}"
-            value="0"
+            {% if not produit.distribution_selectionnee %}disabled{% endif %}
+            value="{{ produit.montant_distribution|default:0 }}"
         >
 
     </td>
@@ -196,7 +230,8 @@
             max="100"
             class="form-control taux"
             name="taux_{{ produit.idproduit }}"
-            value="0"
+            {% if not produit.distribution_selectionnee %}disabled{% endif %}
+            value="{{ produit.taux_distribution_form|default:0 }}"
         >
 
     </td>
@@ -208,7 +243,7 @@
             type="text"
             class="form-control remise"
             readonly
-            value="0"
+            value="{{ produit.remise_distribution|default:0 }}"
 
         >
 
@@ -220,7 +255,7 @@
             type="text"
             class="form-control net"
             readonly
-            value="0"
+            value="{{ produit.net_distribution|default:0 }}"
         >
 
     </td>
@@ -335,7 +370,7 @@
 
     <a
 
-        href="{% url 'distributions:liste_distributions' %}"
+        href="{% if url_retour_direct %}{{ url_retour_direct }}{% else %}{% url 'distributions:liste_distributions' %}{% endif %}"
 
         class="btn btn-secondary"
 
@@ -350,6 +385,10 @@
         type="submit"
 
         class="btn btn-success"
+
+        data-confirm-submit
+
+        data-confirm-message="Voulez-vous vraiment enregistrer cette distribution ?"
 
     >
 
@@ -371,8 +410,9 @@
 
 <script>
 window.montantsInitiauxParDistributeur = {{ reliquats_json|default:"{}"|safe }};
+window.modeModificationDistribution = {% if mode_modification %}true{% else %}false{% endif %};
 </script>
 
-<script src="{% static 'js/distributions_gerant.js' %}?v=montants-initiaux-brut-20260822"></script>
+<script src="{% static 'js/distributions_gerant.js' %}?v=montants-initiaux-enregistrement-20260914"></script>
 
 {% endblock %}

@@ -21,6 +21,8 @@ from comptes.permissions import (
     point_vente_utilisateur
 )
 
+
+
 from .models import Commande
 
 
@@ -312,6 +314,9 @@ def commande_par_id(
 
     )
 
+# ==========================================================
+# COMMANDE GERANT POUR CORRECTION DIRECTEUR
+# ==========================================================
 
 def commande_pour_modification_par_id(
     utilisateur,
@@ -449,3 +454,35 @@ def nombre_commandes_en_attente(utilisateur):
         utilisateur
 
     ).count()
+
+
+# ==========================================================
+# COMMANDE GERANT POUR CORRECTION DIRECTEUR
+# ==========================================================
+
+def commande_gerant_par_id_pour_directeur(
+    utilisateur,
+    pk
+):
+    """
+    Retourne une commande d'un Gérant
+    pour une éventuelle correction par le Directeur.
+    """
+
+    if not est_directeur(utilisateur):
+        return get_object_or_404(
+            Commande.objects.none(),
+            pk=pk
+        )
+
+    return get_object_or_404(
+
+        commandes_queryset().filter(
+            type_commande=Commande.TYPE_GERANT,
+            categorie_commande=Commande.CATEGORIE_NORMALE,
+            actif=True
+        ),
+
+        pk=pk
+
+    )

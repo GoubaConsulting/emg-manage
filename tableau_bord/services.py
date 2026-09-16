@@ -35,6 +35,7 @@ from distributions.models import (
     Distribution,
     LigneDistribution,
 )
+from distributions.permissions import peut_modifier_distribution
 from objectif.models import Objectif
 from referentiel.models import (
     Distributeur,
@@ -45,6 +46,10 @@ from situations.models import (
     Manquant,
     ReglementManquant,
     SituationJournaliere,
+)
+from situations.permissions import (
+    peut_modifier_reglement_manquant,
+    peut_modifier_situation,
 )
 from situations.services import calculer_valeur_nette_quantite
 from stocks.models import (
@@ -1692,13 +1697,45 @@ def _preparer_details_situation_apercu(situation):
 
     total_restant = Decimal("0.00")
 
+    total_brut_restant = Decimal("0.00")
+
     for ligne in situation.lignes.all():
+
+        prix_unitaire = _decimal(
+            ligne.prix_unitaire
+        )
+
+        ligne.montant_brut_distribue = (
+            _decimal(
+                ligne.quantite_distribuee
+            )
+            *
+            prix_unitaire
+        )
+
+        ligne.montant_brut_vendu = (
+            _decimal(
+                ligne.quantite_vendue
+            )
+            *
+            prix_unitaire
+        )
+
+        ligne.montant_brut_restant = (
+            _decimal(
+                ligne.quantite_restante
+            )
+            *
+            prix_unitaire
+        )
 
         ligne.montant_vendu = calculer_valeur_nette_quantite(
             ligne.quantite_vendue,
             ligne.prix_unitaire,
             ligne.taux_remise,
         )
+
+        ligne.montant_net_vendu = ligne.montant_vendu
 
         ligne.montant_restant = calculer_valeur_nette_quantite(
             ligne.quantite_restante,
@@ -1709,6 +1746,8 @@ def _preparer_details_situation_apercu(situation):
         total_vendu += ligne.montant_vendu
 
         total_restant += ligne.montant_restant
+
+        total_brut_restant += ligne.montant_brut_restant
 
         lignes.append(
             ligne
@@ -1724,7 +1763,11 @@ def _preparer_details_situation_apercu(situation):
 
     situation.total_vendu_produits = total_vendu
 
+    situation.total_net_vendu_produits = total_vendu
+
     situation.total_restant_produits = total_restant
+
+    situation.total_brut_restant_produits = total_brut_restant
 
     situation.groupes_compagnies = []
 
@@ -1733,9 +1776,27 @@ def _preparer_details_situation_apercu(situation):
         key=lambda ligne: ligne.produit.compagnie
     ):
 
+        lignes_compagnie = list(
+            lignes_compagnie
+        )
+
         situation.groupes_compagnies.append({
             "compagnie": compagnie,
-            "lignes": list(lignes_compagnie),
+            "lignes": lignes_compagnie,
+            "sous_total_net_vendu": sum(
+                (
+                    ligne.montant_net_vendu
+                    for ligne in lignes_compagnie
+                ),
+                Decimal("0.00")
+            ),
+            "sous_total_brut_restant": sum(
+                (
+                    ligne.montant_brut_restant
+                    for ligne in lignes_compagnie
+                ),
+                Decimal("0.00")
+            ),
         })
 
 
@@ -1757,6 +1818,39 @@ def _preparer_reglements_manquant(manquant):
         ),
         Decimal("0.00")
     )
+
+
+def _annoter_modification_directeur(
+    utilisateur,
+    distributions=None,
+    situations=None,
+    reglements=None,
+):
+    """
+    Attache les droits de modification aux operations
+    affichees dans les pages de suivi Directeur.
+    """
+
+    for distribution in distributions or []:
+
+        distribution.peut_modifier = peut_modifier_distribution(
+            utilisateur,
+            distribution
+        )
+
+    for situation in situations or []:
+
+        situation.peut_modifier = peut_modifier_situation(
+            utilisateur,
+            situation
+        )
+
+    for reglement in reglements or []:
+
+        reglement.peut_modifier = peut_modifier_reglement_manquant(
+            utilisateur,
+            reglement
+        )
 
 
 def _apercu_commandes_gerant(gerant, date_debut, date_fin):
@@ -2233,6 +2327,81 @@ def _apercu_versements_directeur_gerant(gerant, date_debut, date_fin):
     }
 
 
+def _apercu_versements_gerant_en_attente(gerant, date_debut, date_fin):
+    """
+    Versements soumis par le gerant et encore en attente
+    de validation par le Directeur.
+    """
+
+    if gerant is None:
+
+        return {
+            "lignes": [],
+            "totaux": {
+                "nombre": 0,
+                "distribue": Decimal("0.00"),
+                "verse": Decimal("0.00"),
+                "manquant": Decimal("0.00"),
+            },
+        }
+
+    queryset = _filtrer_intervalle(
+        SituationJournaliere.objects
+        .filter(
+            actif=True,
+            etat=SituationJournaliere.ETAT_ATTENTE_VALIDATION,
+            distributeur=gerant,
+        )
+        .select_related(
+            "distributeur",
+            "point_vente",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        )
+        .order_by(
+            "-date_situation",
+            "-idsituation",
+        ),
+        "date_situation",
+        date_debut,
+        date_fin,
+    )
+
+    totaux = queryset.aggregate(
+        total_distribue=Sum("montant_total_distribue"),
+        total_verse=Sum("montant_total_verse"),
+        total_manquant=Sum("montant_manquant"),
+    )
+
+    situations = list(
+        queryset
+    )
+
+    for situation in situations:
+
+        _preparer_details_situation_apercu(
+            situation
+        )
+
+    return {
+        "lignes": situations,
+        "totaux": {
+            "nombre": len(situations),
+            "distribue": _decimal(
+                totaux["total_distribue"]
+            ),
+            "verse": _decimal(
+                totaux["total_verse"]
+            ),
+            "manquant": _decimal(
+                totaux["total_manquant"]
+            ),
+        },
+    }
+
+
 def _apercu_manquants_directeur_gerant(gerant, date_debut, date_fin):
     """
     Manquants constates sur les versements du gerant.
@@ -2546,6 +2715,12 @@ def donnees_apercu_directeur(
         date_fin,
     )
 
+    versements_en_attente = _apercu_versements_gerant_en_attente(
+        gerant_selectionne,
+        date_debut,
+        date_fin,
+    )
+
     manquants = _apercu_manquants_gerant(
         gerant_selectionne,
         date_debut,
@@ -2556,6 +2731,17 @@ def donnees_apercu_directeur(
         gerant_selectionne,
         date_debut,
         date_fin,
+    )
+
+    _annoter_modification_directeur(
+        utilisateur,
+        distributions=(
+            distributions["sous"]
+            +
+            distributions["clients"]
+        ),
+        situations=situations["lignes"],
+        reglements=reglements["lignes"],
     )
 
     return {
@@ -2573,6 +2759,12 @@ def donnees_apercu_directeur(
         ],
         "distributions_clients_totaux": distributions[
             "totaux_clients"
+        ],
+        "versements_en_attente": versements_en_attente[
+            "lignes"
+        ],
+        "versements_en_attente_totaux": versements_en_attente[
+            "totaux"
         ],
         "situations": situations["lignes"],
         "situations_totaux": situations["totaux"],

@@ -24,6 +24,11 @@ urlpatterns = [
         name="ajouter_distribution_directeur",
     ),
     path(
+        "modifier/<int:pk>/",
+        views.modifier_distribution_view,
+        name="modifier_distribution",
+    ),
+    path(
         "directeur/distributeur/ajouter/",
         views.ajouter_distribution_directeur_distributeur,
         name="ajouter_distribution_directeur_distributeur",

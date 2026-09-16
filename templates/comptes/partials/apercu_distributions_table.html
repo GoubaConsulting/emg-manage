@@ -7,11 +7,15 @@
                         <th width="50"></th>
                         <th>Distribution</th>
                         <th>Date</th>
+                        <th>Heure</th>
                         <th>Type</th>
                         <th>Destinataire</th>
                         <th class="text-end">Montant brut</th>
                         <th class="text-end">Montant net</th>
                         <th>Etat</th>
+                        {% if afficher_actions %}
+                            <th class="text-center">Action</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -29,6 +33,7 @@
                         </td>
                         <td>{{ distribution.numero }}</td>
                         <td>{{ distribution.date_distribution|date:"d/m/Y" }}</td>
+                        <td>{{ distribution.heure_distribution|time:"H:i"|default:"-" }}</td>
                         <td>{{ distribution.get_type_distribution_display }}</td>
                         <td>
                             {{ distribution.distributeur.nom }}
@@ -37,24 +42,44 @@
                         <td class="text-end">{{ distribution.montant_brut|floatformat:2 }} FCFA</td>
                         <td class="text-end">{{ distribution.montant_net|floatformat:2 }} FCFA</td>
                         <td>{{ distribution.get_etat_display }}</td>
+                        {% if afficher_actions %}
+                            <td class="text-center">
+                                {% if distribution.peut_modifier %}
+                                    <a
+                                        href="{% url 'distributions:modifier_distribution' distribution.iddistribution %}?next={{ request.get_full_path|urlencode }}"
+                                        class="btn btn-sm btn-outline-warning"
+                                    >
+                                        Modifier
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">
+                                        -
+                                    </span>
+                                {% endif %}
+                            </td>
+                        {% endif %}
                     </tr>
 
                     <tr
                         class="collapse bg-light"
                         id="apercuDist{{ prefix }}{{ distribution.iddistribution }}"
                     >
-                        <td colspan="8">
+                        <td colspan="{% if afficher_actions %}10{% else %}9{% endif %}">
                             <div class="p-3">
                                 <div class="row mb-3">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <strong>Numéro :</strong><br>
                                         {{ distribution.numero }}
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <strong>Date :</strong><br>
                                         {{ distribution.date_distribution|date:"d/m/Y" }}
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
+                                        <strong>Heure :</strong><br>
+                                        {{ distribution.heure_distribution|time:"H:i"|default:"-" }}
+                                    </div>
+                                    <div class="col-md-3">
                                         <strong>Utilisateur :</strong><br>
                                         {{ distribution.utilisateur.get_full_name|default:distribution.utilisateur.username }}
                                     </div>
@@ -155,7 +180,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center">
+                        <td colspan="{% if afficher_actions %}10{% else %}9{% endif %}" class="text-center">
                             {{ empty_message }}
                         </td>
                     </tr>

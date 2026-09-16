@@ -411,6 +411,15 @@
                                         Versements clôturés
                                     </a>
                                     <a
+                                        class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'versement_gerant' %}active{% endif %}"
+                                        href="{% url 'situations:versement_gerant' %}"
+                                    >
+                                        <span>Versement au Directeur</span>
+                                        <span class="badge rounded-pill {% if request.resolver_match.url_name == 'versement_gerant' %}text-bg-light text-primary{% else %}text-bg-success{% endif %}">
+                                            Envoi
+                                        </span>
+                                    </a>
+                                    <a
                                         class="list-group-item list-group-item-action sidebar-item d-flex align-items-center justify-content-between {% if request.resolver_match.url_name == 'liste_manquants' or request.resolver_match.url_name == 'regler_manquant' %}active{% endif %}"
                                         href="{% url 'situations:liste_manquants' %}"
                                     >

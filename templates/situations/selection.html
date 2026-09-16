@@ -36,7 +36,27 @@
 
                 {% endif %}
 
+                {% if mode_versement_gerant %}
+
+                    <div class="alert alert-info">
+
+                        Vous saisissez le versement des distributions
+                        recues du Directeur.
+                        {% if gerant_connecte %}
+                            Gerant :
+                            <strong>
+                                {{ gerant_connecte.nom }}
+                                {{ gerant_connecte.prenom }}
+                            </strong>
+                        {% endif %}
+
+                    </div>
+
+                {% endif %}
+
                 <div class="row">
+
+                    {% if not mode_versement_gerant %}
 
                     <div class="col-md-6">
 
@@ -60,7 +80,9 @@
 
                     </div>
 
-                    <div class="col-md-6">
+                    {% endif %}
+
+                    <div class="{% if mode_versement_gerant %}col-md-4{% else %}col-md-6{% endif %}">
 
                         <div class="mb-3">
 
@@ -93,6 +115,15 @@
 
                 </button>
 
+                {% if mode_versement_gerant and url_retour_direct %}
+                    <a
+                        href="{{ url_retour_direct }}"
+                        class="btn btn-secondary"
+                    >
+                        Retour a la liste
+                    </a>
+                {% endif %}
+
             </form>
 
             {% endif %}
@@ -111,8 +142,16 @@
                 <input
                     type="hidden"
                     name="action"
-                    value="cloturer"
+                    value="{{ action_form|default:'cloturer' }}"
                 >
+
+                {% if next_url %}
+                    <input
+                        type="hidden"
+                        name="next"
+                        value="{{ next_url }}"
+                    >
+                {% endif %}
 
                 <input
                     type="hidden"
@@ -123,7 +162,7 @@
                 <input
                     type="hidden"
                     name="distributeur"
-                    value="{{ form.distributeur.value|default:'' }}"
+                    value="{% if mode_versement_gerant and gerant_connecte %}{{ gerant_connecte.pk }}{% else %}{{ form.distributeur.value|default:'' }}{% endif %}"
                 >
 
                 <input
@@ -259,7 +298,7 @@
                             </small>
 
                             <h5>
-                                {{ situation.etat }}
+                                {{ situation.get_etat_display|default:situation.etat }}
                             </h5>
 
                         </div>
@@ -398,7 +437,7 @@
                                         min="0"
                                         class="form-control montant-restant"
                                         name="montant_restant_{{ ligne.produit.idproduit }}"
-                                        value="0"
+                                        value="{{ ligne.montant_restant_brut|default:0 }}"
                                     >
 
                                 </td>
@@ -640,7 +679,7 @@
                             id="montant-credit-verse"
                             name="montant_credit_verse"
                             data-montant-credit="{{ situation.montant_credit|default:0 }}"
-                            value="{{ situation.montant_credit }}"
+                            value="{{ montant_credit_verse_initial|default:situation.montant_credit }}"
                         >
 
                     </div>
@@ -660,7 +699,7 @@
                             class="form-control"
                             id="montant-vente-verse"
                             name="montant_vente_verse"
-                            value="0"
+                            value="{{ montant_vente_verse_initial|default:0 }}"
                         >
 
                     </div>
@@ -707,7 +746,7 @@
                                 step="1"
                                 class="form-control"
                                 name="coupure_10000"
-                                value="0"
+                                value="{{ coupure_10000|default:0 }}"
                             >
 
                         </div>
@@ -724,7 +763,7 @@
                                 step="1"
                                 class="form-control"
                                 name="coupure_5000"
-                                value="0"
+                                value="{{ coupure_5000|default:0 }}"
                             >
 
                         </div>
@@ -741,7 +780,7 @@
                                 step="1"
                                 class="form-control"
                                 name="coupure_2000"
-                                value="0"
+                                value="{{ coupure_2000|default:0 }}"
                             >
 
                         </div>
@@ -758,7 +797,7 @@
                                 step="1"
                                 class="form-control"
                                 name="coupure_1000"
-                                value="0"
+                                value="{{ coupure_1000|default:0 }}"
                             >
 
                         </div>
@@ -775,7 +814,7 @@
                                 step="1"
                                 class="form-control"
                                 name="coupure_500"
-                                value="0"
+                                value="{{ coupure_500|default:0 }}"
                             >
 
                         </div>
@@ -794,14 +833,16 @@
                     <button
                         type="submit"
                         class="btn btn-success"
+                        data-confirm-submit
+                        data-confirm-message="Voulez-vous vraiment enregistrer ce versement ?"
                     >
 
-                        Clôturer la situation
+                        {{ bouton_situation|default:"Clôturer la situation" }}
 
                     </button>
 
                     <a
-                        href="{% url 'situations:ajouter_situation' %}"
+                        href="{% if url_retour_direct %}{{ url_retour_direct }}{% else %}{% url 'situations:ajouter_situation' %}{% endif %}"
                         class="btn btn-secondary"
                     >
 

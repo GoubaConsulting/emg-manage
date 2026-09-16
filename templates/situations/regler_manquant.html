@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Règlement de manquant
+{{ titre|default:"Règlement de manquant" }}
 {% endblock %}
 
 {% block content %}
@@ -10,7 +10,7 @@ Règlement de manquant
 
     <div class="card-header">
         <h5 class="mb-0">
-            Règlement de manquant
+            {{ titre|default:"Règlement de manquant" }}
         </h5>
     </div>
 
@@ -38,6 +38,14 @@ Règlement de manquant
         <form method="post">
 
             {% csrf_token %}
+
+            {% if next_url %}
+                <input
+                    type="hidden"
+                    name="next"
+                    value="{{ next_url }}"
+                >
+            {% endif %}
 
             {% if form.non_field_errors %}
                 <div class="alert alert-danger">
@@ -68,7 +76,7 @@ Règlement de manquant
             <div class="text-end">
 
                 <a
-                    href="{% url 'situations:liste_manquants' %}"
+                    href="{% if url_retour_direct %}{{ url_retour_direct }}{% else %}{% url 'situations:liste_manquants' %}{% endif %}"
                     class="btn btn-secondary"
                 >
                     Retour
@@ -77,8 +85,10 @@ Règlement de manquant
                 <button
                     type="submit"
                     class="btn btn-success"
+                    data-confirm-submit
+                    data-confirm-message="Voulez-vous vraiment enregistrer ce reglement ?"
                 >
-                    Enregistrer
+                    {{ bouton_enregistrer|default:"Enregistrer" }}
                 </button>
 
             </div>

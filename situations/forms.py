@@ -209,6 +209,32 @@ class SituationGerantDateForm(forms.Form):
 
 
 # ==========================================================
+# FORMULAIRE : VERSEMENT GERANT AU DIRECTEUR
+# ==========================================================
+
+class VersementGerantSelectionForm(forms.Form):
+    """
+    Permet au gerant de choisir la date du versement
+    a soumettre au Directeur.
+    """
+
+    date_situation = forms.DateField(
+
+        label="Date du versement",
+
+        initial=timezone.localdate,
+
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "form-control",
+            }
+        )
+
+    )
+
+
+# ==========================================================
 # FORMULAIRE : REGLEMENT D'UN MANQUANT
 # ==========================================================
 

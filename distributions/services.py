@@ -30,6 +30,7 @@ from referentiel.models import (
 from stocks.models import Stock
 
 from stocks.services import (
+    ajouter_stock,
     retirer_stock,
     transferer_stock,
 )
@@ -65,6 +66,10 @@ from .numerotation import (
     generer_numero_distribution,
 )
 
+from .permissions import (
+    peut_modifier_distribution,
+)
+
 from objectif.models import Objectif
 
 from objectif.services import recalculer_objectif
@@ -96,27 +101,82 @@ def construire_lignes_depuis_formulaire(donnees):
         )
 
         montant = Decimal(
-            donnees.get(
-                f"montant_{idproduit}",
+            str(
+                donnees.get(
+                    f"montant_{idproduit}",
+                    "0"
+                )
+                or
                 "0"
             )
         )
 
-        # Produit non distribué
-        if montant <= 0:
+        montant_initial = Decimal(
+            str(
+                donnees.get(
+                    f"montant_initial_{idproduit}",
+                    "0"
+                )
+                or
+                "0"
+            )
+        )
+
+        montant_net_initial = Decimal(
+            str(
+                donnees.get(
+                    f"montant_net_initial_{idproduit}",
+                    "0"
+                )
+                or
+                "0"
+            )
+        )
+
+        # Produit non distribue et sans montant initial a suivre.
+        if montant <= 0 and montant_initial <= 0:
 
             continue
 
         taux = Decimal(
-            donnees.get(
-                f"taux_{idproduit}",
+            str(
+                donnees.get(
+                    f"taux_{idproduit}",
+                    "0"
+                )
+                or
+                "0"
+            )
+        )
+
+        taux_initial = Decimal(
+            str(
+                donnees.get(
+                    f"taux_initial_{idproduit}",
+                    taux
+                )
+                or
                 "0"
             )
         )
 
         prix = Decimal(str(produit.prix))
 
-        if montant % prix != 0:
+        if montant < 0 or montant_initial < 0 or montant_net_initial < 0:
+
+            raise Exception(
+                "Les montants ne peuvent pas etre negatifs."
+            )
+
+        if montant_net_initial > montant_initial:
+
+            raise Exception(
+                f"Le montant net initial du produit "
+                f"{produit.designation} ne peut pas depasser "
+                "le montant initial."
+            )
+
+        if montant > 0 and montant % prix != 0:
 
             raise Exception(
 
@@ -130,7 +190,17 @@ def construire_lignes_depuis_formulaire(donnees):
 
             )
 
-        quantite = montant / prix
+        quantite = Decimal("0.00")
+
+        if montant > 0:
+
+            quantite = montant / prix
+
+        taux_ligne = taux
+
+        if montant <= 0 and montant_initial > 0:
+
+            taux_ligne = taux_initial
 
         lignes.append({
 
@@ -142,7 +212,13 @@ def construire_lignes_depuis_formulaire(donnees):
 
             "quantite": quantite,
 
-            "taux": taux,
+            "taux": taux_ligne,
+
+            "taux_initial": taux_initial,
+
+            "montant_initial": montant_initial,
+
+            "montant_net_initial": montant_net_initial,
 
         })
 
@@ -530,8 +606,35 @@ def creer_lignes_distribution(
             str(ligne["taux"])
         )
 
+        taux_initial = Decimal(
+            str(
+                ligne.get(
+                    "taux_initial",
+                    taux
+                )
+            )
+        )
+
         montant_brut = Decimal(
             str(ligne["montant"])
+        )
+
+        montant_initial = Decimal(
+            str(
+                ligne.get(
+                    "montant_initial",
+                    Decimal("0.00")
+                )
+            )
+        )
+
+        montant_net_initial = Decimal(
+            str(
+                ligne.get(
+                    "montant_net_initial",
+                    Decimal("0.00")
+                )
+            )
         )
 
         montant_remise = calculer_montant_remise(
@@ -542,6 +645,28 @@ def creer_lignes_distribution(
         montant_net = calculer_montant_net(
             montant_brut,
             montant_remise
+        )
+
+        if montant_initial > 0 and montant_net_initial <= 0:
+
+            montant_net_initial = calculer_montant_net(
+                montant_initial,
+                calculer_montant_remise(
+                    montant_initial,
+                    taux_initial
+                )
+            )
+
+        montant_total_brut = (
+            montant_initial
+            +
+            montant_brut
+        )
+
+        montant_total_net = (
+            montant_net_initial
+            +
+            montant_net
         )
 
         # ------------------------------
@@ -556,9 +681,40 @@ def creer_lignes_distribution(
             taux
         )
 
-        valider_quantite(
-            quantite
+        valider_taux_remise(
+            taux_initial
         )
+
+        if montant_brut < 0 or montant_initial < 0:
+
+            raise ValueError(
+                "Les montants ne peuvent pas etre negatifs."
+            )
+
+        if montant_net_initial < 0:
+
+            raise ValueError(
+                "Le montant net initial ne peut pas etre negatif."
+            )
+
+        if montant_net_initial > montant_initial:
+
+            raise ValueError(
+                "Le montant net initial ne peut pas depasser "
+                "le montant initial."
+            )
+
+        if quantite > 0:
+
+            valider_quantite(
+                quantite
+            )
+
+        elif montant_initial <= 0:
+
+            valider_quantite(
+                quantite
+            )
 
         lignes_distribution.append(
 
@@ -579,6 +735,14 @@ def creer_lignes_distribution(
                 montant_remise=montant_remise,
 
                 montant_net=montant_net,
+
+                montant_initial=montant_initial,
+
+                montant_net_initial=montant_net_initial,
+
+                montant_total_brut=montant_total_brut,
+
+                montant_total_net=montant_total_net,
 
             )
 
@@ -611,7 +775,23 @@ def recalculer_totaux_distribution(distribution):
 
             montant_net=Sum(
                 "montant_net"
-            )
+            ),
+
+            montant_initial=Sum(
+                "montant_initial"
+            ),
+
+            montant_net_initial=Sum(
+                "montant_net_initial"
+            ),
+
+            montant_total_brut=Sum(
+                "montant_total_brut"
+            ),
+
+            montant_total_net=Sum(
+                "montant_total_net"
+            ),
 
         )
     )
@@ -626,10 +806,34 @@ def recalculer_totaux_distribution(distribution):
         or Decimal("0.00")
     )
 
+    distribution.montant_initial = (
+        totaux["montant_initial"]
+        or Decimal("0.00")
+    )
+
+    distribution.montant_net_initial = (
+        totaux["montant_net_initial"]
+        or Decimal("0.00")
+    )
+
+    distribution.montant_total_brut = (
+        totaux["montant_total_brut"]
+        or Decimal("0.00")
+    )
+
+    distribution.montant_total_net = (
+        totaux["montant_total_net"]
+        or Decimal("0.00")
+    )
+
     distribution.save(
         update_fields=[
             "montant_brut",
             "montant_net",
+            "montant_initial",
+            "montant_net_initial",
+            "montant_total_brut",
+            "montant_total_net",
             "date_modification",
         ]
     )
@@ -861,6 +1065,341 @@ def mettre_a_jour_objectifs_distribution(
             objectif
         )
 
+
+def recalculer_objectifs_distribution_reference(
+    point_vente,
+    date_reference,
+    produit_ids
+):
+    """
+    Recalcule les objectifs touches par une distribution.
+    """
+
+    produit_ids = set(
+        produit_ids
+        or
+        []
+    )
+
+    if not produit_ids:
+
+        return
+
+    compagnies = (
+        Produit.objects
+        .filter(
+            pk__in=produit_ids
+        )
+        .values_list(
+            "compagnie_id",
+            flat=True
+        )
+        .distinct()
+    )
+
+    objectifs = Objectif.objects.filter(
+        actif=True,
+        point_vente=point_vente,
+        mois=date_reference.month,
+        annee=date_reference.year,
+        compagnie_id__in=compagnies,
+    )
+
+    for objectif in objectifs:
+
+        recalculer_objectif(
+            objectif
+        )
+
+
+def annuler_effet_stock_distribution(
+    distribution
+):
+    """
+    Replace en stock les quantites sorties par une
+    distribution terrain ou une vente directe.
+    """
+
+    for ligne in distribution.lignes.select_related(
+        "produit"
+    ):
+
+        ajouter_stock(
+            point_vente=distribution.point_vente_source,
+            produit=ligne.produit,
+            quantite=ligne.quantite,
+        )
+
+
+def appliquer_effet_stock_distribution(
+    distribution
+):
+    """
+    Retire du stock les nouvelles quantites d'une
+    distribution terrain ou d'une vente directe.
+    """
+
+    for ligne in distribution.lignes.select_related(
+        "produit"
+    ):
+
+        retirer_stock(
+            point_vente=distribution.point_vente_source,
+            produit=ligne.produit,
+            quantite=ligne.quantite,
+        )
+
+
+# ==========================================================
+# MODIFICATION D'UNE DISTRIBUTION
+# ==========================================================
+
+@transaction.atomic
+def modifier_distribution(
+    distribution,
+    date_distribution,
+    distributeur,
+    lignes,
+    utilisateur
+):
+    """
+    Modifie une distribution terrain
+    ou une vente directe.
+    """
+
+    # ======================================================
+    # VERIFICATION DU DROIT DE MODIFICATION
+    # ======================================================
+
+    if not peut_modifier_distribution(
+        utilisateur,
+        distribution
+    ):
+
+        raise ValueError(
+            "Cette distribution n'est pas modifiable."
+        )
+
+    # ======================================================
+    # INTERDICTION DES DISTRIBUTIONS ISSUES D'UNE COMMANDE
+    # ======================================================
+
+    if distribution.type_distribution == (
+        Distribution.TYPE_COMMANDE_GERANT
+    ):
+
+        raise ValueError(
+            "Cette distribution provient d'une commande gérant "
+            "et ne peut pas être modifiée depuis cet écran."
+        )
+
+    # ======================================================
+    # VALIDATIONS
+    # ======================================================
+
+    verifier_date_distribution(
+        date_distribution
+    )
+
+    verifier_destinataire_distribution_gerant(
+        distribution.type_distribution,
+        distributeur
+    )
+
+    verifier_presence_ligne(
+        lignes
+    )
+
+    # ======================================================
+    # MEMORISATION DES ANCIENNES INFORMATIONS
+    # ======================================================
+
+    ancienne_date = (
+        distribution.date_distribution
+    )
+
+    ancien_distributeur = (
+        distribution.distributeur
+    )
+
+    anciens_produits = set(
+        distribution.lignes.values_list(
+            "produit_id",
+            flat=True
+        )
+    )
+
+    # ======================================================
+    # ANNULATION DE L'ANCIEN EFFET SUR LE STOCK
+    # ======================================================
+
+    annuler_effet_stock_distribution(
+        distribution
+    )
+
+    # ======================================================
+    # VERIFICATION DU STOCK AVEC LES NOUVELLES LIGNES
+    # ======================================================
+
+    verifier_stock_distribution(
+        distribution.point_vente_source,
+        lignes
+    )
+
+    # ======================================================
+    # MODIFICATION DE L'ENTETE
+    # ======================================================
+
+    distribution.date_distribution = (
+        date_distribution
+    )
+
+    distribution.distributeur = (
+        distributeur
+    )
+
+    distribution.point_vente_destination = (
+        distribution.point_vente_source
+    )
+
+    distribution.save(
+        update_fields=[
+            "date_distribution",
+            "distributeur",
+            "point_vente_destination",
+            "date_modification",
+        ]
+    )
+
+    # ======================================================
+    # SUPPRESSION DES ANCIENNES LIGNES
+    # ======================================================
+
+    distribution.lignes.all().delete()
+
+    # ======================================================
+    # CREATION DES NOUVELLES LIGNES
+    # ======================================================
+
+    creer_lignes_distribution(
+        distribution,
+        lignes
+    )
+
+    # ======================================================
+    # RECALCUL DES TOTAUX
+    # ======================================================
+
+    recalculer_totaux_distribution(
+        distribution
+    )
+
+    # ======================================================
+    # APPLICATION DU NOUVEL EFFET SUR LE STOCK
+    # ======================================================
+
+    appliquer_effet_stock_distribution(
+        distribution
+    )
+
+    # ======================================================
+    # NOUVEAUX PRODUITS
+    # ======================================================
+
+    nouveaux_produits = set(
+        distribution.lignes.values_list(
+            "produit_id",
+            flat=True
+        )
+    )
+
+    # ======================================================
+    # RECALCUL DES ANCIENS OBJECTIFS
+    # ======================================================
+
+    recalculer_objectifs_distribution_reference(
+        distribution.point_vente_source,
+        ancienne_date,
+        anciens_produits,
+    )
+
+    # ======================================================
+    # RECALCUL DES NOUVEAUX OBJECTIFS
+    # ======================================================
+
+    recalculer_objectifs_distribution_reference(
+        distribution.point_vente_source,
+        distribution.date_distribution,
+        nouveaux_produits,
+    )
+
+    # ======================================================
+    # CAS PARTICULIER : VENTE DIRECTE
+    # ======================================================
+
+    if distribution.type_distribution == (
+        Distribution.TYPE_CLIENT_DIRECT
+    ):
+
+        from situations.services import (
+            synchroniser_situation_vente_directe,
+        )
+
+        from situations.models import (
+            SituationJournaliere,
+        )
+
+        # --------------------------------------------------
+        # Si la date de la vente a changé
+        # --------------------------------------------------
+
+        if ancienne_date != distribution.date_distribution:
+
+            autres_ventes_ancienne_date = (
+                Distribution.objects
+                .filter(
+                    actif=True,
+                    type_distribution=(
+                        Distribution.TYPE_CLIENT_DIRECT
+                    ),
+                    distributeur=ancien_distributeur,
+                    date_distribution=ancienne_date,
+                )
+                .exclude(
+                    pk=distribution.pk
+                )
+                .exists()
+            )
+
+            # --------------------------------------------------
+            # Désactivation de l'ancienne situation automatique
+            # si aucune autre vente ne subsiste ce jour-là.
+            # --------------------------------------------------
+
+            if not autres_ventes_ancienne_date:
+
+                SituationJournaliere.objects.filter(
+                    actif=True,
+                    distributeur=ancien_distributeur,
+                    date_situation=ancienne_date,
+                    coupures=(
+                        "Situation automatique - vente directe"
+                    ),
+                ).update(
+                    actif=False
+                )
+
+        # --------------------------------------------------
+        # Synchronisation de la nouvelle situation
+        # --------------------------------------------------
+
+        synchroniser_situation_vente_directe(
+            distribution,
+            utilisateur
+        )
+
+    return distribution
+
 # ==========================================================
 # CREATION DISTRIBUTION DEPUIS COMMANDE
 # ==========================================================
@@ -901,6 +1440,10 @@ def creer_distribution_depuis_commande(
     lignes = []
 
     for ligne in commande.lignes.all():
+
+        if ligne.quantite <= 0:
+
+            continue
 
         lignes.append({
 

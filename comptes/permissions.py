@@ -10,6 +10,11 @@ Fonctions communes de gestion des droits.
 ==========================================================
 """
 
+from django.utils import timezone
+
+
+DELAI_MODIFICATION_OPERATION_JOURS = 3
+
 
 # ==========================================================
 # ADMINISTRATEUR
@@ -74,3 +79,37 @@ def point_vente_utilisateur(utilisateur):
     """
 
     return utilisateur.profil.point_vente
+
+
+# ==========================================================
+# DELAI DE MODIFICATION
+# ==========================================================
+
+def date_dans_delai_modification(
+    date_operation,
+    jours=DELAI_MODIFICATION_OPERATION_JOURS
+):
+    """
+    Retourne True si une operation est encore modifiable.
+    """
+
+    if date_operation is None:
+
+        return False
+
+    if hasattr(
+        date_operation,
+        "date"
+    ):
+
+        date_operation = date_operation.date()
+
+    ecart = (
+        timezone.localdate()
+        -
+        date_operation
+    ).days
+
+    return (
+        0 <= ecart <= jours
+    )

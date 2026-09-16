@@ -167,27 +167,39 @@ function construireTableau(produits) {
                 produit.montant_initial_brut || produit.montant_initial || 0
             );
 
-            const montantBrutASuivre = (
-                montantInitialBrut
-                +
-                lireNombre(produit.montant)
+            const montantInitialNet = lireNombre(
+                produit.montant_initial_net || 0
             );
 
             const taux = lireNombre(
                 produit.taux
             );
 
-            const montantRemiseASuivre = (
-                montantBrutASuivre
+            const montantRemiseInitial = (
+                montantInitialBrut
+                -
+                montantInitialNet
+            );
+
+            const montantRemiseNouveau = (
+                lireNombre(produit.montant)
                 *
                 taux
                 /
                 100
             );
 
+            const montantRemiseASuivre = (
+                montantRemiseInitial
+                +
+                montantRemiseNouveau
+            );
+
             const montantNetASuivre = (
+                montantInitialNet
+                +
                 calculerMontantNet(
-                    montantBrutASuivre,
+                    lireNombre(produit.montant),
                     taux
                 )
             );
@@ -209,6 +221,8 @@ function construireTableau(produits) {
                     data-initiale="${montantInitialBrut}"
 
                     data-initiale-brut="${montantInitialBrut}"
+
+                    data-initiale-net="${montantInitialNet}"
 
                 >
 
@@ -523,17 +537,31 @@ function recalculerLigne(ligne) {
         0
     );
 
-    const montantBrutSuivi = (
-        montantInitialBrut
-        +
-        montant
+    const montantInitialNet = (
+        Number(ligne.dataset.initialeNet)
+        ||
+        0
     );
 
-    const montantRemise = montantBrutSuivi * taux / 100;
+    const montantRemiseInitial = (
+        montantInitialBrut
+        -
+        montantInitialNet
+    );
+
+    const montantRemiseNouveau = montant * taux / 100;
+
+    const montantRemise = (
+        montantRemiseInitial
+        +
+        montantRemiseNouveau
+    );
 
     const montantNet = (
+        montantInitialNet
+        +
         calculerMontantNet(
-            montantBrutSuivi,
+            montant,
             taux
         )
     );

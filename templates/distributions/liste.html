@@ -358,6 +358,8 @@ Liste des distributions
 
                         <th>Date</th>
 
+                        <th>Heure</th>
+
                         <th>Commande</th>
 
                         <th>Point de vente</th>
@@ -375,6 +377,14 @@ Liste des distributions
                             Montant net
 
                         </th>
+
+                        {% if est_directeur %}
+
+                        <th class="text-center">
+                            Action
+                        </th>
+
+                        {% endif %}
 
                     </tr>
 
@@ -410,6 +420,12 @@ Liste des distributions
                         <td>
 
                             {{ distribution.date_distribution|date:"d/m/Y" }}
+
+                        </td>
+
+                        <td>
+
+                            {{ distribution.heure_distribution|time:"H:i"|default:"-" }}
 
                         </td>
 
@@ -451,18 +467,35 @@ Liste des distributions
 
                         </td>
 
+                        {% if est_directeur %}
+
+                        <td class="text-center">
+                            {% if distribution.peut_modifier %}
+                                <a
+                                    href="{% url 'distributions:modifier_distribution' distribution.iddistribution %}?next={{ request.get_full_path|urlencode }}"
+                                    class="btn btn-sm btn-outline-warning"
+                                >
+                                    Modifier
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+
+                        {% endif %}
+
                     </tr>
 
                     <!-- Le début du collapse -->
                     <tr class="collapse bg-light" id="dist{{ distribution.iddistribution }}">
 
-                        <td colspan="9">
+                        <td colspan="10">
 
                             <div class="p-3">
 
                                 <div class="row mb-3">
 
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
 
                                         <strong>Numéro :</strong><br>
 
@@ -470,7 +503,7 @@ Liste des distributions
 
                                     </div>
 
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
 
                                         <strong>Date :</strong><br>
 
@@ -478,7 +511,15 @@ Liste des distributions
 
                                     </div>
 
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
+
+                                        <strong>Heure :</strong><br>
+
+                                        {{ distribution.heure_distribution|time:"H:i"|default:"-" }}
+
+                                    </div>
+
+                                    <div class="col-md-3">
 
                                         <strong>Utilisateur :</strong><br>
 
@@ -935,6 +976,9 @@ Liste des distributions
                             <th>Sous-distributeur</th>
                             <th class="text-end">Montant brut</th>
                             <th class="text-end">Montant net</th>
+                            {% if est_directeur %}
+                                <th class="text-center">Action</th>
+                            {% endif %}
 
                         </tr>
 
@@ -996,6 +1040,23 @@ Liste des distributions
 
                             </td>
 
+                            {% if est_directeur %}
+
+                            <td class="text-center">
+                                {% if distribution.peut_modifier %}
+                                    <a
+                                        href="{% url 'distributions:modifier_distribution' distribution.iddistribution %}?next={{ request.get_full_path|urlencode }}"
+                                        class="btn btn-sm btn-outline-warning"
+                                    >
+                                        Modifier
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            {% endif %}
+
                         </tr>
 
                         <tr
@@ -1006,7 +1067,7 @@ Liste des distributions
 
                         >
 
-                            <td colspan="6">
+                            <td colspan="{% if est_directeur %}7{% else %}6{% endif %}">
 
                                 <div class="p-3">
 
@@ -1176,7 +1237,7 @@ Liste des distributions
 
                         <tr>
 
-                            <td colspan="6" class="text-center">
+                            <td colspan="{% if est_directeur %}7{% else %}6{% endif %}" class="text-center">
 
                                 Aucune distribution vers un sous-distributeur.
 
@@ -1366,6 +1427,14 @@ Liste des distributions
 
                             </th>
 
+                            {% if est_directeur %}
+
+                                <th class="text-center">
+                                    Action
+                                </th>
+
+                            {% endif %}
+
                         </tr>
 
                     </thead>
@@ -1426,6 +1495,23 @@ Liste des distributions
 
                             </td>
 
+                            {% if est_directeur %}
+
+                            <td class="text-center">
+                                {% if distribution.peut_modifier %}
+                                    <a
+                                        href="{% url 'distributions:modifier_distribution' distribution.iddistribution %}?next={{ request.get_full_path|urlencode }}"
+                                        class="btn btn-sm btn-outline-warning"
+                                    >
+                                        Modifier
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            {% endif %}
+
                         </tr>
 
                         <tr
@@ -1436,7 +1522,7 @@ Liste des distributions
 
                         >
 
-                            <td colspan="6">
+                            <td colspan="{% if est_directeur %}7{% else %}6{% endif %}">
 
                                 <div class="p-3">
 
@@ -1662,7 +1748,7 @@ Liste des distributions
 
                         <tr>
 
-                            <td colspan="6" class="text-center">
+                            <td colspan="{% if est_directeur %}7{% else %}6{% endif %}" class="text-center">
 
                                 Aucune distribution à un client direct.
 

@@ -73,7 +73,10 @@ function initialiser() {
 
     recalculerSousTotaux();
 
-    if (selectDistributeur) {
+    if (
+        selectDistributeur &&
+        !window.modeModificationDistribution
+    ) {
 
         selectDistributeur.addEventListener(
 
@@ -132,7 +135,36 @@ function actualiserMontantsInitiaux() {
             donneesInitiales
         );
 
+        const montantInitialNet = lireMontantInitialNet(
+            donneesInitiales,
+            montantInitialBrut
+        );
+
+        const tauxInitial = lireTauxInitial(
+            donneesInitiales
+        );
+
         ligne.dataset.initialBrut = montantInitialBrut;
+        ligne.dataset.initialNet = montantInitialNet;
+        ligne.dataset.initialTaux = tauxInitial;
+
+        renseignerChampCache(
+            ligne,
+            ".montant-initial-valeur",
+            montantInitialBrut
+        );
+
+        renseignerChampCache(
+            ligne,
+            ".montant-net-initial-valeur",
+            montantInitialNet
+        );
+
+        renseignerChampCache(
+            ligne,
+            ".taux-initial-valeur",
+            tauxInitial
+        );
 
         champ.textContent = formaterMontant(
             montantInitialBrut
@@ -268,13 +300,41 @@ function desactiverLigne(ligne) {
 
     check.checked = false;
 
-    montant.disabled = true;
+    if (check.checked) {
 
-    taux.disabled = true;
+        activerLigne(
 
-    montant.value = 0;
+            ligne
 
-    taux.value = 0;
+        );
+
+        recalculerLigne(
+
+            ligne
+
+        );
+
+    }
+
+    else {
+
+        montant.disabled = true;
+
+        taux.disabled = true;
+
+        if (montant.value === "") {
+
+            montant.value = 0;
+
+        }
+
+        if (taux.value === "") {
+
+            taux.value = 0;
+
+        }
+
+    }
 
     ligne.querySelector(
 
@@ -492,17 +552,35 @@ function recalculerLigne(ligne) {
         ligne
     );
 
-    const montantBrutSuivi = (
-        montantBrutInitial
-        +
-        montant
+    const montantNetInitial = calculerMontantNetInitial(
+        ligne
     );
 
-    const montantRemise = montantBrutSuivi * taux / 100;
+    const montantRemiseInitial = (
+        montantBrutInitial
+        -
+        montantNetInitial
+    );
+
+    const montantRemiseNouveau = (
+        montant
+        *
+        taux
+        /
+        100
+    );
+
+    const montantRemise = (
+        montantRemiseInitial
+        +
+        montantRemiseNouveau
+    );
 
     const montantNet = (
+        montantNetInitial
+        +
         calculerMontantNet(
-            montantBrutSuivi,
+            montant,
             taux
         )
     );
@@ -690,9 +768,67 @@ function calculerMontantNet(
 
 function calculerMontantBrutInitial(ligne) {
 
-    return lireNombre(
+    const montantDataset = lireNombre(
         ligne.dataset.initialBrut
     );
+
+    if (montantDataset > 0) {
+
+        return montantDataset;
+
+    }
+
+    const champ = ligne.querySelector(
+        ".montant-initial-valeur"
+    );
+
+    return lireNombre(
+        champ ? champ.value : 0
+    );
+
+}
+
+
+function calculerMontantNetInitial(ligne) {
+
+    const montantDataset = lireNombre(
+        ligne.dataset.initialNet
+    );
+
+    if (montantDataset > 0) {
+
+        return montantDataset;
+
+    }
+
+    const champ = ligne.querySelector(
+        ".montant-net-initial-valeur"
+    );
+
+    return lireNombre(
+        champ ? champ.value : 0
+    );
+
+}
+
+
+function renseignerChampCache(
+    ligne,
+    selecteur,
+    valeur
+) {
+
+    const champ = ligne.querySelector(
+        selecteur
+    );
+
+    if (!champ) {
+
+        return;
+
+    }
+
+    champ.value = valeur;
 
 }
 
@@ -714,6 +850,64 @@ function lireMontantInitialBrut(donneesInitiales) {
     return lireNombre(
         donneesInitiales
     );
+
+}
+
+
+function lireMontantInitialNet(
+    donneesInitiales,
+    montantInitialBrut
+) {
+
+    if (
+        donneesInitiales
+        &&
+        typeof donneesInitiales === "object"
+    ) {
+
+        if ("net" in donneesInitiales) {
+
+            return lireNombre(
+                donneesInitiales.net
+            );
+
+        }
+
+        if ("taux" in donneesInitiales) {
+
+            return calculerMontantNet(
+                montantInitialBrut,
+                lireNombre(
+                    donneesInitiales.taux
+                )
+            );
+
+        }
+
+    }
+
+    return montantInitialBrut;
+
+}
+
+
+function lireTauxInitial(donneesInitiales) {
+
+    if (
+        donneesInitiales
+        &&
+        typeof donneesInitiales === "object"
+        &&
+        "taux" in donneesInitiales
+    ) {
+
+        return lireNombre(
+            donneesInitiales.taux
+        );
+
+    }
+
+    return 0;
 
 }
 

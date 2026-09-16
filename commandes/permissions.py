@@ -12,14 +12,11 @@ du module Commandes.
 """
 
 from comptes.permissions import (
+    date_dans_delai_modification,
     est_directeur,
     est_gerant,
     point_vente_utilisateur
 )
-
-from datetime import timedelta
-
-from django.utils import timezone
 
 from commandes.models import Commande
 
@@ -75,6 +72,12 @@ def commande_gerant_modifiable_par_directeur(commande):
 
         return False
 
+    if not date_dans_delai_modification(
+        commande.date_commande
+    ):
+
+        return False
+
     if not commande.pk:
 
         return True
@@ -83,6 +86,39 @@ def commande_gerant_modifiable_par_directeur(commande):
         etat="CLOTUREE"
     ).exists()
 
+
+
+# ==========================================================
+# CORRECTION D'UNE COMMANDE GERANT PAR LE DIRECTEUR
+# ==========================================================
+
+def peut_corriger_par_directeur(
+    utilisateur,
+    commande
+):
+    """
+    Autorise le Directeur à corriger
+    une commande normale enregistrée par un Gérant.
+    """
+
+    if not est_directeur(utilisateur):
+        return False
+
+    if commande.type_commande != Commande.TYPE_GERANT:
+        return False
+
+    if commande.categorie_commande != Commande.CATEGORIE_NORMALE:
+        return False
+
+    if not commande.actif:
+        return False
+
+    return True
+
+
+# ==========================================================
+# Qui peut modifier
+# ==========================================================
 
 def peut_modifier(utilisateur, commande):
 
@@ -99,21 +135,48 @@ def peut_modifier(utilisateur, commande):
             commande
         )
 
+    if not est_directeur(utilisateur):
+
+        return False
+
     if commande.point_vente != point_vente_utilisateur(utilisateur):
         return False
 
     if commande.type_commande == Commande.TYPE_DIRECTEUR:
 
-        return (
-            timezone.now().date() -
+        return date_dans_delai_modification(
             commande.date_commande
-        ).days <= 3
+        )
 
     if commande.type_commande == Commande.TYPE_GERANT:
 
-        return commande.etat == Commande.EN_ATTENTE
+        return False
 
     return False
+
+# ==========================================================
+# CORRECTION PAR LE DIRECTEUR
+# ==========================================================
+
+def peut_corriger_par_directeur(
+    utilisateur,
+    commande
+):
+
+    if not est_directeur(utilisateur):
+        return False
+
+    if commande.type_commande != Commande.TYPE_GERANT:
+        return False
+
+    if commande.categorie_commande != Commande.CATEGORIE_NORMALE:
+        return False
+
+    if not commande.actif:
+        return False
+
+    return True
+
 
 # ==========================================================
 # SUPPRESSION

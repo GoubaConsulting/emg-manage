@@ -1,0 +1,865 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}
+    {{ titre }}
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+
+    <div class="card-header bg-warning">
+
+        <h4 class="mb-0">
+            {{ titre }}
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <!-- ==================================================
+             INFORMATION SUR LA CORRECTION
+        =================================================== -->
+
+        <div class="alert alert-warning border-warning mb-4">
+
+            <h5 class="alert-heading">
+                Correction exceptionnelle
+            </h5>
+
+            <p class="mb-2">
+
+                Vous êtes sur le point de corriger la commande
+
+                <strong>
+                    {{ commande.numero }}
+                </strong>
+
+                enregistrée par le gérant
+
+                <strong>
+                    {{ commande.utilisateur.get_full_name|default:commande.utilisateur.username }}
+                </strong>.
+
+            </p>
+
+            <div class="row mt-3">
+
+                <div class="col-md-4">
+
+                    <strong>
+                        Point de vente :
+                    </strong>
+
+                    {{ commande.point_vente.designation }}
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <strong>
+                        Date actuelle :
+                    </strong>
+
+                    {{ commande.date_commande|date:"d/m/Y" }}
+
+                </div>
+
+                <div class="col-md-4">
+
+                    <strong>
+                        État :
+                    </strong>
+
+                    {{ commande.get_etat_display }}
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <form method="post" id="form-commande">
+
+            {% csrf_token %}
+
+
+            <!-- ==================================================
+                 URL DE RETOUR
+            =================================================== -->
+
+            {% if next_url %}
+
+                <input
+                    type="hidden"
+                    name="next"
+                    value="{{ next_url }}"
+                >
+
+            {% endif %}
+
+
+            <!-- ==================================================
+                 ERREURS GENERALES
+            =================================================== -->
+
+            {% if form.non_field_errors %}
+
+                <div class="alert alert-danger">
+
+                    {{ form.non_field_errors }}
+
+                </div>
+
+            {% endif %}
+
+
+            <!-- ==================================================
+                 DATE
+            =================================================== -->
+
+            <div class="row mb-4">
+
+                <div class="col-md-4">
+
+                    <label class="form-label">
+
+                        {{ form.date_commande.label }}
+
+                    </label>
+
+                    {{ form.date_commande }}
+
+                    {% if form.date_commande.errors %}
+
+                        <div class="text-danger mt-1">
+
+                            {% for error in form.date_commande.errors %}
+
+                                <div>
+                                    {{ error }}
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+
+            <!-- ==================================================
+                 PRODUITS
+            =================================================== -->
+
+            <div class="table-responsive">
+
+                <table
+                    id="table-commandes"
+                    class="table table-bordered table-hover align-middle"
+                >
+
+                    <thead class="table-dark">
+
+                        <tr>
+
+                            <th width="40"></th>
+
+                            <th>
+                                Produit
+                            </th>
+
+                            <th class="text-end">
+                                Prix unitaire
+                            </th>
+
+                            {% if afficher_montant_initial %}
+
+                                <th width="180">
+                                    Montant initial
+                                </th>
+
+                                <th width="180">
+                                    Net initial
+                                </th>
+
+                            {% endif %}
+
+                            <th width="180">
+                                Montant (FCFA)
+                            </th>
+
+                            <th width="120">
+                                Quantité
+                            </th>
+
+                            <th width="120">
+                                Remise (%)
+                            </th>
+
+                            <th width="180">
+                                Montant net (FCFA)
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% regroup produits by compagnie as compagnies %}
+
+                        {% for compagnie in compagnies %}
+
+
+                            <!-- ======================================
+                                 COMPAGNIE
+                            ======================================= -->
+
+                            <tr class="table-secondary">
+
+                                <td colspan="{% if afficher_montant_initial %}9{% else %}7{% endif %}">
+
+                                    <strong>
+
+                                        {{ compagnie.grouper.designation|upper }}
+
+                                    </strong>
+
+                                </td>
+
+                            </tr>
+
+
+                            <!-- ======================================
+                                 PRODUITS
+                            ======================================= -->
+
+                            {% for produit in compagnie.list %}
+
+                                <tr
+                                    class="ligne-produit"
+                                    data-prix="{{ produit.prix }}"
+                                    data-compagnie="{{ produit.compagnie.idcompagnie }}"
+                                    data-montant-initial="{{ produit.montant_initial_commande_js|default:'0' }}"
+                                    data-montant-net-initial="{{ produit.montant_net_initial_commande_js|default:'0' }}"
+                                    data-taux-initial="{{ produit.taux_initial_commande|default:'0' }}"
+                                >
+
+                                    <td class="text-center">
+
+                                        {% if produit.commande_verrouillee %}
+
+                                            <input
+                                                type="hidden"
+                                                name="produit_{{ produit.idproduit }}"
+                                                value="1"
+                                            >
+
+                                        {% endif %}
+
+                                        <input
+                                            type="checkbox"
+                                            class="form-check-input produit-check"
+                                            name="produit_{{ produit.idproduit }}"
+                                            value="1"
+
+                                            {% if produit.commande_selectionnee or produit.commande_verrouillee %}
+                                                checked
+                                            {% endif %}
+
+                                            {% if produit.commande_verrouillee %}
+                                                disabled
+                                                data-locked="1"
+                                            {% endif %}
+                                        >
+
+                                    </td>
+
+
+                                    <td>
+
+                                        {{ produit.designation }}
+
+                                    </td>
+
+
+                                    <td class="text-end">
+
+                                        {{ produit.prix }} FCFA
+
+                                    </td>
+
+
+                                    {% if afficher_montant_initial %}
+
+                                        <td>
+
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                readonly
+                                                value="{{ produit.montant_initial_commande|floatformat:2 }} FCFA"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                class="montant-initial"
+                                                name="montant_initial_{{ produit.idproduit }}"
+                                                value="{{ produit.montant_initial_commande|default:0 }}"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                class="net-initial"
+                                                name="montant_net_initial_{{ produit.idproduit }}"
+                                                value="{{ produit.montant_net_initial_commande|default:0 }}"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                class="taux-initial"
+                                                name="taux_initial_{{ produit.idproduit }}"
+                                                value="{{ produit.taux_initial_commande|default:0 }}"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                class="montant-total-brut-ligne"
+                                                name="montant_total_brut_{{ produit.idproduit }}"
+                                                value="0"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                class="montant-total-net-ligne"
+                                                name="montant_total_net_{{ produit.idproduit }}"
+                                                value="0"
+                                            >
+
+                                        </td>
+
+
+                                        <td>
+
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                readonly
+                                                value="{{ produit.montant_net_initial_commande|floatformat:2 }} FCFA"
+                                            >
+
+                                        </td>
+
+                                    {% endif %}
+
+
+                                    <td>
+
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            class="form-control montant"
+                                            name="montant_{{ produit.idproduit }}"
+
+                                            {% if not produit.commande_selectionnee %}
+                                                disabled
+                                            {% endif %}
+
+                                            value="{{ produit.montant_commande|default:0 }}"
+                                        >
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <input
+                                            type="text"
+                                            class="form-control quantite"
+                                            readonly
+                                            value="{{ produit.quantite_commande|default:0 }}"
+                                        >
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max="100"
+                                            class="form-control taux"
+                                            name="taux_{{ produit.idproduit }}"
+
+                                            {% if not produit.commande_selectionnee %}
+                                                disabled
+                                            {% endif %}
+
+                                            value="{{ produit.taux_commande|default:0 }}"
+                                        >
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <input
+                                            type="text"
+                                            class="form-control net"
+                                            readonly
+                                            value="{{ produit.net_commande|default:0 }}"
+                                        >
+
+                                    </td>
+
+                                </tr>
+
+                            {% endfor %}
+
+
+                            <!-- ======================================
+                                 SOUS-TOTAL COMPAGNIE
+                            ======================================= -->
+
+                            <tr class="table-warning">
+
+                                <td
+                                    colspan="{% if afficher_montant_initial %}8{% else %}6{% endif %}"
+                                    class="text-end"
+                                >
+
+                                    <strong>
+
+                                        Sous-total
+                                        {{ compagnie.grouper.designation }}
+
+                                    </strong>
+
+                                </td>
+
+                                <td>
+
+                                    <input
+                                        type="text"
+                                        class="form-control fw-bold subtotal-compagnie"
+                                        data-compagnie="{{ compagnie.grouper.idcompagnie }}"
+                                        readonly
+                                        value="0 FCFA"
+                                    >
+
+                                </td>
+
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            <hr>
+
+
+            <!-- ==================================================
+                 TOTAUX
+            =================================================== -->
+
+            <div class="row row-cols-1 row-cols-md-3 g-3 mt-4">
+
+
+                <!-- MONTANT BRUT -->
+
+                <div class="col">
+
+                    <div class="card border-primary shadow-sm h-100">
+
+                        <div class="card-header bg-primary text-white">
+
+                            <strong>
+                                Montant brut
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            {% if afficher_montant_initial %}
+
+                                <div class="d-flex justify-content-between gap-3 mb-2">
+
+                                    <span class="text-muted">
+                                        Initiaux
+                                    </span>
+
+                                    <strong id="total-brut-initial">
+                                        0 FCFA
+                                    </strong>
+
+                                </div>
+
+                                <div class="d-flex justify-content-between gap-3 mb-2">
+
+                                    <span class="text-muted">
+                                        Commande
+                                    </span>
+
+                                    <strong id="total-brut-commande">
+                                        0 FCFA
+                                    </strong>
+
+                                </div>
+
+                                <hr class="my-2">
+
+                            {% endif %}
+
+                            <h3
+                                id="total-brut"
+                                class="mb-0"
+                            >
+
+                                0 FCFA
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- MONTANT NET -->
+
+                <div class="col">
+
+                    <div class="card border-success shadow-sm h-100">
+
+                        <div class="card-header bg-success text-white">
+
+                            <strong>
+                                Montant net
+                            </strong>
+
+                        </div>
+
+                        <div class="card-body text-center">
+
+                            {% if afficher_montant_initial %}
+
+                                <div class="d-flex justify-content-between gap-3 mb-2">
+
+                                    <span class="text-muted">
+                                        Net initial
+                                    </span>
+
+                                    <strong id="total-net-initial">
+                                        0 FCFA
+                                    </strong>
+
+                                </div>
+
+                                <div class="d-flex justify-content-between gap-3 mb-2">
+
+                                    <span class="text-muted">
+                                        Net commande
+                                    </span>
+
+                                    <strong id="total-net-commande">
+                                        0 FCFA
+                                    </strong>
+
+                                </div>
+
+                                <hr class="my-2">
+
+                            {% endif %}
+
+                            <h3
+                                id="total-net"
+                                class="mb-0"
+                            >
+
+                                0 FCFA
+
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {% if afficher_montant_initial %}
+
+
+                    <!-- FOND GERANT -->
+
+                    <div class="col">
+
+                        <div class="card border-info shadow-sm h-100">
+
+                            <div class="card-header bg-info text-white">
+
+                                <strong>
+                                    Fond du gérant
+                                </strong>
+
+                            </div>
+
+                            <div class="card-body text-center">
+
+                                <h3
+                                    id="fond-gerant"
+                                    class="mb-0"
+                                    data-fond="{{ fond_gerant_js|default:'0' }}"
+                                >
+
+                                    {{ fond_gerant|default:0|floatformat:2 }} FCFA
+
+                                </h3>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- MONTANTS INITIAUX -->
+
+                    <div class="col">
+
+                        <div class="card border-warning shadow-sm h-100">
+
+                            <div class="card-header bg-warning text-dark">
+
+                                <strong>
+                                    Montants initiaux
+                                </strong>
+
+                            </div>
+
+                            <div class="card-body text-center">
+
+                                <h3
+                                    id="total-montants-initiaux"
+                                    class="mb-0"
+                                    data-total-initial="{{ total_montants_initiaux_js|default:'0' }}"
+                                >
+
+                                    {{ total_montants_initiaux|default:0|floatformat:2 }} FCFA
+
+                                </h3>
+
+                                <small class="text-muted d-block mt-2">
+
+                                    Net initial :
+
+                                    <strong id="total-montants-initiaux-net">
+
+                                        {{ total_montants_initiaux_net|default:0|floatformat:2 }} FCFA
+
+                                    </strong>
+
+                                </small>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- DIFFERENCE FOND -->
+
+                    <div class="col">
+
+                        <div
+                            id="carte-difference-fond"
+                            class="card border-secondary shadow-sm h-100"
+                        >
+
+                            <div
+                                id="entete-difference-fond"
+                                class="card-header bg-secondary text-white"
+                            >
+
+                                <strong>
+                                    Différence fond
+                                </strong>
+
+                            </div>
+
+                            <div class="card-body text-center">
+
+                                <h3
+                                    id="difference-fond"
+                                    class="mb-0"
+                                >
+
+                                    0 FCFA
+
+                                </h3>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- CREDIT -->
+
+                    <div class="col">
+
+                        <div
+                            id="carte-credit-fond"
+                            class="card border-success shadow-sm h-100"
+                        >
+
+                            <div
+                                id="entete-credit-fond"
+                                class="card-header bg-success text-white"
+                            >
+
+                                <strong>
+                                    Crédit
+                                </strong>
+
+                            </div>
+
+                            <div class="card-body text-center">
+
+                                <h3
+                                    id="credit-fond"
+                                    class="mb-0"
+                                >
+
+                                    0 FCFA
+
+                                </h3>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+
+            {% if afficher_montant_initial %}
+
+                {{ commandes_validees_jour|json_script:"commandes-validees-jour" }}
+
+            {% endif %}
+
+
+            <!-- ==================================================
+                 MOTIF DE CORRECTION
+            =================================================== -->
+
+            <div class="card border-warning mt-4">
+
+                <div class="card-header bg-warning">
+
+                    <strong>
+                        Motif de la correction
+                    </strong>
+
+                </div>
+
+                <div class="card-body">
+
+                    <p class="text-muted">
+
+                        Indiquez la raison de cette correction.
+                        Cette information sera conservée dans
+                        l'historique et communiquée au gérant.
+
+                    </p>
+
+                    {{ form.motif_correction }}
+
+                    {% if form.motif_correction.errors %}
+
+                        <div class="text-danger mt-2">
+
+                            {% for error in form.motif_correction.errors %}
+
+                                <div>
+                                    {{ error }}
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+
+            <!-- ==================================================
+                 ACTIONS
+            =================================================== -->
+
+            <div class="d-flex justify-content-between mt-4">
+
+                <a
+                    href="{% if next_url %}{{ next_url }}{% else %}{% url 'apercu_directeur' %}{% endif %}"
+                    class="btn btn-secondary"
+                >
+
+                    Retour
+
+                </a>
+
+
+                <button
+                    type="submit"
+                    class="btn btn-warning"
+                    data-confirm-submit
+                    data-confirm-message="Voulez-vous vraiment enregistrer cette correction ?"
+                >
+
+                    Enregistrer la correction
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script src="{% static 'js/commandes.js' %}?v=20260829-actions"></script>
+
+{% endblock %}

@@ -115,6 +115,46 @@ class Commande(models.Model):
         verbose_name="Montant net"
     )
 
+    montant_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant initial"
+    )
+
+    montant_net_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant net initial"
+    )
+
+    montant_total_brut = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant total brut"
+    )
+
+    montant_total_net = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant total net"
+    )
+
     point_vente = models.ForeignKey(
         PointVente,
         on_delete=models.PROTECT,
@@ -302,6 +342,42 @@ class LigneCommande(models.Model):
         max_digits=18,
         decimal_places=2,
         default=0
+    )
+
+    montant_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
+    )
+
+    montant_net_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
+    )
+
+    montant_total_brut = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
+    )
+
+    montant_total_net = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
     )
 
     class Meta:

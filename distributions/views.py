@@ -1,4 +1,5 @@
 from django.shortcuts import (
+    get_object_or_404,
     render,
     redirect,
 )
@@ -13,9 +14,15 @@ from .forms import (
     DistributionForm,
     VenteDirecteForm,
 )
-from .models import Distribution
+from .models import (
+    Distribution,
+    LigneDistribution,
+)
 from django.contrib.auth.decorators import login_required
-from .permissions import verifier_creation_distribution
+from .permissions import (
+    peut_modifier_distribution,
+    verifier_creation_distribution,
+)
 from referentiel.models import (
     Produit,
     PointVente,
@@ -25,6 +32,7 @@ from .services import (
     construire_lignes_depuis_formulaire,
     creer_distribution,
     creer_distribution_gerant,
+    modifier_distribution,
 )
 from django.contrib import messages
 
@@ -40,6 +48,8 @@ from django.core.paginator import Paginator
 from django.db import transaction
 
 from django.db.models import Sum
+from django.http import HttpResponseForbidden
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from comptes.models import ProfilUtilisateur
 
@@ -118,6 +128,34 @@ def querystring_pagination(
         )
 
     return params.urlencode()
+
+
+def url_retour_securisee(request):
+    """
+    Retourne une URL de retour locale valide.
+    """
+
+    retour = (
+        request.POST.get("next")
+        or
+        request.GET.get("next")
+    )
+
+    if not retour:
+
+        return ""
+
+    if url_has_allowed_host_and_scheme(
+        url=retour,
+        allowed_hosts={
+            request.get_host()
+        },
+        require_https=request.is_secure(),
+    ):
+
+        return retour
+
+    return ""
 
 
 def filtre_texte(
@@ -216,6 +254,127 @@ def produits_disponibles_point_vente(point_vente):
     return produits
 
 
+def produits_formulaire_modification_distribution(
+    distribution
+):
+    """
+    Prepare les produits et les valeurs existantes
+    pour corriger une distribution.
+    """
+
+    lignes = {
+        ligne.produit_id: ligne
+        for ligne in distribution.lignes.select_related(
+            "produit"
+        )
+    }
+
+    stock_par_produit = {
+        stock.produit_id: stock.quantite
+        for stock in Stock.objects.filter(
+            actif=True,
+            point_vente=distribution.point_vente_source,
+            type_stock=TYPE_NORMAL,
+        )
+    }
+
+    produit_ids = (
+        set(
+            stock_par_produit.keys()
+        )
+        |
+        set(
+            lignes.keys()
+        )
+    )
+
+    produits = list(
+        Produit.objects
+        .filter(
+            pk__in=produit_ids,
+            actif=True,
+        )
+        .select_related(
+            "compagnie"
+        )
+        .order_by(
+            "compagnie__designation",
+            "designation",
+        )
+    )
+
+    for produit in produits:
+
+        ligne = lignes.get(
+            produit.pk
+        )
+
+        stock_disponible = stock_par_produit.get(
+            produit.pk,
+            Decimal("0.00")
+        )
+
+        if ligne is not None:
+
+            stock_disponible += ligne.quantite
+
+        produit.stock_disponible = stock_disponible
+
+        produit.distribution_selectionnee = (
+            ligne is not None
+        )
+
+        produit.montant_distribution = (
+            ligne.montant
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.quantite_distribution = (
+            ligne.quantite
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.taux_distribution_form = (
+            ligne.taux_remise
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.remise_distribution = (
+            ligne.montant_remise
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.net_distribution = (
+            ligne.montant_net
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.montant_initial_distribution = (
+            ligne.montant_initial
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.montant_net_initial_distribution = (
+            ligne.montant_net_initial
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.taux_initial_distribution = (
+            ligne.taux_remise
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+    return produits
+
+
 def configurer_form_destinataire(
     form,
     point_vente,
@@ -268,7 +427,8 @@ def date_distribution_saisie(request):
 
 def montants_initiaux_destinataire(
     distributeur,
-    date_distribution
+    date_distribution,
+    distribution_a_exclure=None
 ):
     """
     Retourne les montants bruts et nets restants de la derniere
@@ -288,13 +448,67 @@ def montants_initiaux_destinataire(
 
         return {}
 
+    distributions_jour = (
+        Distribution.objects
+        .filter(
+            actif=True,
+            distributeur=distributeur,
+            date_distribution=date_distribution,
+            type_distribution=Distribution.TYPE_DISTRIBUTEUR,
+            lignes__montant_initial__gt=0,
+        )
+    )
+
+    if distribution_a_exclure is not None:
+
+        distributions_jour = distributions_jour.exclude(
+            pk=distribution_a_exclure.pk
+        )
+
+    produits_deja_reportes = set(
+        LigneDistribution.objects
+        .filter(
+            distribution__in=distributions_jour,
+            montant_initial__gt=0,
+        )
+        .values_list(
+            "produit_id",
+            flat=True,
+        )
+    )
+
+    lignes_situation = list(
+        situation.lignes.all()
+    )
+
+    produits_ids = [
+        ligne.produit_id
+        for ligne in lignes_situation
+        if ligne.quantite_restante > 0
+    ]
+
+    taux_par_produit = taux_derniere_distribution_destinataire(
+        distributeur,
+        produits_ids,
+        date_distribution,
+    )
+
     montants = {}
 
-    for ligne in situation.lignes.all():
+    for ligne in lignes_situation:
 
         if ligne.quantite_restante <= 0:
 
             continue
+
+        if ligne.produit_id in produits_deja_reportes:
+
+            continue
+
+        taux_initial = taux_par_produit.get(
+            ligne.produit_id,
+            ligne.taux_remise,
+        )
 
         montants[str(ligne.produit_id)] = {
             "brut": float(
@@ -306,17 +520,67 @@ def montants_initiaux_destinataire(
                 calculer_valeur_nette_quantite(
                     ligne.quantite_restante,
                     ligne.prix_unitaire,
-                    ligne.taux_remise,
+                    taux_initial,
                 )
+            ),
+            "taux": float(
+                taux_initial
             ),
         }
 
     return montants
 
 
+def taux_derniere_distribution_destinataire(
+    distributeur,
+    produits_ids,
+    date_distribution
+):
+    """
+    Retourne le dernier taux de distribution utilise par produit
+    pour le destinataire avant la distribution en cours.
+    """
+
+    if not produits_ids:
+
+        return {}
+
+    lignes = (
+        LigneDistribution.objects
+        .filter(
+            distribution__actif=True,
+            distribution__distributeur=distributeur,
+            distribution__date_distribution__lt=date_distribution,
+            produit_id__in=produits_ids,
+        )
+        .select_related(
+            "distribution"
+        )
+        .order_by(
+            "produit_id",
+            "-distribution__date_distribution",
+            "-distribution__iddistribution",
+            "-idlignedistribution",
+        )
+    )
+
+    taux = {}
+
+    for ligne in lignes:
+
+        if ligne.produit_id in taux:
+
+            continue
+
+        taux[ligne.produit_id] = ligne.taux_remise
+
+    return taux
+
+
 def reliquats_destinataires_json(
     destinataires,
-    date_distribution
+    date_distribution,
+    distribution_a_exclure=None
 ):
     """
     Prepare les montants initiaux par destinataire pour
@@ -330,7 +594,8 @@ def reliquats_destinataires_json(
         donnees[str(distributeur.pk)] = (
             montants_initiaux_destinataire(
                 distributeur,
-                date_distribution
+                date_distribution,
+                distribution_a_exclure=distribution_a_exclure,
             )
         )
 
@@ -931,6 +1196,247 @@ def ajouter_distribution_directeur_client(request):
 
 
 @login_required
+def modifier_distribution_view(request, pk):
+    """
+    Correction d'une distribution par le Directeur.
+    """
+
+    if request.user.profil.role != "DIRECTEUR":
+
+        return HttpResponseForbidden()
+
+    distribution = get_object_or_404(
+        Distribution.objects
+        .filter(
+            actif=True
+        )
+        .select_related(
+            "commande",
+            "point_vente_source",
+            "point_vente_destination",
+            "distributeur",
+            "utilisateur",
+        )
+        .prefetch_related(
+            "lignes__produit__compagnie"
+        ),
+        pk=pk,
+    )
+
+    next_url = url_retour_securisee(
+        request
+    )
+
+    if not peut_modifier_distribution(
+        request.user,
+        distribution
+    ):
+
+        messages.error(
+            request,
+            "Cette distribution n'est pas modifiable. "
+            "Elle doit etre dans le delai de 3 jours "
+            "et ne pas etre une distribution terrain deja cloturee."
+        )
+
+        if next_url:
+
+            return redirect(
+                next_url
+            )
+
+        return redirect(
+            "distributions:liste_distributions"
+        )
+
+    produits = produits_formulaire_modification_distribution(
+        distribution
+    )
+
+    if distribution.type_distribution == (
+        Distribution.TYPE_CLIENT_DIRECT
+    ):
+
+        if request.method == "POST":
+
+            form = VenteDirecteForm(
+                request.POST
+            )
+
+            if form.is_valid():
+
+                try:
+
+                    lignes = construire_lignes_depuis_formulaire(
+                        request.POST
+                    )
+
+                    modifier_distribution(
+                        distribution=distribution,
+                        date_distribution=(
+                            form.cleaned_data[
+                                "date_distribution"
+                            ]
+                        ),
+                        distributeur=distribution.distributeur,
+                        lignes=lignes,
+                        utilisateur=request.user,
+                    )
+
+                    messages.success(
+                        request,
+                        "Vente directe modifiee avec succes."
+                    )
+
+                    if next_url:
+
+                        return redirect(
+                            next_url
+                        )
+
+                    return redirect(
+                        "distributions:liste_distributions"
+                    )
+
+                except Exception as e:
+
+                    form.add_error(
+                        None,
+                        str(e)
+                    )
+
+        else:
+
+            form = VenteDirecteForm(
+                initial={
+                    "date_distribution": (
+                        distribution.date_distribution
+                    )
+                }
+            )
+
+        return render(
+            request,
+            "distributions/gerant/client_form.html",
+            {
+                "form": form,
+                "produits": produits,
+                "titre": "Modification d'une vente directe",
+                "bouton_enregistrer": "Modifier la vente directe",
+                "distribution": distribution,
+                "mode_modification": True,
+                "next_url": next_url,
+                "url_retour_direct": next_url,
+            }
+        )
+
+    if request.method == "POST":
+
+        form = DistributionForm(
+            request.POST,
+            instance=distribution,
+        )
+
+        configurer_form_destinataire(
+            form,
+            distribution.point_vente_source,
+            Distributeur.CATEGORIE_DISTRIBUTEUR,
+            "Distributeur",
+        )
+
+        if form.is_valid():
+
+            try:
+
+                lignes = construire_lignes_depuis_formulaire(
+                    request.POST
+                )
+
+                modifier_distribution(
+                    distribution=distribution,
+                    date_distribution=(
+                        form.cleaned_data[
+                            "date_distribution"
+                        ]
+                    ),
+                    distributeur=form.cleaned_data[
+                        "distributeur"
+                    ],
+                    lignes=lignes,
+                    utilisateur=request.user,
+                )
+
+                messages.success(
+                    request,
+                    "Distribution modifiee avec succes."
+                )
+
+                if next_url:
+
+                    return redirect(
+                        next_url
+                    )
+
+                return redirect(
+                    "distributions:liste_distributions"
+                )
+
+            except Exception as e:
+
+                form.add_error(
+                    None,
+                    str(e)
+                )
+
+    else:
+
+        form = DistributionForm(
+            instance=distribution,
+            initial={
+                "date_distribution": (
+                    distribution.date_distribution
+                ),
+                "distributeur": distribution.distributeur,
+            }
+        )
+
+        configurer_form_destinataire(
+            form,
+            distribution.point_vente_source,
+            Distributeur.CATEGORIE_DISTRIBUTEUR,
+            "Distributeur",
+        )
+
+    destinataires_distribution = (
+        form.fields["distributeur"].queryset
+    )
+
+    return render(
+        request,
+        "distributions/gerant/form.html",
+        {
+            "form": form,
+            "produits": produits,
+            "titre": "Modification d'une distribution",
+            "destinataire_label": "Distributeur",
+            "bouton_enregistrer": "Modifier la distribution",
+            "aucun_destinataire": (
+                not destinataires_distribution.exists()
+            ),
+            "reliquats_json": reliquats_destinataires_json(
+                destinataires_distribution,
+                distribution.date_distribution,
+                distribution_a_exclure=distribution,
+            ),
+            "distribution": distribution,
+            "mode_modification": True,
+            "next_url": next_url,
+            "url_retour_direct": next_url,
+        }
+    )
+
+
+@login_required
 def liste_distributions(request):
     """
     Liste des distributions.
@@ -1231,6 +1737,13 @@ def liste_distributions(request):
 
         for distribution in distributions_page:
 
+            distribution.peut_modifier = (
+                peut_modifier_distribution(
+                    request.user,
+                    distribution
+                )
+            )
+
             lignes = sorted(
 
                 distribution.lignes.all(),
@@ -1438,7 +1951,7 @@ def ajouter_distribution_directeur(request):
 
         montants_initiaux = montants_initiaux_destinataire(
             distributeur_gerant,
-            date.today()
+            commande.date_commande
         )
 
         for ligne in commande.lignes.select_related(
@@ -1474,6 +1987,17 @@ def ajouter_distribution_directeur(request):
 
                 "montant_initial_brut": float(
                     donnees_initiales.get("brut", 0)
+                ),
+
+                "montant_initial_net": float(
+                    donnees_initiales.get("net", 0)
+                ),
+
+                "taux_initial": float(
+                    donnees_initiales.get(
+                        "taux",
+                        ligne.taux_remise
+                    )
                 ),
 
                 "taux": float(ligne.taux_remise),
@@ -1536,7 +2060,7 @@ def ajouter_distribution_directeur(request):
 
                 distributeur=distributeur,
 
-                date_distribution=date.today(),
+                date_distribution=commande.date_commande,
 
                 lignes=lignes,
 

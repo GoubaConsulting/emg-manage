@@ -169,6 +169,9 @@ Règlements des manquants
                         <th class="text-end">Montant réglé</th>
                         <th class="text-end">Reste à payer</th>
                         <th>Utilisateur</th>
+                        {% if request.user.profil.role != "GERANT" %}
+                            <th class="text-center">Actions</th>
+                        {% endif %}
                     </tr>
                 </thead>
 
@@ -198,10 +201,26 @@ Règlements des manquants
                         <td class="text-end">{{ reglement.montant|floatformat:2 }}</td>
                         <td class="text-end">{{ reglement.manquant.reste_a_payer|floatformat:2 }}</td>
                         <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
+                        {% if request.user.profil.role != "GERANT" %}
+                            <td class="text-center">
+                                {% if reglement.peut_modifier %}
+                                    <a
+                                        href="{% url 'situations:modifier_reglement_manquant' reglement.idreglement %}?next={{ request.get_full_path|urlencode }}"
+                                        class="btn btn-sm btn-outline-warning"
+                                    >
+                                        Modifier
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">
+                                        -
+                                    </span>
+                                {% endif %}
+                            </td>
+                        {% endif %}
                     </tr>
 
                     <tr class="collapse" id="reglement{{ reglement.idreglement }}">
-                        <td colspan="9">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}9{% else %}10{% endif %}">
 
                             <div class="p-3 bg-light">
 
@@ -269,7 +288,7 @@ Règlements des manquants
                     {% empty %}
 
                     <tr>
-                        <td colspan="9" class="text-center">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}9{% else %}10{% endif %}" class="text-center">
                             Aucun règlement de manquant trouvé.
                         </td>
                     </tr>

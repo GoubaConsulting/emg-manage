@@ -20,6 +20,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.http import HttpResponseForbidden
 from django.shortcuts import (
+    get_object_or_404,
     redirect,
     render,
 )
@@ -35,6 +36,7 @@ from .models import MouvementStock
 from .permissions import (
     peut_consulter,
     peut_creer,
+    peut_modifier,
 )
 from .selectors import (
     mouvements_visibles,
@@ -45,6 +47,7 @@ from .selectors import (
 from .services import (
     construire_lignes_depuis_formulaire,
     creer_mouvement_stock,
+    modifier_mouvement_stock,
 )
 
 
@@ -163,7 +166,10 @@ def _preparer_groupes_lignes(mouvements_page):
         mouvement.groupes_compagnies = groupes
 
 
-def _produits_formulaire(point_vente):
+def _produits_formulaire(
+    point_vente,
+    mouvement=None
+):
     """
     Prepare les produits avec les stocks visibles dans le formulaire.
     """
@@ -175,6 +181,15 @@ def _produits_formulaire(point_vente):
     produits = list(
         produits_actifs()
     )
+
+    quantites_mouvement = {}
+
+    if mouvement is not None:
+
+        quantites_mouvement = {
+            ligne.produit_id: ligne.quantite
+            for ligne in mouvement.lignes.all()
+        }
 
     for produit in produits:
 
@@ -190,6 +205,11 @@ def _produits_formulaire(point_vente):
 
         produit.stock_tampon = donnees_stock.get(
             TYPE_TAMPON,
+            Decimal("0.00")
+        )
+
+        produit.quantite_mouvement = quantites_mouvement.get(
+            produit.pk,
             Decimal("0.00")
         )
 
@@ -324,6 +344,13 @@ def liste_mouvements(request):
         page
     )
 
+    for mouvement in page:
+
+        mouvement.peut_modifier = peut_modifier(
+            request.user,
+            mouvement
+        )
+
     return render(
         request,
         "mouvements_stock/liste.html",
@@ -427,5 +454,109 @@ def ajouter_mouvement(request):
             "groupes_compagnies": _produits_formulaire(
                 point_vente
             ),
+        }
+    )
+
+
+@login_required
+def modifier_mouvement(request, pk):
+    """
+    Modification d'une entree ou sortie de stock recente.
+    """
+
+    mouvement = get_object_or_404(
+        mouvements_visibles(
+            request.user
+        ),
+        pk=pk,
+    )
+
+    if not peut_modifier(
+        request.user,
+        mouvement
+    ):
+
+        messages.error(
+            request,
+            "Ce mouvement de stock n'est pas modifiable."
+        )
+
+        return redirect(
+            "mouvements_stock:liste_mouvements"
+        )
+
+    point_vente = mouvement.point_vente
+
+    if request.method == "POST":
+
+        form = MouvementStockForm(
+            request.POST,
+            instance=mouvement,
+        )
+
+        if form.is_valid():
+
+            try:
+
+                lignes = construire_lignes_depuis_formulaire(
+                    request.POST
+                )
+
+                modifier_mouvement_stock(
+                    mouvement=mouvement,
+                    type_mouvement=form.cleaned_data[
+                        "type_mouvement"
+                    ],
+                    type_stock=form.cleaned_data[
+                        "type_stock"
+                    ],
+                    date_mouvement=form.cleaned_data[
+                        "date_mouvement"
+                    ],
+                    motif=form.cleaned_data[
+                        "motif"
+                    ],
+                    observation=form.cleaned_data[
+                        "observation"
+                    ],
+                    lignes=lignes,
+                    utilisateur=request.user,
+                )
+
+                messages.success(
+                    request,
+                    "Mouvement de stock modifie avec succes."
+                )
+
+                return redirect(
+                    "mouvements_stock:liste_mouvements"
+                )
+
+            except Exception as e:
+
+                form.add_error(
+                    None,
+                    str(e)
+                )
+
+    else:
+
+        form = MouvementStockForm(
+            instance=mouvement
+        )
+
+    return render(
+        request,
+        "mouvements_stock/form.html",
+        {
+            "form": form,
+            "mouvement": mouvement,
+            "point_vente": point_vente,
+            "groupes_compagnies": _produits_formulaire(
+                point_vente,
+                mouvement
+            ),
+            "titre": "Modification d'un mouvement de stock",
+            "bouton_enregistrer": "Modifier le mouvement",
         }
     )

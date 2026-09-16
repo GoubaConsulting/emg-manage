@@ -28,6 +28,7 @@ from .models import (
 )
 
 from .numerotation import generer_numero_mouvement_stock
+from .permissions import peut_modifier
 
 
 def construire_lignes_depuis_formulaire(donnees):
@@ -189,6 +190,182 @@ def creer_mouvement_stock(
 
     mouvement.save(
         update_fields=[
+            "total_quantite",
+            "date_modification",
+        ]
+    )
+
+    return mouvement
+
+
+def _appliquer_lignes_mouvement(
+    mouvement,
+    lignes,
+):
+    """
+    Applique les lignes d'un mouvement au stock
+    et retourne la quantite totale.
+    """
+
+    lignes_mouvement = []
+
+    total_quantite = Decimal("0.00")
+
+    for ligne in lignes:
+
+        produit = ligne["produit"]
+
+        quantite = Decimal(
+            str(ligne["quantite"])
+        )
+
+        if quantite <= 0:
+
+            raise ValueError(
+                "La quantite doit etre superieure a zero."
+            )
+
+        stock = creer_stock(
+            point_vente=mouvement.point_vente,
+            produit=produit,
+            type_stock=mouvement.type_stock,
+        )
+
+        stock_avant = stock.quantite
+
+        if mouvement.type_mouvement == MouvementStock.TYPE_ENTREE:
+
+            stock = ajouter_stock(
+                point_vente=mouvement.point_vente,
+                produit=produit,
+                quantite=quantite,
+                type_stock=mouvement.type_stock,
+            )
+
+        elif mouvement.type_mouvement == MouvementStock.TYPE_SORTIE:
+
+            stock = retirer_stock(
+                point_vente=mouvement.point_vente,
+                produit=produit,
+                quantite=quantite,
+                type_stock=mouvement.type_stock,
+            )
+
+        else:
+
+            raise ValueError(
+                "Le type de mouvement est invalide."
+            )
+
+        lignes_mouvement.append(
+            LigneMouvementStock(
+                mouvement=mouvement,
+                produit=produit,
+                quantite=quantite,
+                stock_avant=stock_avant,
+                stock_apres=stock.quantite,
+            )
+        )
+
+        total_quantite += quantite
+
+    LigneMouvementStock.objects.bulk_create(
+        lignes_mouvement
+    )
+
+    return total_quantite
+
+
+def _annuler_effet_stock_mouvement(mouvement):
+    """
+    Retire l'effet stock deja produit par un mouvement.
+    """
+
+    for ligne in mouvement.lignes.select_related(
+        "produit"
+    ):
+
+        if mouvement.type_mouvement == MouvementStock.TYPE_ENTREE:
+
+            retirer_stock(
+                point_vente=mouvement.point_vente,
+                produit=ligne.produit,
+                quantite=ligne.quantite,
+                type_stock=mouvement.type_stock,
+            )
+
+        elif mouvement.type_mouvement == MouvementStock.TYPE_SORTIE:
+
+            ajouter_stock(
+                point_vente=mouvement.point_vente,
+                produit=ligne.produit,
+                quantite=ligne.quantite,
+                type_stock=mouvement.type_stock,
+            )
+
+        else:
+
+            raise ValueError(
+                "Le type de mouvement est invalide."
+            )
+
+
+@transaction.atomic
+def modifier_mouvement_stock(
+    mouvement,
+    type_mouvement,
+    type_stock,
+    date_mouvement,
+    motif,
+    observation,
+    lignes,
+    utilisateur,
+):
+    """
+    Corrige un mouvement et rejoue son impact stock.
+    """
+
+    if not peut_modifier(
+        utilisateur,
+        mouvement
+    ):
+
+        raise ValueError(
+            "Ce mouvement de stock n'est pas modifiable."
+        )
+
+    if not lignes:
+
+        raise ValueError(
+            "Veuillez saisir au moins un produit."
+        )
+
+    _annuler_effet_stock_mouvement(
+        mouvement
+    )
+
+    mouvement.type_mouvement = type_mouvement
+    mouvement.type_stock = type_stock
+    mouvement.date_mouvement = date_mouvement
+    mouvement.motif = motif
+    mouvement.observation = observation or ""
+
+    mouvement.lignes.all().delete()
+
+    total_quantite = _appliquer_lignes_mouvement(
+        mouvement,
+        lignes
+    )
+
+    mouvement.total_quantite = total_quantite
+
+    mouvement.save(
+        update_fields=[
+            "type_mouvement",
+            "type_stock",
+            "date_mouvement",
+            "motif",
+            "observation",
             "total_quantite",
             "date_modification",
         ]

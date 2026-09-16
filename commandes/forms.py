@@ -43,3 +43,36 @@ class CommandeForm(forms.Form):
         )
 
     )
+
+
+
+# ==========================================================
+# CORRECTION COMMANDE GERANT PAR DIRECTEUR
+# ==========================================================
+
+class CorrectionCommandeDirecteurForm(CommandeForm):
+
+    motif_correction = forms.CharField(
+
+        label="Motif de la correction",
+
+        required=True,
+
+        widget=forms.Textarea(
+
+            attrs={
+
+                "class": "form-control",
+
+                "rows": 3,
+
+                "placeholder": (
+                    "Exemple : correction demandée "
+                    "par le Gérant suite à une erreur de saisie."
+                )
+
+            }
+
+        )
+
+    )

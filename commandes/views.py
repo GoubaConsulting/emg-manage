@@ -12,6 +12,7 @@ Vues du module Commandes.
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
 from django.http import HttpResponseForbidden
 from django.shortcuts import (
     render,
@@ -24,12 +25,17 @@ from referentiel.models import (
     Distributeur
 
 )
-from .forms import CommandeForm
+from distributions.models import Distribution
 
+from .forms import (
+    CommandeForm,
+    CorrectionCommandeDirecteurForm
+)
 from .permissions import (
     peut_consulter,
     peut_creer,
-    peut_modifier
+    peut_modifier,
+    peut_corriger_par_directeur
 )
 
 from .selectors import (
@@ -39,6 +45,7 @@ from .selectors import (
     commande_pour_modification_par_id,
     commande_gerant_en_attente_par_id,
     commandes_en_attente,
+    commande_gerant_par_id_pour_directeur,
 )
 
 from .services import (
@@ -53,6 +60,7 @@ from .services import (
     modifier_reglement_stock_tampon,
     valider_commande_gerant,
     rejeter_commande_gerant,
+    corriger_commande_par_directeur,
     
 )
 
@@ -62,7 +70,7 @@ from .presentation import (
 
 from django.shortcuts import get_object_or_404
 
-from .models import Commande
+from .models import Commande, LigneCommande
 from .presentation import preparer_affichage_commande
 from decimal import Decimal
 from calendar import monthrange
@@ -76,6 +84,132 @@ from situations.services import (
 
 type_commande=Commande.TYPE_DIRECTEUR,
 
+# ==========================================================
+# CORRECTION COMMANDE GERANT PAR DIRECTEUR
+# ==========================================================
+
+@login_required
+def corriger_commande_directeur_view(
+    request,
+    pk
+):
+
+    commande = commande_pour_modification_par_id(
+        request.user,
+        pk
+    )
+
+    if not peut_corriger_par_directeur(
+        request.user,
+        commande
+    ):
+
+        messages.error(
+            request,
+            "Cette commande ne peut pas être corrigée."
+        )
+
+        return redirect(
+            "apercu_directeur"
+        )
+
+    produits = produits_actifs()
+
+    next_url = request.GET.get(
+        "next"
+    ) or request.POST.get(
+        "next"
+    )
+
+    if request.method == "POST":
+
+        form = CorrectionCommandeDirecteurForm(
+            request.POST
+        )
+
+        if form.is_valid():
+
+            try:
+
+                lignes = construire_lignes_depuis_formulaire(
+                    request.POST,
+                    produits
+                )
+
+                corriger_commande_par_directeur(
+
+                    commande=commande,
+
+                    directeur=request.user,
+
+                    date_commande=form.cleaned_data[
+                        "date_commande"
+                    ],
+
+                    lignes=lignes
+
+                )
+
+                messages.success(
+                    request,
+                    (
+                        f"La commande {commande.numero} "
+                        "a été corrigée avec succès."
+                    )
+                )
+
+                if next_url:
+                    return redirect(
+                        next_url
+                    )
+
+                return redirect(
+                    "apercu_directeur"
+                )
+
+            except Exception as e:
+
+                form.add_error(
+                    None,
+                    str(e)
+                )
+
+    else:
+
+        form = CorrectionCommandeDirecteurForm(
+
+            initial={
+
+                "date_commande":
+                    commande.date_commande
+
+            }
+
+        )
+
+    return render(
+
+        request,
+
+        "commandes/correction_directeur.html",
+
+        {
+
+            "form": form,
+
+            "commande": commande,
+
+            "produits": produits,
+
+            "titre": (
+                "Correction d'une commande du Gérant"
+            ),
+
+            "next_url": next_url,
+
+        }
+
+    )
 
 # ==========================================================
 # FILTRES DE DATES
@@ -273,7 +407,156 @@ def annoter_produits_commande(
             else Decimal("0.00")
         )
 
+        produit.montant_initial_commande = (
+            ligne.montant_initial
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.montant_initial_commande_js = str(
+            produit.montant_initial_commande
+        )
+
+        produit.montant_net_initial_commande = (
+            ligne.montant_net_initial
+            if ligne is not None
+            else Decimal("0.00")
+        )
+
+        produit.montant_net_initial_commande_js = str(
+            produit.montant_net_initial_commande
+        )
+
+        if (
+            ligne is not None
+            and
+            ligne.montant_initial > Decimal("0.00")
+        ):
+
+            produit.taux_initial_commande = (
+                Decimal("100.00")
+                -
+                (
+                    ligne.montant_net_initial
+                    *
+                    Decimal("100.00")
+                    /
+                    ligne.montant_initial
+                )
+            )
+
+        else:
+
+            produit.taux_initial_commande = (
+                ligne.taux_remise
+                if ligne is not None
+                else Decimal("0.00")
+            )
+
+        produit.commande_verrouillee = (
+            produit.montant_initial_commande > Decimal("0.00")
+        )
+
     return produits
+
+
+def totaux_commandes_validees_gerant_par_date(utilisateur):
+    """
+    Retourne le total brut des commandes gerant validees
+    et non cloturees du point de vente, groupe par date.
+    """
+
+    point_vente = utilisateur.profil.point_vente
+
+    if point_vente is None:
+
+        return {}
+
+    lignes = (
+        Commande.objects
+        .filter(
+            actif=True,
+            point_vente=point_vente,
+            type_commande=Commande.TYPE_GERANT,
+            categorie_commande=Commande.CATEGORIE_NORMALE,
+            etat=Commande.VALIDEE,
+        )
+        .exclude(
+            distributions__actif=True,
+            distributions__type_distribution=(
+                Distribution.TYPE_COMMANDE_GERANT
+            ),
+            distributions__etat=Distribution.ETAT_CLOTUREE,
+        )
+        .values(
+            "date_commande"
+        )
+        .annotate(
+            total=Sum(
+                "montant_total_brut"
+            )
+        )
+    )
+
+    return {
+        item["date_commande"].isoformat(): str(
+            item["total"]
+            or
+            Decimal("0.00")
+        )
+        for item in lignes
+    }
+
+
+def taux_derniere_commande_gerant_par_produit(
+    utilisateur,
+    produits_ids
+):
+    """
+    Retourne le dernier taux utilise par produit
+    dans les commandes normales du gerant.
+    """
+
+    point_vente = utilisateur.profil.point_vente
+
+    if point_vente is None:
+
+        return {}
+
+    lignes = (
+        LigneCommande.objects
+        .filter(
+            commande__actif=True,
+            commande__point_vente=point_vente,
+            commande__type_commande=Commande.TYPE_GERANT,
+            commande__categorie_commande=Commande.CATEGORIE_NORMALE,
+            produit_id__in=produits_ids,
+        )
+        .exclude(
+            commande__etat=Commande.REFUSEE
+        )
+        .select_related(
+            "commande"
+        )
+        .order_by(
+            "produit_id",
+            "-commande__date_commande",
+            "-commande__idcommande",
+            "-idlignecommande",
+        )
+    )
+
+    taux_par_produit = {}
+
+    for ligne in lignes:
+
+        if ligne.produit_id in taux_par_produit:
+
+            continue
+
+        taux_par_produit[ligne.produit_id] = ligne.taux_remise
+
+    return taux_par_produit
 
 
 # ==========================================================
@@ -348,6 +631,11 @@ def liste_commandes(request):
     for commande in page:
 
         commande.groupes_compagnies = preparer_affichage_commande(
+            commande
+        )
+
+        commande.peut_modifier = peut_modifier(
+            request.user,
             commande
         )
 
@@ -457,6 +745,11 @@ def liste_commandes_stock_tampon(request):
             commande
         )
 
+        commande.peut_modifier = peut_modifier(
+            request.user,
+            commande
+        )
+
         total_brut += commande.montant_brut
 
         total_net += commande.montant_net
@@ -553,6 +846,11 @@ def liste_reglement_stock(request):
     for commande in page:
 
         commande.groupes_compagnies = preparer_affichage_commande(
+            commande
+        )
+
+        commande.peut_modifier = peut_modifier(
+            request.user,
             commande
         )
 
@@ -654,6 +952,11 @@ def liste_commandes_caution(request):
     for commande in page:
 
         commande.groupes_compagnies = preparer_affichage_commande(
+            commande
+        )
+
+        commande.peut_modifier = peut_modifier(
+            request.user,
             commande
         )
 
@@ -1093,6 +1396,16 @@ def ajouter_commande_gerant(request):
         request.user
     )
 
+    taux_derniere_commande = (
+        taux_derniere_commande_gerant_par_produit(
+            request.user,
+            [
+                produit.pk
+                for produit in produits
+            ]
+        )
+    )
+
     gerant = gerant_du_point_vente(
         request.user.profil.point_vente
     )
@@ -1104,6 +1417,7 @@ def ajouter_commande_gerant(request):
     )
 
     total_montants_initiaux = Decimal("0.00")
+    total_montants_initiaux_net = Decimal("0.00")
 
     for produit in produits:
 
@@ -1114,13 +1428,51 @@ def ajouter_commande_gerant(request):
             )
         )
 
+        taux_initial = (
+            taux_derniere_commande.get(
+                produit.pk,
+                Decimal("0.00")
+            )
+        )
+
+        remise_initiale = (
+            montant_initial
+            *
+            taux_initial
+            /
+            Decimal("100")
+        )
+
+        montant_net_initial = (
+            montant_initial
+            -
+            remise_initiale
+        )
+
         produit.montant_initial_commande = montant_initial
 
         produit.montant_initial_commande_js = str(
             montant_initial
         )
 
+        produit.montant_net_initial_commande = montant_net_initial
+
+        produit.montant_net_initial_commande_js = str(
+            montant_net_initial
+        )
+
+        produit.taux_initial_commande = taux_initial
+
+        produit.commande_selectionnee = (
+            montant_initial > Decimal("0.00")
+        )
+
+        produit.commande_verrouillee = produit.commande_selectionnee
+
+        produit.taux_commande = taux_initial
+
         total_montants_initiaux += montant_initial
+        total_montants_initiaux_net += montant_net_initial
 
     if request.method == "POST":
 
@@ -1138,7 +1490,9 @@ def ajouter_commande_gerant(request):
 
                     request.POST,
 
-                    produits
+                    produits,
+
+                    taux_initiaux=taux_derniere_commande
 
                 )
 
@@ -1210,6 +1564,112 @@ def ajouter_commande_gerant(request):
                 total_montants_initiaux
             ),
 
+            "total_montants_initiaux_net": (
+                total_montants_initiaux_net
+            ),
+
+            "total_montants_initiaux_net_js": str(
+                total_montants_initiaux_net
+            ),
+
+            "commandes_validees_jour": (
+                totaux_commandes_validees_gerant_par_date(
+                    request.user
+                )
+            ),
+
+        }
+
+    )
+
+
+# ==========================================================
+# CORRECTION COMMANDE GERANT PAR DIRECTEUR
+# ==========================================================
+
+@login_required
+def corriger_commande_directeur_view(
+    request,
+    pk
+):
+
+    commande = commande_gerant_par_id_pour_directeur(
+        request.user,
+        pk
+    )
+
+    if not peut_corriger_par_directeur(
+        request.user,
+        commande
+    ):
+
+        messages.error(
+            request,
+            "Cette commande ne peut pas être corrigée."
+        )
+
+        return redirect(
+            "comptes:apercu_directeur"
+        )
+
+    produits = produits_actifs()
+
+    next_url = (
+        request.GET.get("next")
+        or
+        request.POST.get("next")
+    )
+
+    if request.method == "POST":
+
+        form = CorrectionCommandeDirecteurForm(
+            request.POST
+        )
+
+        if form.is_valid():
+
+            messages.warning(
+                request,
+                "L'enregistrement de la correction sera activé "
+                "après la mise en place de la synchronisation métier."
+            )
+
+    else:
+
+        form = CorrectionCommandeDirecteurForm(
+
+            initial={
+
+                "date_commande":
+                    commande.date_commande
+
+            }
+
+        )
+
+    preparer_affichage_commande(
+        commande,
+        produits
+    )
+
+    return render(
+
+        request,
+
+        "commandes/correction_directeur.html",
+
+        {
+
+            "form": form,
+
+            "commande": commande,
+
+            "produits": produits,
+
+            "titre": "Correction d'une commande du Gérant",
+
+            "next_url": next_url,
+
         }
 
     )
@@ -1268,6 +1728,24 @@ def modifier_commande_view(
             produits_actifs()
         ),
         commande
+    )
+
+    afficher_montant_initial = (
+        commande.type_commande == Commande.TYPE_GERANT
+    )
+
+    gerant = (
+        gerant_du_point_vente(
+            commande.point_vente
+        )
+        if afficher_montant_initial
+        else None
+    )
+
+    fond_gerant = (
+        gerant.fond
+        if gerant is not None
+        else Decimal("0.00")
     )
 
     if request.method == "POST":
@@ -1368,6 +1846,28 @@ def modifier_commande_view(
 
             "next_url": next_url,
 
+            "afficher_montant_initial": afficher_montant_initial,
+
+            "fond_gerant": fond_gerant,
+
+            "fond_gerant_js": str(fond_gerant),
+
+            "total_montants_initiaux": commande.montant_initial,
+
+            "total_montants_initiaux_js": str(
+                commande.montant_initial
+            ),
+
+            "total_montants_initiaux_net": (
+                commande.montant_net_initial
+            ),
+
+            "total_montants_initiaux_net_js": str(
+                commande.montant_net_initial
+            ),
+
+            "commandes_validees_jour": {},
+
         }
 
     )
@@ -1412,7 +1912,12 @@ def modifier_commande_caution_view(
 
         return redirect("liste_commandes_caution")
 
-    produits = produits_actifs()
+    produits = annoter_produits_commande(
+        list(
+            produits_actifs()
+        ),
+        commande
+    )
 
     if request.method == "POST":
 
@@ -1533,7 +2038,12 @@ def modifier_commande_stock_tampon_view(
 
         return HttpResponseForbidden()
 
-    produits = produits_actifs()
+    produits = annoter_produits_commande(
+        list(
+            produits_actifs()
+        ),
+        commande
+    )
 
     if request.method == "POST":
 
@@ -1666,7 +2176,12 @@ def modifier_reglement_stock_tampon_view(
 
         )
 
-    produits = produits_actifs()
+    produits = annoter_produits_commande(
+        list(
+            produits_actifs()
+        ),
+        commande
+    )
 
     if request.method == "POST":
 

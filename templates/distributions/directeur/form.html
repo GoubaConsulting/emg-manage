@@ -450,6 +450,10 @@ Distribution Directeur
 
                     class="btn btn-success"
 
+                    data-confirm-submit
+
+                    data-confirm-message="Voulez-vous vraiment enregistrer cette distribution ?"
+
                 >
 
                     Enregistrer
@@ -476,6 +480,6 @@ const commandes = {{ context_commandes|safe }};
 
 </script>
 
-<script src="{% static 'js/distributions_directeur.js' %}?v=montants-initiaux-brut-20260822"></script>
+<script src="{% static 'js/distributions_directeur.js' %}?v=montants-initiaux-net-suivi-20260913"></script>
 
 {% endblock %}

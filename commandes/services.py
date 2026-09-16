@@ -10,7 +10,6 @@ Services métier du module Commandes.
 ==========================================================
 """
 
-
 from decimal import Decimal
 
 from django.db import transaction
@@ -65,7 +64,11 @@ from stocks.models import (
     TYPE_NORMAL,
     TYPE_TAMPON,
 )
-from .permissions import peut_modifier
+
+from .permissions import (
+    peut_modifier,
+    peut_corriger_par_directeur
+)
 
 from distributions.models import Distribution
 from distributions.numerotation import generer_numero_distribution
@@ -76,40 +79,99 @@ from distributions.numerotation import generer_numero_distribution
 
 def construire_lignes_depuis_formulaire(
     donnees,
-    produits
+    produits,
+    taux_initiaux=None
 ):
 
     lignes = []
 
     for produit in produits:
 
-        if f"produit_{produit.idproduit}" not in donnees:
+        montant = Decimal(
+
+            str(
+                donnees.get(
+
+                    f"montant_{produit.idproduit}",
+
+                    "0"
+
+                )
+                or
+                "0"
+            )
+
+        )
+
+        montant_initial = Decimal(
+
+            str(
+                donnees.get(
+
+                    f"montant_initial_{produit.idproduit}",
+
+                    "0"
+
+                )
+                or
+                "0"
+            )
+
+        )
+
+        if (
+            f"produit_{produit.idproduit}" not in donnees
+            and
+            montant_initial <= 0
+        ):
 
             continue
 
-        montant = Decimal(
-
-            donnees.get(
-
-                f"montant_{produit.idproduit}",
-
-                "0"
-
-            )
-
-        )
-
         taux = Decimal(
 
-            donnees.get(
+            str(
+                donnees.get(
 
-                f"taux_{produit.idproduit}",
+                    f"taux_{produit.idproduit}",
 
+                    "0"
+
+                )
+                or
                 "0"
-
             )
 
         )
+
+        taux_initial = Decimal(
+
+            str(
+                (
+                    taux_initiaux
+                    or
+                    {}
+                ).get(
+                    produit.idproduit,
+                    donnees.get(
+                        f"taux_initial_{produit.idproduit}",
+                        taux
+                    )
+                )
+                or
+                "0"
+            )
+
+        )
+
+        taux_ligne = taux
+
+        if (
+            montant <= 0
+            and
+            montant_initial > 0
+        ):
+
+            taux_ligne = taux_initial
 
         prix = produit.prix
 
@@ -126,7 +188,11 @@ def construire_lignes_depuis_formulaire(
 
             "quantite": quantite,
 
-            "taux_remise": taux
+            "taux_remise": taux_ligne,
+
+            "taux_initial": taux_initial,
+
+            "montant_initial": montant_initial,
 
         })
 
@@ -305,9 +371,27 @@ def creer_lignes_commande(
 
         )
 
+        montant_initial = Decimal(
+
+            ligne.get(
+                "montant_initial",
+                Decimal("0.00")
+            )
+
+        )
+
         taux = Decimal(
 
             ligne["taux_remise"]
+
+        )
+
+        taux_initial = Decimal(
+
+            ligne.get(
+                "taux_initial",
+                taux
+            )
 
         )
 
@@ -319,15 +403,37 @@ def creer_lignes_commande(
 
         )
 
-        verifier_montant(
+        if montant < 0 or montant_initial < 0:
 
-            montant
+            raise ValueError(
+                "Les montants ne peuvent pas etre negatifs."
+            )
+
+        if montant <= 0 and montant_initial <= 0:
+
+            verifier_montant(
+
+                montant
+
+            )
+
+        if montant > 0:
+
+            verifier_montant(
+
+                montant
+
+            )
+
+        verifier_taux(
+
+            taux
 
         )
 
         verifier_taux(
 
-            taux
+            taux_initial
 
         )
 
@@ -355,6 +461,34 @@ def creer_lignes_commande(
 
         )
 
+        remise_initiale = calculer_remise(
+
+            montant_initial,
+
+            taux_initial
+
+        )
+
+        montant_net_initial = calculer_montant_net(
+
+            montant_initial,
+
+            remise_initiale
+
+        )
+
+        montant_total_brut = (
+            montant_initial
+            +
+            montant
+        )
+
+        montant_total_net = (
+            montant_net_initial
+            +
+            montant_net
+        )
+
         LigneCommande.objects.create(
 
             commande=commande,
@@ -371,7 +505,15 @@ def creer_lignes_commande(
 
             montant_remise=remise,
 
-            montant_net=montant_net
+            montant_net=montant_net,
+
+            montant_initial=montant_initial,
+
+            montant_net_initial=montant_net_initial,
+
+            montant_total_brut=montant_total_brut,
+
+            montant_total_net=montant_total_net
 
         )
 
@@ -468,25 +610,40 @@ def recalculer_totaux_commande(
     commande
 ):
     """
-    Recalcule les montants brut et net
-    de la commande.
+    Recalcule les montants de la commande.
     """
 
     total_brut = Decimal("0")
     total_net = Decimal("0")
+    total_initial = Decimal("0")
+    total_net_initial = Decimal("0")
+    total_total_brut = Decimal("0")
+    total_total_net = Decimal("0")
 
     for ligne in commande.lignes.all():
 
         total_brut += ligne.montant
         total_net += ligne.montant_net
+        total_initial += ligne.montant_initial
+        total_net_initial += ligne.montant_net_initial
+        total_total_brut += ligne.montant_total_brut
+        total_total_net += ligne.montant_total_net
 
     commande.montant_brut = total_brut
     commande.montant_net = total_net
+    commande.montant_initial = total_initial
+    commande.montant_net_initial = total_net_initial
+    commande.montant_total_brut = total_total_brut
+    commande.montant_total_net = total_total_net
 
     commande.save(
         update_fields=[
             "montant_brut",
-            "montant_net"
+            "montant_net",
+            "montant_initial",
+            "montant_net_initial",
+            "montant_total_brut",
+            "montant_total_net",
         ]
     )
 
@@ -573,6 +730,18 @@ def synchroniser_distribution_commande_gerant(
     )
 
     for ligne in lignes_commande:
+
+        if ligne.quantite <= 0:
+
+            ligne.quantite_distribuee = Decimal("0.00")
+
+            ligne.save(
+                update_fields=[
+                    "quantite_distribuee",
+                ]
+            )
+
+            continue
 
         LigneDistribution.objects.create(
             distribution=distribution,
@@ -1623,6 +1792,10 @@ def verifier_stock_commande_gerant(
 
     for ligne in lignes:
 
+        if ligne.quantite <= 0:
+
+            continue
+
         stock = (
             Stock.objects
             .select_for_update()
@@ -1707,7 +1880,7 @@ def valider_commande_directeur_service(
 
         distributeur=gerant,
 
-        date_distribution=timezone.now().date(),
+        date_distribution=commande.date_commande,
 
         montant_brut=commande.montant_brut,
 
@@ -1719,6 +1892,10 @@ def valider_commande_directeur_service(
     # ==========================================================
 
     for ligne in lignes_commande:
+
+        if ligne.quantite <= 0:
+
+            continue
 
         LigneDistribution.objects.create(
 
@@ -1787,3 +1964,104 @@ def valider_commande_directeur_service(
     )
 
     return distribution
+
+
+# ==========================================================
+# CORRECTION COMMANDE GERANT PAR DIRECTEUR
+# ==========================================================
+
+@transaction.atomic
+def corriger_commande_par_directeur(
+    commande,
+    directeur,
+    date_commande,
+    lignes
+):
+    """
+    Corrige une commande d'un Gérant
+    à la demande de celui-ci.
+    """
+
+    if not peut_corriger_par_directeur(
+        directeur,
+        commande
+    ):
+        raise Exception(
+            "Vous n'êtes pas autorisé à corriger cette commande."
+        )
+
+    verifier_presence_ligne(
+        lignes
+    )
+
+    # ------------------------------------------------------
+    # Si la commande est déjà validée,
+    # on retire d'abord son impact actuel.
+    # ------------------------------------------------------
+
+    commande_deja_validee = (
+        commande.etat == Commande.VALIDEE
+    )
+
+    if commande_deja_validee:
+
+        mettre_a_jour_objectifs(
+            commande,
+            suppression=True
+        )
+
+        annuler_stock_commande_directeur(
+            commande
+        )
+
+    # ------------------------------------------------------
+    # Modification de l'en-tête
+    # ------------------------------------------------------
+
+    commande.date_commande = date_commande
+
+    commande.save(
+        update_fields=[
+            "date_commande",
+            "date_modification"
+        ]
+    )
+
+    # ------------------------------------------------------
+    # Suppression des anciennes lignes
+    # ------------------------------------------------------
+
+    commande.lignes.all().delete()
+
+    # ------------------------------------------------------
+    # Création des nouvelles lignes
+    # ------------------------------------------------------
+
+    creer_lignes_commande(
+        commande,
+        lignes
+    )
+
+    # ------------------------------------------------------
+    # Recalcul des totaux
+    # ------------------------------------------------------
+
+    recalculer_totaux_commande(
+        commande
+    )
+
+    # ------------------------------------------------------
+    # Réapplication des traitements si validée
+    # ------------------------------------------------------
+
+    if commande_deja_validee:
+
+        mettre_a_jour_objectifs(
+            commande
+        )
+
+        alimenter_stock_commande_directeur(
+            commande
+        )
+
+    return commande

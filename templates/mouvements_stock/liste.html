@@ -216,6 +216,9 @@ Mouvements de stock
                             Quantité
                         </th>
                         <th>Utilisateur</th>
+                        {% if peut_creer %}
+                            <th class="text-center">Actions</th>
+                        {% endif %}
                     </tr>
                 </thead>
 
@@ -256,13 +259,29 @@ Mouvements de stock
                             <td>
                                 {{ mouvement.utilisateur.get_full_name|default:mouvement.utilisateur.username }}
                             </td>
+                            {% if peut_creer %}
+                                <td class="text-center">
+                                    {% if mouvement.peut_modifier %}
+                                        <a
+                                            href="{% url 'mouvements_stock:modifier_mouvement' mouvement.idmouvementstock %}"
+                                            class="btn btn-sm btn-outline-warning"
+                                        >
+                                            Modifier
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            -
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            {% endif %}
                         </tr>
 
                         <tr
                             class="collapse bg-light"
                             id="mvt{{ mouvement.idmouvementstock }}"
                         >
-                            <td colspan="9">
+                            <td colspan="{% if peut_creer %}10{% else %}9{% endif %}">
                                 <div class="p-3">
 
                                     <div class="row mb-3">
@@ -341,7 +360,7 @@ Mouvements de stock
                     {% empty %}
 
                         <tr>
-                            <td colspan="9" class="text-center">
+                            <td colspan="{% if peut_creer %}10{% else %}9{% endif %}" class="text-center">
                                 Aucun mouvement de stock trouvé.
                             </td>
                         </tr>

@@ -30,4 +30,10 @@ urlpatterns = [
         name="ajouter_mouvement"
     ),
 
+    path(
+        "modifier/<int:pk>/",
+        views.modifier_mouvement,
+        name="modifier_mouvement"
+    ),
+
 ]

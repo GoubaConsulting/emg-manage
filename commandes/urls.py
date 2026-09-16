@@ -112,6 +112,20 @@ urlpatterns = [
         name="liste_commandes_stock_tampon"
 
     ),
+
+    # ======================================================
+    # CORRECTION COMMANDE GERANT PAR DIRECTEUR
+    # ======================================================
+
+    path(
+
+        "correction-directeur/<int:pk>/",
+
+        views.corriger_commande_directeur_view,
+
+        name="corriger_commande_directeur"
+
+    ),
     # ======================================================
     # COMMANDES CAUTION BANCAIRE
     # ======================================================
@@ -201,5 +215,6 @@ urlpatterns = [
         views.valider_commande_directeur,
         name="valider_commande_directeur",
     ),
+    
 
 ]

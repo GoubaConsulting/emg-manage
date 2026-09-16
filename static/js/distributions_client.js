@@ -93,13 +93,45 @@ function initialiserLigne(ligne) {
 
     );
 
-    montant.disabled = true;
+    if (check.checked) {
 
-    taux.disabled = true;
+        montant.disabled = false;
 
-    montant.value = 0;
+        taux.disabled = false;
 
-    taux.value = 0;
+        ligne.classList.add(
+
+            "table-success"
+
+        );
+
+        recalculerLigne(
+
+            ligne
+
+        );
+
+    }
+
+    else {
+
+        montant.disabled = true;
+
+        taux.disabled = true;
+
+        if (montant.value === "") {
+
+            montant.value = 0;
+
+        }
+
+        if (taux.value === "") {
+
+            taux.value = 0;
+
+        }
+
+    }
 
     check.addEventListener(
 

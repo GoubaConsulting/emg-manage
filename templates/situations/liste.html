@@ -201,6 +201,9 @@ Situations clôturées
                         <th class="text-end">Crédit versé</th>
                         <th class="text-end">Ventes versées</th>
                         <th class="text-end">Manquant</th>
+                        {% if request.user.profil.role != "GERANT" %}
+                            <th class="text-center">Actions</th>
+                        {% endif %}
                     </tr>
 
                 </thead>
@@ -238,10 +241,26 @@ Situations clôturées
                         <td class="text-end">
                             {{ situation.montant_manquant|floatformat:2 }}
                         </td>
+                        {% if request.user.profil.role != "GERANT" %}
+                            <td class="text-center">
+                                {% if situation.peut_modifier %}
+                                    <a
+                                        href="{% url 'situations:modifier_situation' situation.idsituation %}?next={{ request.get_full_path|urlencode }}"
+                                        class="btn btn-sm btn-outline-warning"
+                                    >
+                                        Modifier
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">
+                                        -
+                                    </span>
+                                {% endif %}
+                            </td>
+                        {% endif %}
                     </tr>
 
                     <tr class="collapse" id="situation{{ situation.idsituation }}">
-                        <td colspan="8">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}8{% else %}9{% endif %}">
 
                             <div class="p-3 bg-light">
 
@@ -314,7 +333,7 @@ Situations clôturées
                     {% empty %}
 
                     <tr>
-                        <td colspan="8" class="text-center">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}8{% else %}9{% endif %}" class="text-center">
                             Aucune situation clôturée trouvée.
                         </td>
                     </tr>

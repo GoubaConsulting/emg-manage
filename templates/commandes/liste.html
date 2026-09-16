@@ -355,6 +355,8 @@ Liste des commandes
 
                         <td>
 
+                            {% if commande.peut_modifier %}
+
                             <a
 
                                 href="{% url url_modifier commande.idcommande %}"
@@ -366,6 +368,14 @@ Liste des commandes
                                 Modifier
 
                             </a>
+
+                            {% else %}
+
+                            <span class="text-muted">
+                                -
+                            </span>
+
+                            {% endif %}
 
                         </td>
 

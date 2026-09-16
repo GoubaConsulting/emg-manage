@@ -206,10 +206,10 @@
                                 <td class="text-center">
                                     {% if commande.modification_directeur_autorisee %}
                                         <a
-                                            href="{% url 'modifier_commande' commande.idcommande %}?next={{ request.get_full_path|urlencode }}"
+                                            href="{% url 'corriger_commande_directeur' commande.idcommande %}?next={{ request.get_full_path|urlencode }}"
                                             class="btn btn-sm btn-outline-warning"
                                         >
-                                            Modifier
+                                            Corriger
                                         </a>
                                     {% else %}
                                         <span class="text-muted">
@@ -347,15 +347,207 @@
         </div>
 
         <h5 class="mb-3">Distributions aux sous-distributeurs</h5>
-        {% include "comptes/partials/apercu_distributions_table.html" with distributions=distributions_sous empty_message="Aucune distribution vers un sous-distributeur." prefix="sous" %}
+        {% include "comptes/partials/apercu_distributions_table.html" with distributions=distributions_sous empty_message="Aucune distribution vers un sous-distributeur." prefix="sous" afficher_actions=True %}
 
         <hr class="my-4">
 
         <h5 class="mb-3">Ventes directes</h5>
-        {% include "comptes/partials/apercu_distributions_table.html" with distributions=distributions_clients empty_message="Aucune vente directe trouvée." prefix="client" %}
+        {% include "comptes/partials/apercu_distributions_table.html" with distributions=distributions_clients empty_message="Aucune vente directe trouvée." prefix="client" afficher_actions=True %}
     </div>
 
     <div class="tab-pane fade" id="versements" role="tabpanel" aria-labelledby="versements-tab">
+        <h5 class="mb-3">
+            Versements soumis a validation
+        </h5>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="card border-secondary shadow-sm h-100">
+                    <div class="card-header bg-secondary text-white">
+                        En attente
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ versements_en_attente_totaux.nombre }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-primary shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        Distribue
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ versements_en_attente_totaux.distribue|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-success shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        Verse
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ versements_en_attente_totaux.verse|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-danger shadow-sm h-100">
+                    <div class="card-header bg-danger text-white">
+                        Manquant prevu
+                    </div>
+                    <div class="card-body text-end">
+                        <h4 class="mb-0">{{ versements_en_attente_totaux.manquant|floatformat:2 }} FCFA</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="50"></th>
+                                <th>Numero</th>
+                                <th>Date</th>
+                                <th>Gerant</th>
+                                <th class="text-end">Distribue</th>
+                                <th class="text-end">Credit verse</th>
+                                <th class="text-end">Ventes versees</th>
+                                <th class="text-end">Manquant</th>
+                                <th>Etat</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for situation in versements_en_attente %}
+                            <tr>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#apercuVersementAttente{{ situation.idsituation }}">
+                                        v
+                                    </button>
+                                </td>
+                                <td>{{ situation.numero }}</td>
+                                <td>{{ situation.date_situation|date:"d/m/Y" }}</td>
+                                <td>{{ situation.distributeur.nom }} {{ situation.distributeur.prenom }}</td>
+                                <td class="text-end">{{ situation.montant_total_distribue|floatformat:2 }}</td>
+                                <td class="text-end">{{ situation.montant_credit_verse|floatformat:2 }}</td>
+                                <td class="text-end">{{ situation.montant_vente_verse|floatformat:2 }}</td>
+                                <td class="text-end">{{ situation.montant_manquant|floatformat:2 }}</td>
+                                <td>
+                                    <span class="badge text-bg-warning">
+                                        {{ situation.get_etat_display }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <form method="post" action="{% url 'situations:valider_versement_gerant' situation.idsituation %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button
+                                            type="submit"
+                                            class="btn btn-sm btn-success"
+                                            onclick="return confirm('Valider ce versement ?');"
+                                        >
+                                            Valider
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{% url 'situations:rejeter_versement_gerant' situation.idsituation %}" class="d-inline ms-1">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button
+                                            type="submit"
+                                            class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Rejeter ce versement ?');"
+                                        >
+                                            Rejeter
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr class="collapse" id="apercuVersementAttente{{ situation.idsituation }}">
+                                <td colspan="10">
+                                    <div class="p-3 bg-light">
+                                        <div class="row mb-3">
+                                            <div class="col-md-3"><strong>Point de vente :</strong> {{ situation.point_vente.designation }}</div>
+                                            <div class="col-md-3"><strong>Fond :</strong> {{ situation.fond|floatformat:2 }} FCFA</div>
+                                            <div class="col-md-3"><strong>Credit :</strong> {{ situation.montant_credit|floatformat:2 }} FCFA</div>
+                                            <div class="col-md-3"><strong>Total verse :</strong> {{ situation.montant_total_verse|floatformat:2 }} FCFA</div>
+                                        </div>
+
+                                        {% for groupe in situation.groupes_compagnies %}
+                                            <h6 class="mt-3">{{ groupe.compagnie.designation }}</h6>
+                                            <table class="table table-sm table-bordered">
+                                                <thead class="table-secondary">
+                                                    <tr>
+                                                        <th>Produit</th>
+                                                        <th class="text-end">Prix</th>
+                                                        <th class="text-end">Montant brut distribue</th>
+                                                        <th class="text-end">Montant brut vendu</th>
+                                                        <th class="text-end">Net vendu</th>
+                                                        <th class="text-end">Montant brut restant</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for ligne in groupe.lignes %}
+                                                    <tr>
+                                                        <td>{{ ligne.produit.designation }}</td>
+                                                        <td class="text-end">{{ ligne.prix_unitaire|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant_brut_distribue|floatformat:2 }} FCFA</td>
+                                                        <td class="text-end">{{ ligne.montant_brut_vendu|floatformat:2 }} FCFA</td>
+                                                        <td class="text-end">{{ ligne.montant_net_vendu|floatformat:2 }} FCFA</td>
+                                                        <td class="text-end">{{ ligne.montant_brut_restant|floatformat:2 }} FCFA</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                    <tr class="table-warning">
+                                                        <td colspan="4" class="text-end">
+                                                            <strong>Sous-total {{ groupe.compagnie.designation }}</strong>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <strong>{{ groupe.sous_total_net_vendu|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <strong>{{ groupe.sous_total_brut_restant|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        {% endfor %}
+                                        {% if situation.groupes_compagnies %}
+                                            <table class="table table-sm table-bordered mt-3">
+                                                <tbody>
+                                                    <tr class="table-success">
+                                                        <th class="text-end">Total net vendu</th>
+                                                        <td class="text-end">
+                                                            <strong>{{ situation.total_net_vendu_produits|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                        <th class="text-end">Total brut restant</th>
+                                                        <td class="text-end">
+                                                            <strong>{{ situation.total_brut_restant_produits|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="10" class="text-center">Aucun versement soumis a validation.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mb-3">
+            Versements clotures des distributeurs du gerant
+        </h5>
+
         <div class="row g-3 mb-3">
             <div class="col-md-4">
                 <div class="card border-primary shadow-sm h-100">
@@ -403,6 +595,7 @@
                                 <th class="text-end">Crédit versé</th>
                                 <th class="text-end">Ventes versées</th>
                                 <th class="text-end">Manquant</th>
+                                <th class="text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -420,9 +613,23 @@
                                 <td class="text-end">{{ situation.montant_credit_verse|floatformat:2 }}</td>
                                 <td class="text-end">{{ situation.montant_vente_verse|floatformat:2 }}</td>
                                 <td class="text-end">{{ situation.montant_manquant|floatformat:2 }}</td>
+                                <td class="text-center">
+                                    {% if situation.peut_modifier %}
+                                        <a
+                                            href="{% url 'situations:modifier_situation' situation.idsituation %}?next={{ request.get_full_path|urlencode }}"
+                                            class="btn btn-sm btn-outline-warning"
+                                        >
+                                            Modifier
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            -
+                                        </span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr class="collapse" id="apercuSituation{{ situation.idsituation }}">
-                                <td colspan="8">
+                                <td colspan="9">
                                     <div class="p-3 bg-light">
                                         <div class="row mb-3">
                                             <div class="col-md-3"><strong>Point de vente :</strong> {{ situation.point_vente.designation }}</div>
@@ -438,11 +645,10 @@
                                                     <tr>
                                                         <th>Produit</th>
                                                         <th class="text-end">Prix</th>
-                                                        <th class="text-end">Distribuée</th>
-                                                        <th class="text-end">Vendue</th>
-                                                        <th class="text-end">Restante</th>
-                                                        <th class="text-end">Montant vendu</th>
-                                                        <th class="text-end">Valeur restante</th>
+                                                        <th class="text-end">Montant brut distribue</th>
+                                                        <th class="text-end">Montant brut vendu</th>
+                                                        <th class="text-end">Net vendu</th>
+                                                        <th class="text-end">Montant brut restant</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -450,22 +656,48 @@
                                                     <tr>
                                                         <td>{{ ligne.produit.designation }}</td>
                                                         <td class="text-end">{{ ligne.prix_unitaire|floatformat:2 }}</td>
-                                                        <td class="text-end">{{ ligne.quantite_distribuee|floatformat:2 }}</td>
-                                                        <td class="text-end">{{ ligne.quantite_vendue|floatformat:2 }}</td>
-                                                        <td class="text-end">{{ ligne.quantite_restante|floatformat:2 }}</td>
-                                                        <td class="text-end">{{ ligne.montant_vendu|floatformat:2 }}</td>
-                                                        <td class="text-end">{{ ligne.montant_restant|floatformat:2 }}</td>
+                                                        <td class="text-end">{{ ligne.montant_brut_distribue|floatformat:2 }} FCFA</td>
+                                                        <td class="text-end">{{ ligne.montant_brut_vendu|floatformat:2 }} FCFA</td>
+                                                        <td class="text-end">{{ ligne.montant_net_vendu|floatformat:2 }} FCFA</td>
+                                                        <td class="text-end">{{ ligne.montant_brut_restant|floatformat:2 }} FCFA</td>
                                                     </tr>
                                                     {% endfor %}
+                                                    <tr class="table-warning">
+                                                        <td colspan="4" class="text-end">
+                                                            <strong>Sous-total {{ groupe.compagnie.designation }}</strong>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <strong>{{ groupe.sous_total_net_vendu|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <strong>{{ groupe.sous_total_brut_restant|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                    </tr>
                                                 </tbody>
                                             </table>
                                         {% endfor %}
+                                        {% if situation.groupes_compagnies %}
+                                            <table class="table table-sm table-bordered mt-3">
+                                                <tbody>
+                                                    <tr class="table-success">
+                                                        <th class="text-end">Total net vendu</th>
+                                                        <td class="text-end">
+                                                            <strong>{{ situation.total_net_vendu_produits|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                        <th class="text-end">Total brut restant</th>
+                                                        <td class="text-end">
+                                                            <strong>{{ situation.total_brut_restant_produits|floatformat:2 }} FCFA</strong>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center">Aucun versement clôturé trouvé.</td>
+                                <td colspan="9" class="text-center">Aucun versement clôturé trouvé.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -604,6 +836,7 @@
                                 <th class="text-end">Montant réglé</th>
                                 <th class="text-end">Reste à payer</th>
                                 <th>Utilisateur</th>
+                                <th class="text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -622,9 +855,23 @@
                                 <td class="text-end">{{ reglement.montant|floatformat:2 }}</td>
                                 <td class="text-end">{{ reglement.manquant.reste_a_payer|floatformat:2 }}</td>
                                 <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
+                                <td class="text-center">
+                                    {% if reglement.peut_modifier %}
+                                        <a
+                                            href="{% url 'situations:modifier_reglement_manquant' reglement.idreglement %}?next={{ request.get_full_path|urlencode }}"
+                                            class="btn btn-sm btn-outline-warning"
+                                        >
+                                            Modifier
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            -
+                                        </span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             <tr class="collapse" id="apercuReglement{{ reglement.idreglement }}">
-                                <td colspan="9">
+                                <td colspan="10">
                                     <div class="p-3 bg-light">
                                         <div class="row g-3 mb-3">
                                             <div class="col-md-3"><strong>Date situation :</strong> {{ reglement.manquant.situation.date_situation|date:"d/m/Y" }}</div>
@@ -665,7 +912,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="9" class="text-center">Aucun règlement de manquant trouvé.</td>
+                                <td colspan="10" class="text-center">Aucun règlement de manquant trouvé.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

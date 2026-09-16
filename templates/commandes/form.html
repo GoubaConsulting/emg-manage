@@ -80,6 +80,7 @@
 
                 {% if afficher_montant_initial %}
                     <th width="180">Montant initial</th>
+                    <th width="180">Net initial</th>
                 {% endif %}
 
                 <th width="180">Montant (FCFA)</th>
@@ -101,7 +102,7 @@
 
 <tr class="table-secondary">
 
-    <td colspan="{% if afficher_montant_initial %}8{% else %}7{% endif %}">
+    <td colspan="{% if afficher_montant_initial %}9{% else %}7{% endif %}">
 
         <strong>
 
@@ -120,16 +121,27 @@
     data-prix="{{ produit.prix }}"
     data-compagnie="{{ produit.compagnie.idcompagnie }}"
     data-montant-initial="{{ produit.montant_initial_commande_js|default:'0' }}"
+    data-montant-net-initial="{{ produit.montant_net_initial_commande_js|default:'0' }}"
+    data-taux-initial="{{ produit.taux_initial_commande|default:'0' }}"
 >
 
     <td class="text-center">
+
+        {% if produit.commande_verrouillee %}
+            <input
+                type="hidden"
+                name="produit_{{ produit.idproduit }}"
+                value="1"
+            >
+        {% endif %}
 
         <input
             type="checkbox"
             class="form-check-input produit-check"
             name="produit_{{ produit.idproduit }}"
             value="1"
-            {% if produit.commande_selectionnee %}checked{% endif %}
+            {% if produit.commande_selectionnee or produit.commande_verrouillee %}checked{% endif %}
+            {% if produit.commande_verrouillee %}disabled data-locked="1"{% endif %}
         >
 
     </td>
@@ -154,6 +166,52 @@
             class="form-control"
             readonly
             value="{{ produit.montant_initial_commande|floatformat:2 }} FCFA"
+        >
+
+        <input
+            type="hidden"
+            class="montant-initial"
+            name="montant_initial_{{ produit.idproduit }}"
+            value="{{ produit.montant_initial_commande|default:0 }}"
+        >
+
+        <input
+            type="hidden"
+            class="net-initial"
+            name="montant_net_initial_{{ produit.idproduit }}"
+            value="{{ produit.montant_net_initial_commande|default:0 }}"
+        >
+
+        <input
+            type="hidden"
+            class="taux-initial"
+            name="taux_initial_{{ produit.idproduit }}"
+            value="{{ produit.taux_initial_commande|default:0 }}"
+        >
+
+        <input
+            type="hidden"
+            class="montant-total-brut-ligne"
+            name="montant_total_brut_{{ produit.idproduit }}"
+            value="0"
+        >
+
+        <input
+            type="hidden"
+            class="montant-total-net-ligne"
+            name="montant_total_net_{{ produit.idproduit }}"
+            value="0"
+        >
+
+    </td>
+
+    <td>
+
+        <input
+            type="text"
+            class="form-control"
+            readonly
+            value="{{ produit.montant_net_initial_commande|floatformat:2 }} FCFA"
         >
 
     </td>
@@ -215,7 +273,7 @@
 {% endfor %}
 <tr class="table-warning">
 
-    <td colspan="{% if afficher_montant_initial %}7{% else %}6{% endif %}" class="text-end">
+    <td colspan="{% if afficher_montant_initial %}8{% else %}6{% endif %}" class="text-end">
 
         <strong>
 
@@ -267,6 +325,22 @@
 
             <div class="card-body text-center">
 
+                {% if afficher_montant_initial %}
+
+                    <div class="d-flex justify-content-between gap-3 mb-2">
+                        <span class="text-muted">Initiaux</span>
+                        <strong id="total-brut-initial">0 FCFA</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between gap-3 mb-2">
+                        <span class="text-muted">Commande</span>
+                        <strong id="total-brut-commande">0 FCFA</strong>
+                    </div>
+
+                    <hr class="my-2">
+
+                {% endif %}
+
                 <h3
                     id="total-brut"
                     class="mb-0"
@@ -298,6 +372,22 @@
             </div>
 
             <div class="card-body text-center">
+
+                {% if afficher_montant_initial %}
+
+                    <div class="d-flex justify-content-between gap-3 mb-2">
+                        <span class="text-muted">Net initial</span>
+                        <strong id="total-net-initial">0 FCFA</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between gap-3 mb-2">
+                        <span class="text-muted">Net commande</span>
+                        <strong id="total-net-commande">0 FCFA</strong>
+                    </div>
+
+                    <hr class="my-2">
+
+                {% endif %}
 
                 <h3
                     id="total-net"
@@ -373,6 +463,13 @@
                     {{ total_montants_initiaux|default:0|floatformat:2 }} FCFA
 
                 </h3>
+
+                <small class="text-muted d-block mt-2">
+                    Net initial :
+                    <strong id="total-montants-initiaux-net">
+                        {{ total_montants_initiaux_net|default:0|floatformat:2 }} FCFA
+                    </strong>
+                </small>
 
             </div>
 
@@ -458,6 +555,10 @@
 
 </div>
 
+{% if afficher_montant_initial %}
+    {{ commandes_validees_jour|json_script:"commandes-validees-jour" }}
+{% endif %}
+
 <div class="text-end mt-4">
 
     <a
@@ -478,6 +579,10 @@
 
         class="btn btn-success"
 
+        data-confirm-submit
+
+        data-confirm-message="Voulez-vous vraiment enregistrer cette commande ?"
+
     >
 
         Enregistrer
@@ -496,6 +601,6 @@
 
 {% block scripts %}
 
-<script src="{% static 'js/commandes.js' %}?v=20260829-actions"></script>
+<script src="{% static 'js/commandes.js' %}?v=20260916-credit-brut"></script>
 
 {% endblock %}

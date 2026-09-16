@@ -18,6 +18,8 @@ from django.core.validators import (
 
 from django.contrib.auth.models import User
 
+from django.utils import timezone
+
 from commandes.models import Commande
 
 from referentiel.models import (
@@ -145,6 +147,12 @@ class Distribution(models.Model):
         verbose_name="Date de distribution"
     )
 
+    heure_distribution = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name="Heure"
+    )
+
     montant_brut = models.DecimalField(
         max_digits=18,
         decimal_places=2,
@@ -157,6 +165,46 @@ class Distribution(models.Model):
         decimal_places=2,
         default=0,
         verbose_name="Montant net"
+    )
+
+    montant_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant initial"
+    )
+
+    montant_net_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant net initial"
+    )
+
+    montant_total_brut = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant total brut"
+    )
+
+    montant_total_net = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ],
+        verbose_name="Montant total net"
     )
 
     etat = models.CharField(
@@ -239,6 +287,23 @@ class Distribution(models.Model):
 
         return self.numero
 
+    def save(self, *args, **kwargs):
+
+        if self.heure_distribution is None:
+
+            self.heure_distribution = (
+                timezone.localtime(
+                    timezone.now()
+                )
+                .time()
+                .replace(
+                    second=0,
+                    microsecond=0
+                )
+            )
+
+        super().save(*args, **kwargs)
+
 
 # ==========================================================
 # MODELE : LIGNE DISTRIBUTION
@@ -309,6 +374,42 @@ class LigneDistribution(models.Model):
         max_digits=18,
         decimal_places=2,
         default=0
+    )
+
+    montant_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
+    )
+
+    montant_net_initial = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
+    )
+
+    montant_total_brut = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
+    )
+
+    montant_total_net = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[
+            MinValueValidator(0)
+        ]
     )
 
     class Meta:
