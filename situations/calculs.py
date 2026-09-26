@@ -22,8 +22,8 @@ def calculer_credit(
     fond
 ):
     """
-    Calcule le crédit généré par les distributions
-    de la journée.
+    Calcule le crédit net généré par les distributions
+    de la journée et le reliquat à suivre.
 
     Le crédit correspond à la partie du montant
     total distribué qui dépasse le fond.
@@ -46,6 +46,28 @@ def calculer_credit(
         credit = Decimal("0.00")
 
     return credit
+
+
+def ventiler_versement(montant_remis, montant_credit, montant_net_vendu):
+    """Affecte un paiement unique au crédit, puis aux autres ventes."""
+
+    montant_remis = Decimal(str(montant_remis or "0"))
+    montant_credit = Decimal(str(montant_credit or "0"))
+    montant_net_vendu = Decimal(str(montant_net_vendu or "0"))
+
+    if min(montant_remis, montant_credit, montant_net_vendu) < 0:
+        raise ValueError("Les montants du versement ne peuvent pas être négatifs.")
+
+    credit_verse = min(montant_remis, montant_credit)
+
+    return {
+        "montant_credit_verse": credit_verse,
+        "montant_credit_restant": montant_credit - credit_verse,
+        "montant_vente_verse": montant_remis - credit_verse,
+        "montant_total_verse": montant_remis,
+        "montant_manquant": max(montant_net_vendu - montant_remis, Decimal("0")),
+        "montant_surplus": max(montant_remis - montant_net_vendu, Decimal("0")),
+    }
 
 
 # ==========================================================

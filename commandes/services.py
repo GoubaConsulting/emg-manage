@@ -10,8 +10,9 @@ Services métier du module Commandes.
 ==========================================================
 """
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .models import (
@@ -77,6 +78,28 @@ from distributions.numerotation import generer_numero_distribution
 # CONSTRUCTION DES LIGNES
 # ==========================================================
 
+def convertir_decimal_formulaire(valeur, libelle):
+    """Convertit une valeur numerique POST, y compris au format francais."""
+
+    if valeur is None or valeur == "":
+        return Decimal("0")
+
+    valeur_normalisee = (
+        str(valeur)
+        .strip()
+        .replace("\u00a0", "")
+        .replace("\u202f", "")
+        .replace(" ", "")
+        .replace(",", ".")
+    )
+
+    try:
+        return Decimal(valeur_normalisee)
+    except (InvalidOperation, TypeError, ValueError) as erreur:
+        raise ValidationError(
+            f"La valeur du champ {libelle} n'est pas un nombre valide."
+        ) from erreur
+
 def construire_lignes_depuis_formulaire(
     donnees,
     produits,
@@ -87,36 +110,20 @@ def construire_lignes_depuis_formulaire(
 
     for produit in produits:
 
-        montant = Decimal(
-
-            str(
-                donnees.get(
-
-                    f"montant_{produit.idproduit}",
-
-                    "0"
-
-                )
-                or
+        montant = convertir_decimal_formulaire(
+            donnees.get(
+                f"montant_{produit.idproduit}",
                 "0"
-            )
-
+            ),
+            f"montant du produit « {produit.designation} »"
         )
 
-        montant_initial = Decimal(
-
-            str(
-                donnees.get(
-
-                    f"montant_initial_{produit.idproduit}",
-
-                    "0"
-
-                )
-                or
+        montant_initial = convertir_decimal_formulaire(
+            donnees.get(
+                f"montant_initial_{produit.idproduit}",
                 "0"
-            )
-
+            ),
+            f"montant initial du produit « {produit.designation} »"
         )
 
         if (
@@ -127,40 +134,27 @@ def construire_lignes_depuis_formulaire(
 
             continue
 
-        taux = Decimal(
-
-            str(
-                donnees.get(
-
-                    f"taux_{produit.idproduit}",
-
-                    "0"
-
-                )
-                or
+        taux = convertir_decimal_formulaire(
+            donnees.get(
+                f"taux_{produit.idproduit}",
                 "0"
-            )
-
+            ),
+            f"taux du produit « {produit.designation} »"
         )
 
-        taux_initial = Decimal(
-
-            str(
-                (
-                    taux_initiaux
-                    or
-                    {}
-                ).get(
-                    produit.idproduit,
-                    donnees.get(
-                        f"taux_initial_{produit.idproduit}",
-                        taux
-                    )
-                )
+        taux_initial = convertir_decimal_formulaire(
+            (
+                taux_initiaux
                 or
-                "0"
-            )
-
+                {}
+            ).get(
+                produit.idproduit,
+                donnees.get(
+                    f"taux_initial_{produit.idproduit}",
+                    taux
+                )
+            ),
+            f"taux initial du produit « {produit.designation} »"
         )
 
         taux_ligne = taux

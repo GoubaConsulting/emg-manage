@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static l10n %}
 
 {% block content %}
 
@@ -260,7 +261,7 @@
                         <div class="border rounded p-3">
 
                             <small>
-                                Total distribué
+                                Total distribué (brut)
                             </small>
 
                             <h5>
@@ -277,7 +278,7 @@
                         <div class="border rounded p-3">
 
                             <small>
-                                Crédit
+                                Crédit net
                             </small>
 
                             <h5>
@@ -395,12 +396,12 @@
 
                             <tr
                                 class="ligne-situation"
-                                data-prix="{{ ligne.prix_unitaire }}"
-                                data-taux="{{ ligne.taux_distribution|default:0 }}"
+                                data-prix="{{ ligne.prix_unitaire|unlocalize }}"
+                                data-taux="{{ ligne.taux_distribution|default:0|unlocalize }}"
                                 data-compagnie="{{ groupe.compagnie.idcompagnie }}"
                                 data-distribuee="{{ ligne.quantite_distribuee }}"
-                                data-montant-distribue="{{ ligne.montant_distribue|default:0 }}"
-                                data-net-distribue="{{ ligne.montant_net_distribue|default:0 }}"
+                                data-montant-distribue="{{ ligne.montant_distribue|default:0|unlocalize }}"
+                                data-net-distribue="{{ ligne.montant_net_distribue|default:0|unlocalize }}"
                             >
 
                                 <td>
@@ -437,7 +438,7 @@
                                         min="0"
                                         class="form-control montant-restant"
                                         name="montant_restant_{{ ligne.produit.idproduit }}"
-                                        value="{{ ligne.montant_restant_brut|default:0 }}"
+                                        value="{{ ligne.montant_restant_brut|default:0|unlocalize }}"
                                     >
 
                                 </td>
@@ -667,19 +668,17 @@
 
                         <label class="form-label">
 
-                            Crédit à versé
+                            Crédit restant
 
                         </label>
 
                         <input
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="text"
                             class="form-control"
-                            id="montant-credit-verse"
-                            name="montant_credit_verse"
-                            data-montant-credit="{{ situation.montant_credit|default:0 }}"
-                            value="{{ montant_credit_verse_initial|default:situation.montant_credit }}"
+                            id="montant-credit-restant"
+                            data-montant-credit="{{ situation.montant_credit|default:0|unlocalize }}"
+                            readonly
+                            value="0 FCFA"
                         >
 
                     </div>
@@ -688,7 +687,7 @@
 
                         <label class="form-label">
 
-                            Montant versé
+                            Montant total remis
 
                         </label>
 
@@ -697,25 +696,25 @@
                             step="0.01"
                             min="0"
                             class="form-control"
-                            id="montant-vente-verse"
-                            name="montant_vente_verse"
-                            value="{{ montant_vente_verse_initial|default:0 }}"
+                            id="montant-total-verse"
+                            name="montant_total_verse"
+                            value="{{ montant_total_verse_initial|default:0|unlocalize }}"
                         >
 
                     </div>
 
                     <div class="col-md-4">
 
-                        <label class="form-label">
+                        <label class="form-label" id="libelle-ecart-versement">
 
-                            Manquant
+                            Écart
 
                         </label>
 
                         <input
                             type="text"
                             class="form-control fw-bold"
-                            id="montant-manquant-auto"
+                            id="montant-ecart-auto"
                             readonly
                             value="0 FCFA"
                         >
@@ -862,10 +861,8 @@
 
 </div>
 
-{% load static %}
-
 <script
-    src="{% static 'js/situations.js' %}?v=remise-net-verse-20260829"
+    src="{% static 'js/situations.js' %}?v=versement-unique-20260926"
 ></script>
 
 {% endblock %}

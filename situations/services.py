@@ -48,9 +48,7 @@ from .models import (
 from .calculs import (
     calculer_credit,
     calculer_montant_total_verse,
-    calculer_manquant,
-    convertir_montant_brut_en_net,
-    verifier_versement_credit,
+    ventiler_versement,
 )
 
 from .numerotation import (
@@ -1050,6 +1048,21 @@ def calculer_total_distribue(
     return total
 
 
+def calculer_total_distribue_net(distributeur, date_situation):
+    """Valorise les distributions ouvertes et les reliquats une seule fois."""
+
+    return sum(
+        (
+            donnees["montant_net_distribue"]
+            for donnees in construire_donnees_lignes_situation(
+                distributeur,
+                date_situation,
+            )
+        ),
+        Decimal("0.00"),
+    )
+
+
 # ==========================================================
 # CALCUL DU CREDIT DU DISTRIBUTEUR
 # ==========================================================
@@ -1067,7 +1080,7 @@ def calculer_credit_distributeur(
     """
 
     montant_total_distribue = (
-        calculer_total_distribue(
+        calculer_total_distribue_net(
             distributeur,
             date_situation
         )
@@ -1613,6 +1626,7 @@ def synchroniser_situation_vente_directe(
     situation.montant_vente_verse = montant_total
     situation.montant_total_verse = montant_total
     situation.montant_manquant = Decimal("0.00")
+    situation.montant_surplus = Decimal("0.00")
     situation.coupures = "Situation automatique - vente directe"
     situation.etat = SituationJournaliere.ETAT_CLOTUREE
     situation.actif = True
@@ -1758,7 +1772,7 @@ def creer_situation_journaliere(
     )
 
     montant_credit = calculer_credit(
-        montant_total_distribue,
+        calculer_total_distribue_net(distributeur, date_situation),
         distributeur.fond
     )
 
@@ -1885,21 +1899,13 @@ def calculer_manquant_situation(
     """
     Calcule le montant manquant d'une situation.
 
-    Le montant distribue net doit etre justifie par :
-
-        credit verse net + ventes versees net + montant restant net.
+    Le montant net vendu est justifie par le paiement unique.
     """
 
-    montant_total_distribue_brut = Decimal("0.00")
     montant_total_distribue_net = Decimal("0.00")
     montant_restant_net = Decimal("0.00")
 
     for ligne in situation.lignes.all():
-
-        montant_total_distribue_brut += calculer_valeur_brute_quantite(
-            ligne.quantite_distribuee,
-            ligne.prix_unitaire,
-        )
 
         montant_total_distribue_net += calculer_valeur_nette_quantite(
             ligne.quantite_distribuee,
@@ -1913,23 +1919,11 @@ def calculer_manquant_situation(
             ligne.taux_remise,
         )
 
-    montant_credit_verse_net = convertir_montant_brut_en_net(
-        situation.montant_credit_verse,
-        montant_total_distribue_brut,
-        montant_total_distribue_net,
-    )
-
-    return calculer_manquant(
-
-        montant_total_distribue_net,
-
-        montant_credit_verse_net,
-
-        situation.montant_vente_verse,
-
-        montant_restant_net,
-
-    )
+    return ventiler_versement(
+        situation.montant_total_verse,
+        situation.montant_credit,
+        montant_total_distribue_net - montant_restant_net,
+    )["montant_manquant"]
 
 
 # ==========================================================
@@ -1979,8 +1973,7 @@ def creer_manquant_situation(
 def soumettre_versement_gerant(
     situation,
     donnees_lignes,
-    montant_credit_verse,
-    montant_vente_verse,
+    montant_total_verse,
     coupures,
     utilisateur,
 ):
@@ -2030,25 +2023,10 @@ def soumettre_versement_gerant(
             "pour cette date."
         )
 
-    montant_credit_verse = Decimal(
-        str(montant_credit_verse or "0")
-    )
+    montant_total_verse = Decimal(str(montant_total_verse or "0"))
 
-    montant_vente_verse = Decimal(
-        str(montant_vente_verse or "0")
-    )
-
-    if montant_credit_verse < 0:
-
-        raise ValueError(
-            "Le montant du credit verse ne peut pas etre negatif."
-        )
-
-    if montant_vente_verse < 0:
-
-        raise ValueError(
-            "Le montant verse ne peut pas etre negatif."
-        )
+    if montant_total_verse < 0:
+        raise ValueError("Le montant verse ne peut pas etre negatif.")
 
     situation.montant_total_distribue = calculer_total_distribue(
         situation.distributeur,
@@ -2056,17 +2034,14 @@ def soumettre_versement_gerant(
     )
 
     situation.montant_credit = calculer_credit(
-        situation.montant_total_distribue,
+        calculer_total_distribue_net(
+            situation.distributeur,
+            situation.date_situation,
+        ),
         situation.fond
     )
 
-    verifier_versement_credit(
-        situation.montant_credit,
-        montant_credit_verse
-    )
-
     montant_total_restant_net = Decimal("0.00")
-    montant_total_distribue_brut = Decimal("0.00")
     montant_total_distribue_net = Decimal("0.00")
 
     for ligne in situation.lignes.select_related(
@@ -2142,11 +2117,6 @@ def soumettre_versement_gerant(
             ligne.taux_remise,
         )
 
-        montant_total_distribue_brut += calculer_valeur_brute_quantite(
-            ligne.quantite_distribuee,
-            ligne.prix_unitaire,
-        )
-
         montant_total_distribue_net += calculer_valeur_nette_quantite(
             ligne.quantite_distribuee,
             ligne.prix_unitaire,
@@ -2168,25 +2138,16 @@ def soumettre_versement_gerant(
             ]
         )
 
-    situation.montant_credit_verse = montant_credit_verse
-    situation.montant_vente_verse = montant_vente_verse
-
-    mettre_a_jour_total_verse(
-        situation
+    repartition = ventiler_versement(
+        montant_total_verse,
+        situation.montant_credit,
+        montant_total_distribue_net - montant_total_restant_net,
     )
-
-    montant_credit_verse_net = convertir_montant_brut_en_net(
-        situation.montant_credit_verse,
-        montant_total_distribue_brut,
-        montant_total_distribue_net,
-    )
-
-    situation.montant_manquant = calculer_manquant(
-        montant_total_distribue_net,
-        montant_credit_verse_net,
-        situation.montant_vente_verse,
-        montant_total_restant_net,
-    )
+    situation.montant_credit_verse = repartition["montant_credit_verse"]
+    situation.montant_vente_verse = repartition["montant_vente_verse"]
+    situation.montant_total_verse = repartition["montant_total_verse"]
+    situation.montant_manquant = repartition["montant_manquant"]
+    situation.montant_surplus = repartition["montant_surplus"]
 
     if coupures:
 
@@ -2365,8 +2326,7 @@ def rejeter_versement_gerant(
 def cloturer_situation(
     situation,
     donnees_lignes,
-    montant_credit_verse,
-    montant_vente_verse,
+    montant_total_verse,
     coupures,
     utilisateur,
 ):
@@ -2399,31 +2359,14 @@ def cloturer_situation(
     # CONVERSION DES MONTANTS
     # ======================================================
 
-    montant_credit_verse = Decimal(
-        str(montant_credit_verse or "0")
-    )
-
-    montant_vente_verse = Decimal(
-        str(montant_vente_verse or "0")
-    )
+    montant_total_verse = Decimal(str(montant_total_verse or "0"))
 
     # ======================================================
     # VERIFICATION DES MONTANTS
     # ======================================================
 
-    if montant_credit_verse < 0:
-
-        raise ValueError(
-            "Le montant du crédit versé "
-            "ne peut pas être négatif."
-        )
-
-    if montant_vente_verse < 0:
-
-        raise ValueError(
-            "Le montant des ventes versé "
-            "ne peut pas être négatif."
-        )
+    if montant_total_verse < 0:
+        raise ValueError("Le montant verse ne peut pas etre negatif.")
 
     situation.montant_total_distribue = calculer_total_distribue(
         situation.distributeur,
@@ -2431,17 +2374,11 @@ def cloturer_situation(
     )
 
     situation.montant_credit = calculer_credit(
-        situation.montant_total_distribue,
+        calculer_total_distribue_net(
+            situation.distributeur,
+            situation.date_situation,
+        ),
         situation.fond
-    )
-
-    # ======================================================
-    # VERIFICATION DU CREDIT
-    # ======================================================
-
-    verifier_versement_credit(
-        situation.montant_credit,
-        montant_credit_verse
     )
 
     # ======================================================
@@ -2449,7 +2386,6 @@ def cloturer_situation(
     # ======================================================
 
     montant_total_restant_net = Decimal("0.00")
-    montant_total_distribue_brut = Decimal("0.00")
     montant_total_distribue_net = Decimal("0.00")
 
     for ligne in situation.lignes.select_related(
@@ -2552,11 +2488,6 @@ def cloturer_situation(
             ligne.taux_remise,
         )
 
-        montant_total_distribue_brut += calculer_valeur_brute_quantite(
-            ligne.quantite_distribuee,
-            ligne.prix_unitaire,
-        )
-
         montant_total_distribue_net += calculer_valeur_nette_quantite(
             ligne.quantite_distribuee,
             ligne.prix_unitaire,
@@ -2592,47 +2523,16 @@ def cloturer_situation(
     # MONTANTS
     # ======================================================
 
-    situation.montant_credit_verse = (
-        montant_credit_verse
+    repartition = ventiler_versement(
+        montant_total_verse,
+        situation.montant_credit,
+        montant_total_distribue_net - montant_total_restant_net,
     )
-
-    situation.montant_vente_verse = (
-        montant_vente_verse
-    )
-
-    # ======================================================
-    # TOTAL VERSE
-    # ======================================================
-
-    mettre_a_jour_total_verse(
-        situation
-    )
-
-    # ======================================================
-    # MANQUANT
-    # ======================================================
-
-    montant_credit_verse_net = convertir_montant_brut_en_net(
-        situation.montant_credit_verse,
-        montant_total_distribue_brut,
-        montant_total_distribue_net,
-    )
-
-    montant_manquant = calculer_manquant(
-
-        montant_total_distribue_net,
-
-        montant_credit_verse_net,
-
-        situation.montant_vente_verse,
-
-        montant_total_restant_net,
-
-    )
-
-    situation.montant_manquant = (
-        montant_manquant
-    )
+    situation.montant_credit_verse = repartition["montant_credit_verse"]
+    situation.montant_vente_verse = repartition["montant_vente_verse"]
+    situation.montant_total_verse = repartition["montant_total_verse"]
+    situation.montant_manquant = repartition["montant_manquant"]
+    situation.montant_surplus = repartition["montant_surplus"]
 
     # ======================================================
     # COUPURES
@@ -2658,13 +2558,13 @@ def cloturer_situation(
     # CREATION DU MANQUANT
     # ======================================================
 
-    if montant_manquant > 0:
+    if situation.montant_manquant > 0:
 
         creer_manquant_situation(
 
             situation,
 
-            montant_manquant,
+            situation.montant_manquant,
 
             utilisateur
 
@@ -2695,8 +2595,7 @@ def cloturer_situation(
 def modifier_situation_cloturee(
     situation,
     donnees_lignes,
-    montant_credit_verse,
-    montant_vente_verse,
+    montant_total_verse,
     coupures,
     utilisateur,
 ):
@@ -2763,8 +2662,7 @@ def modifier_situation_cloturee(
     return cloturer_situation(
         situation=situation,
         donnees_lignes=donnees_lignes,
-        montant_credit_verse=montant_credit_verse,
-        montant_vente_verse=montant_vente_verse,
+        montant_total_verse=montant_total_verse,
         coupures=coupures,
         utilisateur=utilisateur,
     )

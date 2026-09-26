@@ -49,6 +49,7 @@ from .services import (
     annoter_lignes_reliquat,
     calculer_valeur_nette_quantite,
     calculer_total_distribue,
+    calculer_total_distribue_net,
     calculer_situation_gerant,
     construire_lignes_affichage_situation,
     creer_situation_journaliere,
@@ -218,6 +219,10 @@ def _situation_affichage_temporaire(
         distributeur,
         date_situation
     )
+    montant_total_distribue_net = calculer_total_distribue_net(
+        distributeur,
+        date_situation,
+    )
 
     point_vente = None
 
@@ -260,7 +265,7 @@ def _situation_affichage_temporaire(
         ),
 
         montant_credit=calculer_credit(
-            montant_total_distribue,
+            montant_total_distribue_net,
             fond,
         ),
 
@@ -988,6 +993,9 @@ def liste_situations(request):
         total_manquant=Sum(
             "montant_manquant"
         ),
+        total_surplus=Sum(
+            "montant_surplus"
+        ),
     )
 
     page = paginer(
@@ -1031,6 +1039,11 @@ def liste_situations(request):
             ),
             "total_manquant": (
                 totaux["total_manquant"]
+                or
+                Decimal("0.00")
+            ),
+            "total_surplus": (
+                totaux["total_surplus"]
                 or
                 Decimal("0.00")
             ),
@@ -1531,12 +1544,8 @@ def modifier_situation_view(request, pk):
                     situation,
                     request
                 ),
-                montant_credit_verse=request.POST.get(
-                    "montant_credit_verse",
-                    "0"
-                ),
-                montant_vente_verse=request.POST.get(
-                    "montant_vente_verse",
+                montant_total_verse=request.POST.get(
+                    "montant_total_verse",
                     "0"
                 ),
                 coupures=_coupures_depuis_post(
@@ -1621,12 +1630,7 @@ def modifier_situation_view(request, pk):
             "action_form": "modifier",
             "bouton_situation": "Modifier le versement",
             "mode_modification": True,
-            "montant_credit_verse_initial": (
-                situation.montant_credit_verse
-            ),
-            "montant_vente_verse_initial": (
-                situation.montant_vente_verse
-            ),
+            "montant_total_verse_initial": situation.montant_total_verse,
             "coupure_10000": coupures["10000"],
             "coupure_5000": coupures["5000"],
             "coupure_2000": coupures["2000"],
@@ -1865,6 +1869,9 @@ def versement_gerant(request):
             total_manquant=Sum(
                 "montant_manquant"
             ),
+            total_surplus=Sum(
+                "montant_surplus"
+            ),
         )
 
         page = paginer(
@@ -1908,6 +1915,11 @@ def versement_gerant(request):
                 ),
                 "total_manquant": (
                     totaux["total_manquant"]
+                    or
+                    Decimal("0.00")
+                ),
+                "total_surplus": (
+                    totaux["total_surplus"]
                     or
                     Decimal("0.00")
                 ),
@@ -2003,12 +2015,8 @@ def versement_gerant(request):
                                     request
                                 )
                             ),
-                            montant_credit_verse=request.POST.get(
-                                "montant_credit_verse",
-                                "0"
-                            ),
-                            montant_vente_verse=request.POST.get(
-                                "montant_vente_verse",
+                            montant_total_verse=request.POST.get(
+                                "montant_total_verse",
                                 "0"
                             ),
                             coupures=_coupures_depuis_post(
@@ -2128,7 +2136,10 @@ def versement_gerant(request):
         )
 
         situation.montant_credit = calculer_credit(
-            situation.montant_total_distribue,
+            calculer_total_distribue_net(
+                situation.distributeur,
+                situation.date_situation,
+            ),
             situation.fond,
         )
 
@@ -2184,13 +2195,8 @@ def versement_gerant(request):
             "url_retour_direct": reverse(
                 "situations:versement_gerant"
             ),
-            "montant_credit_verse_initial": (
-                situation.montant_credit_verse
-                if situation_en_base
-                else None
-            ),
-            "montant_vente_verse_initial": (
-                situation.montant_vente_verse
+            "montant_total_verse_initial": (
+                situation.montant_total_verse
                 if situation_en_base
                 else 0
             ),
@@ -2393,13 +2399,8 @@ def ajouter_situation(request):
             # MONTANTS
             # ----------------------------------------------
 
-            montant_credit_verse = request.POST.get(
-                "montant_credit_verse",
-                "0"
-            )
-
-            montant_vente_verse = request.POST.get(
-                "montant_vente_verse",
+            montant_total_verse = request.POST.get(
+                "montant_total_verse",
                 "0"
             )
 
@@ -2448,13 +2449,7 @@ def ajouter_situation(request):
 
                     donnees_lignes=donnees_lignes,
 
-                    montant_credit_verse=(
-                        montant_credit_verse
-                    ),
-
-                    montant_vente_verse=(
-                        montant_vente_verse
-                    ),
+                    montant_total_verse=montant_total_verse,
 
                     coupures=coupures,
 
@@ -2627,7 +2622,10 @@ def ajouter_situation(request):
         )
 
         situation.montant_credit = calculer_credit(
-            situation.montant_total_distribue,
+            calculer_total_distribue_net(
+                situation.distributeur,
+                situation.date_situation,
+            ),
             situation.fond,
         )
 

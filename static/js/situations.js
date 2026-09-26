@@ -49,34 +49,12 @@ function initialiserSituation() {
 
     recalculerSousTotauxNets();
 
-    const champVentesVersees = document.getElementById(
-        "montant-vente-verse"
-    );
+    const champMontantRemis = document.getElementById("montant-total-verse");
 
-    const champCreditVerse = document.getElementById(
-        "montant-credit-verse"
-    );
-
-    [
-        champCreditVerse,
-        champVentesVersees
-    ].forEach(function (champ) {
-
-        if (!champ) {
-            return;
-        }
-
-        champ.addEventListener(
-            "input",
-            actualiserManquantAuto
-        );
-
-        champ.addEventListener(
-            "change",
-            actualiserManquantAuto
-        );
-
-    });
+    if (champMontantRemis) {
+        champMontantRemis.addEventListener("input", actualiserManquantAuto);
+        champMontantRemis.addEventListener("change", actualiserManquantAuto);
+    }
 
     document.addEventListener(
         "input",
@@ -97,33 +75,10 @@ function initialiserSituation() {
 
 function initialiserPaiements() {
 
-    const champCreditVerse = document.getElementById(
-        "montant-credit-verse"
-    );
+    const champMontantRemis = document.getElementById("montant-total-verse");
 
-    if (champCreditVerse) {
-
-        const montantCredit = convertirNombre(
-            champCreditVerse.dataset.montantCredit
-        );
-
-        champCreditVerse.value = formaterNombre(
-            montantCredit
-        );
-
-    }
-
-    const champVentesVersees = document.getElementById(
-        "montant-vente-verse"
-    );
-
-    if (
-        champVentesVersees &&
-        champVentesVersees.value === ""
-    ) {
-
-        champVentesVersees.value = "0";
-
+    if (champMontantRemis && champMontantRemis.value === "") {
+        champMontantRemis.value = "0";
     }
 
 }
@@ -643,6 +598,8 @@ function recalculerSousTotauxNets() {
 
     if (champTotalNetVerse) {
 
+        champTotalNetVerse.dataset.montantNet = String(totalNetVerse);
+
         champTotalNetVerse.textContent = formaterMontant(
             totalNetVerse
         );
@@ -660,71 +617,34 @@ function recalculerSousTotauxNets() {
 
 function actualiserManquantAuto() {
 
-    const champManquant = document.getElementById(
-        "montant-manquant-auto"
-    );
+    const champEcart = document.getElementById("montant-ecart-auto");
+    const libelleEcart = document.getElementById("libelle-ecart-versement");
+    const champCreditRestant = document.getElementById("montant-credit-restant");
 
-    if (!champManquant) {
+    if (!champEcart || !libelleEcart || !champCreditRestant) {
 
         return;
 
     }
 
-    const champTotalDistribue = document.getElementById(
-        "total-net-distribue"
+    const credit = convertirNombre(champCreditRestant.dataset.montantCredit);
+    const montantRemis = convertirNombre(
+        document.getElementById("montant-total-verse")?.value
     );
+    const netVendu = convertirNombre(
+        document.getElementById("total-net-verse")?.dataset.montantNet
+    );
+    const difference = montantRemis - netVendu;
 
-    const champTotalRestant = document.getElementById(
-        "total-net-restant"
-    );
-
-    const totalDistribueBrut = convertirNombre(
-        champTotalDistribue?.dataset.montantBrut ||
-        champTotalDistribue?.textContent
-    );
-
-    const totalDistribueNet = convertirNombre(
-        champTotalDistribue?.dataset.montantNet ||
-        champTotalDistribue?.textContent
-    );
-
-    const totalRestantNet = convertirNombre(
-        champTotalRestant?.dataset.montantNet ||
-        champTotalRestant?.textContent
-    );
-
-    const creditVerse = convertirNombre(
-        document.getElementById(
-            "montant-credit-verse"
-        )?.value
-    );
-
-    const ventesVersees = convertirNombre(
-        document.getElementById(
-            "montant-vente-verse"
-        )?.value
-    );
-
-    const creditVerseNet = convertirMontantBrutEnNet(
-        creditVerse,
-        totalDistribueBrut,
-        totalDistribueNet
-    );
-
-    const manquant = Math.max(
-        0,
-        totalDistribueNet
-        -
-        creditVerseNet
-        -
-        ventesVersees
-        -
-        totalRestantNet
-    );
-
-    champManquant.value = formaterMontant(
-        manquant
-    );
+    champCreditRestant.value = formaterMontant(Math.max(0, credit - montantRemis));
+    libelleEcart.textContent = difference < 0
+        ? "Manquant"
+        : difference > 0
+            ? "Surplus"
+            : "Écart";
+    champEcart.value = formaterMontant(Math.abs(difference));
+    champEcart.classList.toggle("text-danger", difference < 0);
+    champEcart.classList.toggle("text-success", difference > 0);
 
 }
 
@@ -744,39 +664,6 @@ function calculerRemise(
         taux
         /
         100
-    );
-
-}
-
-
-function convertirMontantBrutEnNet(
-    montantBrut,
-    totalBrutReference,
-    totalNetReference
-) {
-
-    if (
-        montantBrut <= 0
-    ) {
-
-        return 0;
-
-    }
-
-    if (
-        totalBrutReference <= 0
-    ) {
-
-        return montantBrut;
-
-    }
-
-    return (
-        montantBrut
-        *
-        totalNetReference
-        /
-        totalBrutReference
     );
 
 }

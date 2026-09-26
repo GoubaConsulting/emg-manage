@@ -207,6 +207,14 @@ class SituationJournaliere(models.Model):
         verbose_name="Montant manquant"
     )
 
+    montant_surplus = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        verbose_name="Montant surplus"
+    )
+
     # ======================================================
     # COUPURES
     # ======================================================

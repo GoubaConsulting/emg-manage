@@ -60,7 +60,6 @@ from .services import (
     modifier_reglement_stock_tampon,
     valider_commande_gerant,
     rejeter_commande_gerant,
-    corriger_commande_par_directeur,
     
 )
 

@@ -141,7 +141,7 @@ Situations clôturées
 
 <div class="row mb-4">
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-primary shadow-sm">
             <div class="card-header bg-primary text-white">
                 Montant distribué
@@ -154,7 +154,7 @@ Situations clôturées
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-success shadow-sm">
             <div class="card-header bg-success text-white">
                 Montant versé
@@ -167,7 +167,7 @@ Situations clôturées
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-danger shadow-sm">
             <div class="card-header bg-danger text-white">
                 Manquants
@@ -176,6 +176,15 @@ Situations clôturées
                 <h4 class="mb-0">
                     {{ total_manquant|floatformat:2 }} FCFA
                 </h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-info shadow-sm">
+            <div class="card-header bg-info text-dark">Surplus</div>
+            <div class="card-body text-end">
+                <h4 class="mb-0">{{ total_surplus|floatformat:2 }} FCFA</h4>
             </div>
         </div>
     </div>
@@ -200,7 +209,7 @@ Situations clôturées
                         <th class="text-end">Distribué</th>
                         <th class="text-end">Crédit versé</th>
                         <th class="text-end">Ventes versées</th>
-                        <th class="text-end">Manquant</th>
+                        <th class="text-end">Écart</th>
                         {% if request.user.profil.role != "GERANT" %}
                             <th class="text-center">Actions</th>
                         {% endif %}
@@ -239,7 +248,13 @@ Situations clôturées
                             {{ situation.montant_vente_verse|floatformat:2 }}
                         </td>
                         <td class="text-end">
-                            {{ situation.montant_manquant|floatformat:2 }}
+                            {% if situation.montant_manquant > 0 %}
+                                <span class="text-danger">Manquant {{ situation.montant_manquant|floatformat:2 }}</span>
+                            {% elif situation.montant_surplus > 0 %}
+                                <span class="text-success">Surplus {{ situation.montant_surplus|floatformat:2 }}</span>
+                            {% else %}
+                                0,00
+                            {% endif %}
                         </td>
                         {% if request.user.profil.role != "GERANT" %}
                             <td class="text-center">
