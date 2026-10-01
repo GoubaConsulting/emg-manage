@@ -46,6 +46,7 @@ function initialiserSituation() {
     });
 
     initialiserPaiements();
+    initialiserCoupures();
 
     recalculerSousTotauxNets();
 
@@ -80,6 +81,47 @@ function initialiserPaiements() {
     if (champMontantRemis && champMontantRemis.value === "") {
         champMontantRemis.value = "0";
     }
+
+}
+
+
+function initialiserCoupures() {
+
+    const tableau = document.getElementById("tableau-coupures");
+
+    if (!tableau) {
+        return;
+    }
+
+    tableau.addEventListener("input", recalculerCoupures);
+    tableau.addEventListener("change", recalculerCoupures);
+    recalculerCoupures();
+
+}
+
+
+function recalculerCoupures() {
+
+    const tableau = document.getElementById("tableau-coupures");
+
+    if (!tableau) {
+        return;
+    }
+
+    let total = 0;
+
+    tableau.querySelectorAll("tbody tr[data-valeur-coupure]").forEach(function (ligne) {
+        const valeur = Number(ligne.dataset.valeurCoupure);
+        const quantite = Number(ligne.querySelector(".quantite-coupure").value);
+        const montant = Number.isInteger(quantite) && quantite >= 0
+            ? valeur * quantite
+            : 0;
+
+        ligne.querySelector(".montant-coupure").textContent = formaterMontant(montant);
+        total += montant;
+    });
+
+    tableau.querySelector("#total-coupures").textContent = formaterMontant(total);
 
 }
 
