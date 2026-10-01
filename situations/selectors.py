@@ -41,7 +41,8 @@ from .services import (
 def distributions_du_jour(
     distributeur,
     date_situation,
-    inclure_cloturees=False
+    inclure_cloturees=False,
+    situation=None,
 ):
     """
     Retourne les distributions actives d'un distributeur
@@ -77,6 +78,11 @@ def distributions_du_jour(
             "iddistribution",
         )
     )
+
+    if situation is None:
+        distributions = distributions.filter(situation__isnull=True)
+    else:
+        distributions = distributions.filter(situation=situation)
 
     if types_distribution:
 
@@ -160,12 +166,18 @@ def situation_existante(
             distributeur=distributeur,
             date_situation=date_situation,
             actif=True,
+            etat__in=[
+                SituationJournaliere.ETAT_OUVERTE,
+                SituationJournaliere.ETAT_ATTENTE_VALIDATION,
+                SituationJournaliere.ETAT_REFUSEE,
+            ],
         )
 
         .prefetch_related(
             "lignes__produit__compagnie",
         )
 
+        .order_by("-idsituation")
         .first()
     )
 

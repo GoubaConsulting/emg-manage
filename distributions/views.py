@@ -60,7 +60,7 @@ from stocks.models import (
 
 from situations.services import (
     calculer_valeur_nette_quantite,
-    derniere_situation_cloturee_avant,
+    dernieres_situations_cloturees_avant,
 )
 
 
@@ -439,12 +439,11 @@ def montants_initiaux_destinataire(
 
         return {}
 
-    situation = derniere_situation_cloturee_avant(
-        distributeur,
-        date_distribution
-    )
+    situations = list(dernieres_situations_cloturees_avant(
+        distributeur, date_distribution
+    ))
 
-    if situation is None:
+    if not situations:
 
         return {}
 
@@ -477,9 +476,11 @@ def montants_initiaux_destinataire(
         )
     )
 
-    lignes_situation = list(
-        situation.lignes.all()
-    )
+    lignes_situation = [
+        ligne
+        for situation in situations
+        for ligne in situation.lignes.all()
+    ]
 
     produits_ids = [
         ligne.produit_id
@@ -510,23 +511,16 @@ def montants_initiaux_destinataire(
             ligne.taux_remise,
         )
 
-        montants[str(ligne.produit_id)] = {
-            "brut": float(
-                ligne.quantite_restante
-                *
-                ligne.prix_unitaire
-            ),
-            "net": float(
-                calculer_valeur_nette_quantite(
-                    ligne.quantite_restante,
-                    ligne.prix_unitaire,
-                    taux_initial,
-                )
-            ),
-            "taux": float(
-                taux_initial
-            ),
-        }
+        produit_id = str(ligne.produit_id)
+        precedent = montants.setdefault(
+            produit_id, {"brut": 0.0, "net": 0.0, "taux": float(taux_initial)}
+        )
+        precedent["brut"] += float(
+            ligne.quantite_restante * ligne.prix_unitaire
+        )
+        precedent["net"] += float(calculer_valeur_nette_quantite(
+            ligne.quantite_restante, ligne.prix_unitaire, taux_initial
+        ))
 
     return montants
 

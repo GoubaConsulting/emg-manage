@@ -48,7 +48,7 @@
 
             <div class="row mt-3">
 
-                <div class="col-md-4">
+                <div class="col-md-6 col-xl-3">
 
                     <strong>
                         Point de vente :
@@ -58,7 +58,7 @@
 
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-6 col-xl-3">
 
                     <strong>
                         Date actuelle :
@@ -68,7 +68,15 @@
 
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-6 col-xl-3">
+
+                    <strong>Heure :</strong>
+
+                    {{ commande.date_creation|date:"H:i" }}
+
+                </div>
+
+                <div class="col-md-6 col-xl-3">
 
                     <strong>
                         État :

@@ -272,25 +272,6 @@ class SituationJournaliere(models.Model):
 
         ]
 
-        constraints = [
-
-            models.UniqueConstraint(
-
-                fields=[
-                    "distributeur",
-                    "date_situation",
-                ],
-
-                condition=models.Q(
-                    actif=True
-                ),
-
-                name="situation_unique_distributeur_date_active"
-
-            )
-
-        ]
-
         indexes = [
 
             models.Index(

@@ -316,6 +316,15 @@ Versements au Directeur
                                         </div>
                                     {% endif %}
 
+                                    {% if versement.etat != versement.ETAT_CLOTUREE %}
+                                        <div class="text-end mt-3">
+                                            <a class="btn btn-outline-primary btn-sm"
+                                               href="{% url 'situations:versement_gerant' %}?nouveau=1&amp;idsituation={{ versement.idsituation }}">
+                                                Corriger ce versement
+                                            </a>
+                                        </div>
+                                    {% endif %}
+
                                 </div>
                             </td>
                         </tr>

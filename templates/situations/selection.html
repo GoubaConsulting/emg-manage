@@ -160,6 +160,10 @@
                     value="{{ situation.idsituation }}"
                 >
 
+                {% for distribution in distributions %}
+                    <input type="hidden" name="distribution_ids" value="{{ distribution.pk }}">
+                {% endfor %}
+
                 <input
                     type="hidden"
                     name="distributeur"
@@ -231,6 +235,15 @@
                     </div>
 
                 </div>
+
+                {% if distributions %}
+                    <div class="mb-3 small text-muted">
+                        Distributions concernées :
+                        {% for distribution in distributions %}
+                            {{ distribution.numero }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
 
 
                 <!-- ======================================

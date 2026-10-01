@@ -223,7 +223,9 @@ Liste des commandes
 
                         <th>Numéro</th>
 
-                        <th>Date</th>
+                        <th>Date commande</th>
+
+                        <th>Heure</th>
 
                         <th class="text-end">
 
@@ -289,6 +291,8 @@ Liste des commandes
 
                         </td>
 
+                        <td>{{ commande.date_creation|date:"H:i" }}</td>
+
                         <td class="text-end">
 
                             {{ commande.montant_brut }} FCFA
@@ -337,7 +341,7 @@ Liste des commandes
 
                         <td></td>
 
-                        <td colspan="{% if request.user.profil.role == 'GERANT' %}4{% else %}5{% endif %}">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}5{% else %}6{% endif %}">
 
                             <div class="p-3 bg-light rounded">
 
@@ -581,7 +585,7 @@ Liste des commandes
 
                     <tr>
 
-                        <td colspan="{% if request.user.profil.role == 'GERANT' %}5{% else %}6{% endif %}" class="text-center">
+                        <td colspan="{% if request.user.profil.role == 'GERANT' %}6{% else %}7{% endif %}" class="text-center">
 
                             Aucune commande trouvée.
 

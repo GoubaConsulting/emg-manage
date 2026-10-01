@@ -179,7 +179,8 @@
                             <tr>
                                 <th width="50"></th>
                                 <th>Numéro</th>
-                                <th>Date</th>
+                                <th>Date commande</th>
+                                <th>Heure</th>
                                 <th>Etat</th>
                                 <th class="text-end">Montant brut</th>
                                 <th class="text-end">Montant net</th>
@@ -196,6 +197,7 @@
                                 </td>
                                 <td>{{ commande.numero }}</td>
                                 <td>{{ commande.date_commande|date:"d/m/Y" }}</td>
+                                <td>{{ commande.date_creation|date:"H:i" }}</td>
                                 <td>
                                     <span class="badge {% if commande.etat == commande.VALIDEE %}text-bg-success{% elif commande.etat == commande.REFUSEE %}text-bg-danger{% elif commande.etat == commande.VALIDEE_PARTIELLEMENT %}text-bg-warning{% else %}text-bg-secondary{% endif %}">
                                         {{ commande.get_etat_display }}
@@ -219,7 +221,7 @@
                                 </td>
                             </tr>
                             <tr class="collapse" id="apercuCmd{{ commande.idcommande }}">
-                                <td colspan="7">
+                                <td colspan="8">
                                     <div class="p-3 bg-light rounded">
                                         <div class="row mb-3">
                                             <div class="col-md-4">
@@ -292,7 +294,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-center">Aucune commande trouvée.</td>
+                                <td colspan="8" class="text-center">Aucune commande trouvée.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

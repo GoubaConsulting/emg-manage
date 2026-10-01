@@ -20,6 +20,8 @@ Commandes en attente
 
     <div class="card-body">
 
+        <div class="table-responsive">
+
         <table class="table table-bordered table-hover">
 
             <thead class="table-header-emg">
@@ -30,7 +32,9 @@ Commandes en attente
 
                     <th>Numéro</th>
 
-                    <th>Date</th>
+                    <th>Date commande</th>
+
+                    <th>Heure</th>
 
                     <th>Point de vente</th>
 
@@ -73,6 +77,8 @@ Commandes en attente
                     <td>{{ commande.numero }}</td>
 
                     <td>{{ commande.date_commande|date:"d/m/Y" }}</td>
+
+                    <td>{{ commande.date_creation|date:"H:i" }}</td>
 
                     <td>{{ commande.point_vente.designation }}</td>
 
@@ -125,7 +131,7 @@ Commandes en attente
 
                     <td></td>
 
-                    <td colspan="6">
+                    <td colspan="7">
 
                         <div class="p-3 bg-light rounded">
 
@@ -293,7 +299,7 @@ Commandes en attente
 
                 <tr>
 
-                    <td colspan="7" class="text-center">
+                    <td colspan="8" class="text-center">
 
                         Aucune commande en attente.
 
@@ -306,6 +312,8 @@ Commandes en attente
             </tbody>
 
         </table>
+
+        </div>
 
     </div>
 

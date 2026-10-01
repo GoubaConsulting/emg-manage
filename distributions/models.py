@@ -143,6 +143,15 @@ class Distribution(models.Model):
         verbose_name="Distributeur"
     )
 
+    situation = models.ForeignKey(
+        "situations.SituationJournaliere",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="distributions",
+        verbose_name="Versement",
+    )
+
     date_distribution = models.DateField(
         verbose_name="Date de distribution"
     )

@@ -684,35 +684,42 @@ def montants_initiaux_commande_gerant(utilisateur):
 
         return {}
 
-    situation = (
+    date_derniere = (
         SituationJournaliere.objects
         .filter(
             actif=True,
             distributeur=gerant,
             etat=SituationJournaliere.ETAT_CLOTUREE,
         )
-        .prefetch_related(
-            "lignes"
-        )
-        .order_by(
-            "-date_situation",
-            "-idsituation",
-        )
+        .order_by("-date_situation")
+        .values_list("date_situation", flat=True)
         .first()
     )
 
-    if situation is None:
-
+    if date_derniere is None:
         return {}
 
-    return {
-        ligne.produit_id: calculer_valeur_brute_quantite(
-            ligne.quantite_restante,
-            ligne.prix_unitaire,
+    montants = {}
+    for situation in (
+        SituationJournaliere.objects
+        .filter(
+            actif=True,
+            distributeur=gerant,
+            etat=SituationJournaliere.ETAT_CLOTUREE,
+            date_situation=date_derniere,
         )
-        for ligne in situation.lignes.all()
-        if ligne.quantite_restante > 0
-    }
+        .prefetch_related("lignes")
+    ):
+        for ligne in situation.lignes.all():
+            if ligne.quantite_restante > 0:
+                montants[ligne.produit_id] = (
+                    montants.get(ligne.produit_id, Decimal("0.00"))
+                    + calculer_valeur_brute_quantite(
+                        ligne.quantite_restante, ligne.prix_unitaire
+                    )
+                )
+
+    return montants
 
 
 # ==========================================================
@@ -749,7 +756,8 @@ def types_distribution_pour_distributeur(distributeur):
 def recuperer_distributions_journee(
     distributeur,
     date_situation,
-    inclure_cloturees=False
+    inclure_cloturees=False,
+    situation=None,
 ):
     """
     Retourne toutes les distributions réalisées
@@ -787,6 +795,11 @@ def recuperer_distributions_journee(
         )
     )
 
+    if situation is None:
+        distributions = distributions.filter(situation__isnull=True)
+    else:
+        distributions = distributions.filter(situation=situation)
+
     if types_distribution:
 
         distributions = distributions.filter(
@@ -812,7 +825,8 @@ def cloturer_distributions_situation(
 
     distributions = recuperer_distributions_journee(
         situation.distributeur,
-        situation.date_situation
+        situation.date_situation,
+        situation=situation,
     )
 
     return distributions.update(
@@ -850,6 +864,38 @@ def derniere_situation_cloturee_avant(
         )
         .first()
     )
+
+
+def dernieres_situations_cloturees_avant(distributeur, date_situation):
+    """Retourne tous les versements clos de la derniere date anterieure."""
+
+    situations = SituationJournaliere.objects.filter(
+        distributeur=distributeur,
+        date_situation__lt=date_situation,
+        etat=SituationJournaliere.ETAT_CLOTUREE,
+        actif=True,
+    )
+    derniere_date = (
+        situations.order_by("-date_situation")
+        .values_list("date_situation", flat=True)
+        .first()
+    )
+    if derniere_date is None:
+        return situations.none()
+    return situations.filter(date_situation=derniere_date).prefetch_related(
+        "lignes__produit__compagnie"
+    )
+
+
+def reliquat_deja_affecte_ce_jour(distributeur, date_situation, situation=None):
+    situations = SituationJournaliere.objects.filter(
+        distributeur=distributeur,
+        date_situation=date_situation,
+        actif=True,
+    )
+    if situation is not None:
+        situations = situations.filter(idsituation__lt=situation.pk)
+    return situations.exists()
 
 
 def calculer_valeur_nette_quantite(
@@ -900,20 +946,15 @@ def calculer_valeur_brute_quantite(
 def calculer_valeur_reliquat_precedent(
     distributeur,
     date_situation,
-    produits_exclus=None
+    produits_exclus=None,
+    situation=None,
 ):
     """
     Calcule la valeur brute des quantites restantes
     de la derniere situation cloturee.
     """
 
-    situation = derniere_situation_cloturee_avant(
-        distributeur,
-        date_situation
-    )
-
-    if situation is None:
-
+    if reliquat_deja_affecte_ce_jour(distributeur, date_situation, situation):
         return Decimal("0.00")
 
     total = Decimal("0.00")
@@ -924,7 +965,13 @@ def calculer_valeur_reliquat_precedent(
         []
     )
 
-    for ligne in situation.lignes.all():
+    for ligne in (
+        ligne
+        for precedente in dernieres_situations_cloturees_avant(
+            distributeur, date_situation
+        )
+        for ligne in precedente.lignes.all()
+    ):
 
         if ligne.quantite_restante <= 0:
 
@@ -944,7 +991,8 @@ def calculer_valeur_reliquat_precedent(
 
 def calculer_total_distribue(
     distributeur,
-    date_situation
+    date_situation,
+    situation=None,
 ):
     """
     Calcule le montant brut total de toutes les
@@ -966,6 +1014,11 @@ def calculer_total_distribue(
             etat=Distribution.ETAT_OUVERTE,
         )
     )
+
+    if situation is None:
+        distributions = distributions.filter(situation__isnull=True)
+    else:
+        distributions = distributions.filter(situation=situation)
 
     if types_distribution:
 
@@ -1043,12 +1096,13 @@ def calculer_total_distribue(
         distributeur,
         date_situation,
         produits_exclus=produits_initiaux_jour,
+        situation=situation,
     )
 
     return total
 
 
-def calculer_total_distribue_net(distributeur, date_situation):
+def calculer_total_distribue_net(distributeur, date_situation, situation=None):
     """Valorise les distributions ouvertes et les reliquats une seule fois."""
 
     return sum(
@@ -1057,6 +1111,7 @@ def calculer_total_distribue_net(distributeur, date_situation):
             for donnees in construire_donnees_lignes_situation(
                 distributeur,
                 date_situation,
+                situation=situation,
             )
         ),
         Decimal("0.00"),
@@ -1099,7 +1154,8 @@ def calculer_credit_distributeur(
 def construire_donnees_lignes_situation(
     distributeur,
     date_situation,
-    distributions=None
+    distributions=None,
+    situation=None,
 ):
     """
     Construit les lignes metier d'une situation.
@@ -1112,7 +1168,8 @@ def construire_donnees_lignes_situation(
 
         distributions = recuperer_distributions_journee(
             distributeur,
-            date_situation
+            date_situation,
+            situation=situation,
         )
 
     distributions = list(
@@ -1155,17 +1212,18 @@ def construire_donnees_lignes_situation(
                         ligne_distribution.produit_id
                     )
 
-    situation_precedente = derniere_situation_cloturee_avant(
-        distributeur,
-        date_situation
-    )
+    if not reliquat_deja_affecte_ce_jour(
+        distributeur, date_situation, situation
+    ):
+        lignes_precedentes = (
+            ligne
+            for precedente in dernieres_situations_cloturees_avant(
+                distributeur, date_situation
+            )
+            for ligne in precedente.lignes.all()
+        )
 
-    if situation_precedente is not None:
-
-        for ligne in situation_precedente.lignes.select_related(
-            "produit",
-            "produit__compagnie",
-        ):
+        for ligne in lignes_precedentes:
 
             if ligne.quantite_restante <= 0:
 
@@ -1177,28 +1235,31 @@ def construire_donnees_lignes_situation(
 
             produit_id = ligne.produit.idproduit
 
-            produits[produit_id] = {
-                "produit": ligne.produit,
-                "prix_unitaire": ligne.prix_unitaire,
-                "taux_remise": ligne.taux_remise,
-                "taux_distribution": ligne.taux_remise,
-                "quantite_initiale": ligne.quantite_restante,
-                "quantite_jour": Decimal("0.00"),
-                "quantite_distribuee": ligne.quantite_restante,
-                "montant_distribue": (
-                    calculer_valeur_brute_quantite(
-                        ligne.quantite_restante,
-                        ligne.prix_unitaire,
-                    )
-                ),
-                "montant_net_distribue": (
-                    calculer_valeur_nette_quantite(
-                        ligne.quantite_restante,
-                        ligne.prix_unitaire,
-                        ligne.taux_remise,
-                    )
-                ),
-            }
+            if produit_id not in produits:
+                produits[produit_id] = {
+                    "produit": ligne.produit,
+                    "prix_unitaire": ligne.prix_unitaire,
+                    "taux_remise": ligne.taux_remise,
+                    "taux_distribution": ligne.taux_remise,
+                    "quantite_initiale": Decimal("0.00"),
+                    "quantite_jour": Decimal("0.00"),
+                    "quantite_distribuee": Decimal("0.00"),
+                    "montant_distribue": Decimal("0.00"),
+                    "montant_net_distribue": Decimal("0.00"),
+                }
+
+            produits[produit_id]["quantite_initiale"] += ligne.quantite_restante
+            produits[produit_id]["quantite_distribuee"] += ligne.quantite_restante
+            produits[produit_id]["montant_distribue"] += (
+                calculer_valeur_brute_quantite(
+                    ligne.quantite_restante, ligne.prix_unitaire
+                )
+            )
+            produits[produit_id]["montant_net_distribue"] += (
+                calculer_valeur_nette_quantite(
+                    ligne.quantite_restante, ligne.prix_unitaire, ligne.taux_remise
+                )
+            )
 
     for distribution in distributions:
 
@@ -1404,7 +1465,8 @@ def annoter_lignes_reliquat(
     lignes,
     distributeur,
     date_situation,
-    distributions=None
+    distributions=None,
+    situation=None,
 ):
     """
     Ajoute les informations de reliquat aux lignes
@@ -1416,7 +1478,8 @@ def annoter_lignes_reliquat(
         for donnees in construire_donnees_lignes_situation(
             distributeur,
             date_situation,
-            distributions
+            distributions,
+            situation=situation,
         )
     }
 
@@ -1509,7 +1572,8 @@ def creer_lignes_situation(
     donnees_lignes = construire_donnees_lignes_situation(
         situation.distributeur,
         situation.date_situation,
-        distributions
+        distributions,
+        situation=situation,
     )
 
     # ======================================================
@@ -1689,10 +1753,12 @@ def synchroniser_situation_vente_directe(
 # CREATION D'UNE SITUATION JOURNALIERE
 # ==========================================================
 
+@transaction.atomic
 def creer_situation_journaliere(
     distributeur,
     date_situation,
-    utilisateur
+    utilisateur,
+    ids_distributions_attendus=None,
 ):
     """
     Crée une situation journalière à partir
@@ -1713,14 +1779,11 @@ def creer_situation_journaliere(
     # RECUPERATION DES DISTRIBUTIONS
     # ======================================================
 
-    distributions = (
-        recuperer_distributions_journee(
-            distributeur,
-            date_situation
-        )
-    )
+    distributions = list(recuperer_distributions_journee(
+        distributeur, date_situation
+    ))
 
-    if not distributions.exists():
+    if not distributions:
 
         toutes_distributions = recuperer_distributions_journee(
             distributeur,
@@ -1740,25 +1803,23 @@ def creer_situation_journaliere(
             "pour ce distributeur à cette date."
         )
 
-    # ======================================================
-    # VERIFICATION D'UNE SITUATION EXISTANTE
-    # ======================================================
-
-    situation_existante = (
-        SituationJournaliere.objects
-
-        .filter(
-            distributeur=distributeur,
-            date_situation=date_situation,
-            actif=True,
+    ids_distributions = [distribution.pk for distribution in distributions]
+    if (
+        ids_distributions_attendus is not None
+        and set(ids_distributions) != set(ids_distributions_attendus)
+    ):
+        raise ValueError(
+            "Les distributions ont change depuis la recherche. "
+            "Relancez la recherche avant d'enregistrer le versement."
         )
 
-        .first()
-    )
-
-    if situation_existante:
-
-        return situation_existante
+    verrouillees = list(Distribution.objects.select_for_update().filter(
+        pk__in=ids_distributions,
+        situation__isnull=True,
+        etat=Distribution.ETAT_OUVERTE,
+    ).values_list("pk", flat=True))
+    if len(verrouillees) != len(ids_distributions):
+        raise ValueError("Les distributions de ce versement ont deja ete prises en compte.")
 
     # ======================================================
     # CALCULS
@@ -1834,6 +1895,13 @@ def creer_situation_journaliere(
         situation,
         distributions
     )
+
+    rattachees = Distribution.objects.filter(
+        pk__in=ids_distributions,
+        situation__isnull=True,
+    ).update(situation=situation)
+    if rattachees != len(ids_distributions):
+        raise ValueError("Les distributions de ce versement ont change.")
 
     return situation
 
@@ -2013,7 +2081,8 @@ def soumettre_versement_gerant(
 
     distributions = recuperer_distributions_journee(
         situation.distributeur,
-        situation.date_situation
+        situation.date_situation,
+        situation=situation,
     )
 
     if not distributions.exists():
@@ -2030,13 +2099,15 @@ def soumettre_versement_gerant(
 
     situation.montant_total_distribue = calculer_total_distribue(
         situation.distributeur,
-        situation.date_situation
+        situation.date_situation,
+        situation=situation,
     )
 
     situation.montant_credit = calculer_credit(
         calculer_total_distribue_net(
             situation.distributeur,
             situation.date_situation,
+            situation=situation,
         ),
         situation.fond
     )
@@ -2231,7 +2302,8 @@ def valider_versement_gerant(
 
     distributions = recuperer_distributions_journee(
         situation.distributeur,
-        situation.date_situation
+        situation.date_situation,
+        situation=situation,
     )
 
     if not distributions.exists():
@@ -2243,7 +2315,8 @@ def valider_versement_gerant(
 
     montant_total_actuel = calculer_total_distribue(
         situation.distributeur,
-        situation.date_situation
+        situation.date_situation,
+        situation=situation,
     )
 
     if montant_total_actuel != situation.montant_total_distribue:
@@ -2370,13 +2443,15 @@ def cloturer_situation(
 
     situation.montant_total_distribue = calculer_total_distribue(
         situation.distributeur,
-        situation.date_situation
+        situation.date_situation,
+        situation=situation,
     )
 
     situation.montant_credit = calculer_credit(
         calculer_total_distribue_net(
             situation.distributeur,
             situation.date_situation,
+            situation=situation,
         ),
         situation.fond
     )
@@ -2637,6 +2712,7 @@ def modifier_situation_cloturee(
         situation.distributeur,
         situation.date_situation,
         inclure_cloturees=True,
+        situation=situation,
     )
 
     if not distributions.exists():

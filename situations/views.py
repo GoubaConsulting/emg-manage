@@ -61,6 +61,7 @@ from .services import (
     preparer_affichage_situations_gerant,
     regler_manquant,
     soumettre_versement_gerant,
+    types_distribution_pour_distributeur,
     valider_versement_gerant,
     rejeter_versement_gerant,
 )
@@ -162,6 +163,39 @@ def _situation_depuis_post(request):
         )
 
     return situation
+
+
+def _situation_gerant_par_id(gerant, identifiant):
+    try:
+        identifiant = int(identifiant)
+    except (TypeError, ValueError):
+        raise ValueError("Le versement indique est invalide.")
+
+    situation = SituationJournaliere.objects.filter(
+        pk=identifiant,
+        distributeur=gerant,
+        actif=True,
+    ).first()
+    if situation is None:
+        raise ValueError("Le versement indique est introuvable.")
+    return situation
+
+
+def _verifier_lot_distributions_affiche(request, distributions):
+    try:
+        ids_affiches = {int(valeur) for valeur in request.POST.getlist(
+            "distribution_ids"
+        )}
+    except (TypeError, ValueError):
+        raise ValueError("Les distributions affichees sont invalides.")
+
+    ids_actuels = set(distributions.values_list("pk", flat=True))
+    if not ids_actuels or ids_affiches != ids_actuels:
+        raise ValueError(
+            "Les distributions ont change depuis la recherche. "
+            "Relancez la recherche avant d'enregistrer le versement."
+        )
+    return ids_affiches
 
 
 def _contexte_cloture_depuis_post(request):
@@ -283,13 +317,26 @@ def _message_distributions_indisponibles(
     aucune distribution ouverte n'est disponible.
     """
 
-    toutes_distributions = distributions_du_jour(
-        distributeur,
-        date_situation,
-        inclure_cloturees=True
+    toutes_distributions = distributeur.distributions.filter(
+        actif=True,
+        date_distribution=date_situation,
+        type_distribution__in=types_distribution_pour_distributeur(distributeur),
     )
 
     if toutes_distributions.exists():
+
+        if toutes_distributions.filter(
+            situation__etat__in=[
+                SituationJournaliere.ETAT_OUVERTE,
+                SituationJournaliere.ETAT_ATTENTE_VALIDATION,
+                SituationJournaliere.ETAT_REFUSEE,
+            ]
+        ).exists():
+            return (
+                "Les distributions de cette date sont deja rattachees "
+                "a un versement en cours. Aucune nouvelle distribution "
+                "n'est disponible."
+            )
 
         return (
             "Toutes les distributions de "
@@ -1580,6 +1627,7 @@ def modifier_situation_view(request, pk):
         situation.distributeur,
         situation.date_situation,
         inclure_cloturees=True,
+        situation=situation,
     )
 
     lignes = list(
@@ -1595,6 +1643,7 @@ def modifier_situation_view(request, pk):
         situation.distributeur,
         situation.date_situation,
         distributions,
+        situation=situation,
     )
 
     _annoter_montants_existants_situation(
@@ -1939,6 +1988,27 @@ def versement_gerant(request):
             "Aucun gerant actif n'est rattache a votre point de vente."
         )
 
+    elif request.method == "GET" and request.GET.get("idsituation"):
+
+        try:
+            situation = _situation_gerant_par_id(
+                gerant, request.GET.get("idsituation")
+            )
+            if situation.etat == SituationJournaliere.ETAT_CLOTUREE:
+                raise ValueError("Ce versement est deja valide et cloture.")
+            distributions = distributions_du_jour(
+                gerant, situation.date_situation, situation=situation
+            )
+            lignes = situation.lignes.select_related(
+                "produit", "produit__compagnie"
+            )
+            form = VersementGerantSelectionForm(initial={
+                "date_situation": situation.date_situation
+            })
+        except ValueError as e:
+            messages.error(request, str(e))
+            situation = None
+
     elif request.method == "POST":
 
         form = VersementGerantSelectionForm(
@@ -1951,10 +2021,33 @@ def versement_gerant(request):
                 "date_situation"
             ]
 
-            distributions = distributions_du_jour(
-                gerant,
-                date_situation
-            )
+            identifiant_versement = request.POST.get("idsituation")
+            if identifiant_versement:
+                try:
+                    situation = _situation_gerant_par_id(
+                        gerant, identifiant_versement
+                    )
+                    if situation.date_situation != date_situation:
+                        raise ValueError("La date du versement ne correspond pas.")
+                    distributions = distributions_du_jour(
+                        gerant, date_situation, situation=situation
+                    )
+                except ValueError as e:
+                    form.add_error(None, str(e))
+                    distributions = distributions_du_jour(
+                        gerant, date_situation
+                    ).none()
+            else:
+                distributions = distributions_du_jour(gerant, date_situation)
+                if (
+                    not distributions.exists()
+                    and request.POST.get("action") != "soumettre_versement_gerant"
+                ):
+                    situation = situation_existante(gerant, date_situation)
+                    if situation is not None:
+                        distributions = distributions_du_jour(
+                            gerant, date_situation, situation=situation
+                        )
 
             if not distributions.exists():
 
@@ -1967,11 +2060,6 @@ def versement_gerant(request):
                 )
 
             else:
-
-                situation = situation_existante(
-                    gerant,
-                    date_situation
-                )
 
                 if (
                     situation is not None
@@ -1992,12 +2080,20 @@ def versement_gerant(request):
 
                     try:
 
+                        ids_distributions = _verifier_lot_distributions_affiche(
+                            request, distributions
+                        )
+
                         if situation is None:
 
                             situation = creer_situation_journaliere(
                                 distributeur=gerant,
                                 date_situation=date_situation,
                                 utilisateur=request.user,
+                                ids_distributions_attendus=ids_distributions,
+                            )
+                            distributions = distributions_du_jour(
+                                gerant, date_situation, situation=situation
                             )
 
                         elif not situation.lignes.exists():
@@ -2132,13 +2228,15 @@ def versement_gerant(request):
 
         situation.montant_total_distribue = calculer_total_distribue(
             situation.distributeur,
-            situation.date_situation
+            situation.date_situation,
+            situation=situation if situation_en_base else None,
         )
 
         situation.montant_credit = calculer_credit(
             calculer_total_distribue_net(
                 situation.distributeur,
                 situation.date_situation,
+                situation=situation if situation_en_base else None,
             ),
             situation.fond,
         )
@@ -2151,7 +2249,8 @@ def versement_gerant(request):
                 list(lignes),
                 situation.distributeur,
                 situation.date_situation,
-                distributions
+                distributions,
+                situation=situation if situation_en_base else None,
             )
 
         if situation_en_base:
@@ -2292,7 +2391,9 @@ def ajouter_situation(request):
 
                     distributeur,
 
-                    date_situation
+                    date_situation,
+
+                    situation=situation,
 
                 )
             )
@@ -2311,17 +2412,17 @@ def ajouter_situation(request):
                     "situations:ajouter_situation"
                 )
 
+            try:
+                ids_distributions = _verifier_lot_distributions_affiche(
+                    request, distributions
+                )
+            except ValueError as e:
+                messages.error(request, str(e))
+                return redirect("situations:ajouter_situation")
+
             # ----------------------------------------------
             # RECHERCHE D'UNE SITUATION EXISTANTE
             # ----------------------------------------------
-
-            situation = situation_existante(
-
-                distributeur,
-
-                date_situation
-
-            )
 
             # ----------------------------------------------
             # CREATION DE LA SITUATION SI NECESSAIRE
@@ -2342,7 +2443,14 @@ def ajouter_situation(request):
 
                             utilisateur=request.user,
 
+                            ids_distributions_attendus=ids_distributions,
+
                         )
+                    )
+                    distributions = distributions_du_jour(
+                        distributeur,
+                        date_situation,
+                        situation=situation,
                     )
 
                 except Exception as e:
@@ -2476,6 +2584,11 @@ def ajouter_situation(request):
                     request,
                     str(e)
                 )
+                distributions = distributions_du_jour(
+                    distributeur,
+                    date_situation,
+                    situation=situation,
+                )
 
         # ==================================================
         # ETAPE 1 : RECHERCHE
@@ -2513,6 +2626,20 @@ def ajouter_situation(request):
 
                 if not distributions.exists():
 
+                    candidate = situation_existante(
+                        distributeur, date_situation
+                    )
+                    if (
+                        candidate is not None
+                        and candidate.etat == SituationJournaliere.ETAT_OUVERTE
+                    ):
+                        situation = candidate
+                        distributions = distributions_du_jour(
+                            distributeur, date_situation, situation=situation
+                        )
+
+                if not distributions.exists():
+
                     form.add_error(
 
                         None,
@@ -2532,14 +2659,6 @@ def ajouter_situation(request):
                     # IMPORTANT :
                     # Nous ne la créons PAS ici.
                     # --------------------------------------
-
-                    situation = situation_existante(
-
-                        distributeur,
-
-                        date_situation
-
-                    )
 
                     # --------------------------------------
                     # SI UNE SITUATION EXISTE DEJA
@@ -2603,7 +2722,9 @@ def ajouter_situation(request):
 
                         situation.distributeur,
 
-                        situation.date_situation
+                        situation.date_situation,
+
+                        situation=situation,
 
                     )
                 )
@@ -2613,18 +2734,21 @@ def ajouter_situation(request):
     # ======================================================
 
     groupes_compagnies = []
+    situation_en_base = isinstance(situation, SituationJournaliere)
 
     if situation is not None and distributions is not None:
 
         situation.montant_total_distribue = calculer_total_distribue(
             situation.distributeur,
-            situation.date_situation
+            situation.date_situation,
+            situation=situation if situation_en_base else None,
         )
 
         situation.montant_credit = calculer_credit(
             calculer_total_distribue_net(
                 situation.distributeur,
                 situation.date_situation,
+                situation=situation if situation_en_base else None,
             ),
             situation.fond,
         )
@@ -2641,7 +2765,8 @@ def ajouter_situation(request):
                 list(lignes),
                 situation.distributeur,
                 situation.date_situation,
-                distributions
+                distributions,
+                situation=situation if situation_en_base else None,
             )
 
         # --------------------------------------------------
