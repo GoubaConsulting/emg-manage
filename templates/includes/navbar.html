@@ -31,6 +31,17 @@
 
                 </a>
 
+            {% elif request.user.profil.role == "GERANT" %}
+                <a href="{% url 'notifications_corrections' %}"
+                   class="btn btn-primary position-relative me-3"
+                   aria-label="Notifications de correction" title="Notifications de correction">
+                    🔔
+                    {% if nb_corrections_non_lues %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            {{ nb_corrections_non_lues }}
+                        </span>
+                    {% endif %}
+                </a>
             {% endif %}
 
 

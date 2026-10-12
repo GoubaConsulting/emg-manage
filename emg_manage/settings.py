@@ -48,6 +48,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "commandes.context_processors.commandes_en_attente",
+                "comptes.context_processors.corrections_non_lues",
             ],
         },
     },

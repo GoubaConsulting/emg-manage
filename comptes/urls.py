@@ -45,4 +45,10 @@ urlpatterns = [
         name="mes_operations_redirect"
     ),
 
+    path("notifications-corrections/", views.notifications_corrections,
+         name="notifications_corrections"),
+    path("notifications-corrections/<int:pk>/ouvrir/",
+         views.ouvrir_notification_correction,
+         name="ouvrir_notification_correction"),
+
 ]

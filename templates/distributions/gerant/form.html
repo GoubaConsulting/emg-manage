@@ -366,6 +366,13 @@
 
 </div>
 
+{% if correction_apercu %}
+<div class="mt-4">
+    <label for="motif_correction" class="form-label fw-bold">Motif de correction</label>
+    <textarea id="motif_correction" name="motif_correction" class="form-control" rows="3" required>{{ request.POST.motif_correction }}</textarea>
+</div>
+{% endif %}
+
 <div class="text-end mt-4">
 
     <a

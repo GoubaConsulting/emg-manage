@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from django.http import (
     HttpResponse,
     HttpResponseForbidden,
@@ -10,6 +12,7 @@ from tableau_bord.services import (
     donnees_dashboard,
     donnees_operations_directeur_gerant,
 )
+from .models import NotificationCorrection
 
 def connexion(request):
 
@@ -103,3 +106,30 @@ def operations_gerant_directeur(request):
         "comptes/operations_gerant.html",
         context
     )
+
+
+@login_required
+def notifications_corrections(request):
+    if request.user.profil.role != "GERANT":
+        return HttpResponseForbidden()
+    notifications = NotificationCorrection.objects.filter(
+        destinataire=request.user
+    ).select_related("correction", "correction__directeur")[:100]
+    return render(request, "comptes/notifications_corrections.html", {
+        "notifications": notifications,
+    })
+
+
+@login_required
+def ouvrir_notification_correction(request, pk):
+    if request.user.profil.role != "GERANT" or request.method != "POST":
+        return HttpResponseForbidden()
+    notification = get_object_or_404(
+        NotificationCorrection.objects.select_related("correction"),
+        pk=pk,
+        destinataire=request.user,
+    )
+    if notification.date_lecture is None:
+        notification.date_lecture = timezone.now()
+        notification.save(update_fields=["date_lecture"])
+    return redirect(notification.correction.lien_operation or "dashboard")

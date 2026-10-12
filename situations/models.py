@@ -388,6 +388,40 @@ class LigneSituationJournaliere(models.Model):
         verbose_name="Quantité restante"
     )
 
+    montant_distribue_brut = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True
+    )
+
+    montant_distribue_net = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True
+    )
+
+    montant_restant_brut = models.DecimalField(
+        max_digits=18, decimal_places=2, null=True, blank=True
+    )
+
+    @property
+    def brut_distribue_effectif(self):
+        if self.montant_distribue_brut is not None:
+            return self.montant_distribue_brut
+        return self.quantite_distribuee * self.prix_unitaire
+
+    @property
+    def net_distribue_effectif(self):
+        if self.montant_distribue_net is not None:
+            return self.montant_distribue_net
+        return self.brut_distribue_effectif * (100 - self.taux_remise) / 100
+
+    @property
+    def brut_restant_effectif(self):
+        if self.montant_restant_brut is not None:
+            return self.montant_restant_brut
+        return self.quantite_restante * self.prix_unitaire
+
+    @property
+    def net_restant_effectif(self):
+        return self.brut_restant_effectif * (100 - self.taux_remise) / 100
+
     class Meta:
 
         db_table = "lignesituationjournaliere"

@@ -44,12 +44,12 @@
                         <td>{{ distribution.get_etat_display }}</td>
                         {% if afficher_actions %}
                             <td class="text-center">
-                                {% if distribution.peut_modifier %}
+                                {% if distribution.correction_apercu_autorisee %}
                                     <a
-                                        href="{% url 'distributions:modifier_distribution' distribution.iddistribution %}?next={{ request.get_full_path|urlencode }}"
+                                        href="{% url 'distributions:corriger_distribution_apercu' distribution.iddistribution %}?next={{ request.get_full_path|add:'#distributions'|urlencode }}"
                                         class="btn btn-sm btn-outline-warning"
                                     >
-                                        Modifier
+                                        Corriger
                                     </a>
                                 {% else %}
                                     <span class="text-muted">

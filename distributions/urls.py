@@ -29,6 +29,12 @@ urlpatterns = [
         name="modifier_distribution",
     ),
     path(
+        "correction-apercu/<int:pk>/",
+        views.modifier_distribution_view,
+        {"correction_apercu": True},
+        name="corriger_distribution_apercu",
+    ),
+    path(
         "directeur/distributeur/ajouter/",
         views.ajouter_distribution_directeur_distributeur,
         name="ajouter_distribution_directeur_distributeur",

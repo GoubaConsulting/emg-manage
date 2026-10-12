@@ -4,6 +4,24 @@
     Aperçu
 {% endblock %}
 
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const cible = document.querySelector(
+        '#apercuTabs [data-bs-target="' + window.location.hash + '"]'
+    );
+    if (cible) {
+        bootstrap.Tab.getOrCreateInstance(cible).show();
+    }
+    document.querySelectorAll('#apercuTabs [data-bs-toggle="tab"]').forEach(function (onglet) {
+        onglet.addEventListener("shown.bs.tab", function () {
+            history.replaceState(null, "", onglet.dataset.bsTarget);
+        });
+    });
+});
+</script>
+{% endblock %}
+
 {% block content %}
 
 <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
@@ -184,7 +202,7 @@
                                 <th>Etat</th>
                                 <th class="text-end">Montant brut</th>
                                 <th class="text-end">Montant net</th>
-                                <th class="text-center">Action</th>
+                                <th class="text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -208,7 +226,7 @@
                                 <td class="text-center">
                                     {% if commande.modification_directeur_autorisee %}
                                         <a
-                                            href="{% url 'corriger_commande_directeur' commande.idcommande %}?next={{ request.get_full_path|urlencode }}"
+                                            href="{% url 'corriger_commande_directeur' commande.idcommande %}?next={{ request.get_full_path|add:'#commandes'|urlencode }}"
                                             class="btn btn-sm btn-outline-warning"
                                         >
                                             Corriger
@@ -616,12 +634,12 @@
                                 <td class="text-end">{{ situation.montant_vente_verse|floatformat:2 }}</td>
                                 <td class="text-end">{{ situation.montant_manquant|floatformat:2 }}</td>
                                 <td class="text-center">
-                                    {% if situation.peut_modifier %}
+                                    {% if situation.correction_apercu_autorisee %}
                                         <a
-                                            href="{% url 'situations:modifier_situation' situation.idsituation %}?next={{ request.get_full_path|urlencode }}"
+                                            href="{% url 'situations:corriger_situation_apercu' situation.idsituation %}?next={{ request.get_full_path|add:'#versements'|urlencode }}"
                                             class="btn btn-sm btn-outline-warning"
                                         >
-                                            Modifier
+                                            Corriger
                                         </a>
                                     {% else %}
                                         <span class="text-muted">
@@ -746,6 +764,7 @@
                                 <th class="text-end">Montant</th>
                                 <th class="text-end">Reste à payer</th>
                                 <th>Statut</th>
+                                <th class="text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -762,9 +781,15 @@
                                 <td class="text-end">{{ manquant.montant|floatformat:2 }}</td>
                                 <td class="text-end">{{ manquant.reste_a_payer|floatformat:2 }}</td>
                                 <td>{{ manquant.get_statut_display }}</td>
+                                <td class="text-center">
+                                    {% if manquant.correction_source_autorisee %}
+                                        <a href="{% url 'situations:corriger_situation_apercu' manquant.situation_id %}?next={{ request.get_full_path|add:'#manquants'|urlencode }}"
+                                           class="btn btn-sm btn-outline-warning" title="Corriger la situation source">Corriger</a>
+                                    {% else %}<span class="text-muted">-</span>{% endif %}
+                                </td>
                             </tr>
                             <tr class="collapse" id="apercuManquant{{ manquant.idmanquant }}">
-                                <td colspan="7">
+                                <td colspan="8">
                                     <div class="p-3 bg-light">
                                         <div class="row mb-3">
                                             <div class="col-md-3"><strong>Situation :</strong> {{ manquant.situation.numero }}</div>
@@ -803,7 +828,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-center">Aucun manquant trouvé.</td>
+                                <td colspan="8" class="text-center">Aucun manquant trouvé.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -858,12 +883,12 @@
                                 <td class="text-end">{{ reglement.manquant.reste_a_payer|floatformat:2 }}</td>
                                 <td>{{ reglement.utilisateur.get_full_name|default:reglement.utilisateur.username }}</td>
                                 <td class="text-center">
-                                    {% if reglement.peut_modifier %}
+                                    {% if reglement.correction_apercu_autorisee %}
                                         <a
-                                            href="{% url 'situations:modifier_reglement_manquant' reglement.idreglement %}?next={{ request.get_full_path|urlencode }}"
+                                            href="{% url 'situations:corriger_reglement_apercu' reglement.idreglement %}?next={{ request.get_full_path|add:'#reglements'|urlencode }}"
                                             class="btn btn-sm btn-outline-warning"
                                         >
-                                            Modifier
+                                            Corriger
                                         </a>
                                     {% else %}
                                         <span class="text-muted">

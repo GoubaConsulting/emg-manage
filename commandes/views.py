@@ -12,7 +12,9 @@ Vues du module Commandes.
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db import transaction
+from django.db.models import Q, Sum
+from django.urls import reverse
 from django.http import HttpResponseForbidden
 from django.shortcuts import (
     render,
@@ -26,6 +28,13 @@ from referentiel.models import (
 
 )
 from distributions.models import Distribution
+from comptes.corrections_apercu import (
+    commande_corrigeable,
+    enregistrer_correction,
+    gerant_du_point_vente as gerant_apercu,
+    instantane,
+    retour_apercu,
+)
 
 from .forms import (
     CommandeForm,
@@ -60,6 +69,7 @@ from .services import (
     modifier_reglement_stock_tampon,
     valider_commande_gerant,
     rejeter_commande_gerant,
+    corriger_commande_par_directeur,
     
 )
 
@@ -1591,33 +1601,26 @@ def corriger_commande_directeur_view(
     request,
     pk
 ):
-
+    if request.user.profil.role != "DIRECTEUR":
+        return HttpResponseForbidden()
     commande = commande_gerant_par_id_pour_directeur(
         request.user,
         pk
     )
 
-    if not peut_corriger_par_directeur(
-        request.user,
-        commande
-    ):
+    if not commande_corrigeable(request.user, commande):
+        return HttpResponseForbidden("Cette commande ne peut pas être corrigée.")
 
-        messages.error(
-            request,
-            "Cette commande ne peut pas être corrigée."
-        )
-
-        return redirect(
-            "comptes:apercu_directeur"
-        )
-
-    produits = produits_actifs()
-
-    next_url = (
-        request.GET.get("next")
-        or
-        request.POST.get("next")
+    produits = annoter_produits_commande(
+        list(Produit.objects.filter(
+            Q(actif=True) | Q(lignes_commande__commande=commande)
+        ).distinct().select_related("compagnie").order_by(
+            "compagnie__designation", "designation"
+        )),
+        commande,
     )
+    next_url = retour_apercu(request, "commandes")
+    gerant = gerant_apercu(commande.point_vente)
 
     if request.method == "POST":
 
@@ -1626,12 +1629,44 @@ def corriger_commande_directeur_view(
         )
 
         if form.is_valid():
-
-            messages.warning(
-                request,
-                "L'enregistrement de la correction sera activé "
-                "après la mise en place de la synchronisation métier."
-            )
+            try:
+                donnees = request.POST.copy()
+                anciennes = {ligne.produit_id: ligne for ligne in commande.lignes.all()}
+                for produit in produits:
+                    ancienne = anciennes.get(produit.pk)
+                    initial = ancienne.montant_initial if ancienne else Decimal("0")
+                    donnees[f"montant_initial_{produit.pk}"] = str(initial)
+                    if initial > 0:
+                        donnees[f"produit_{produit.pk}"] = "1"
+                taux_initiaux = {
+                    produit.pk: produit.taux_initial_commande
+                    for produit in produits
+                }
+                lignes = construire_lignes_depuis_formulaire(
+                    donnees, produits, taux_initiaux=taux_initiaux
+                )
+                with transaction.atomic():
+                    commande = Commande.objects.select_for_update().get(pk=pk)
+                    if not commande_corrigeable(request.user, commande):
+                        raise ValueError("Cette commande ne peut plus être corrigée.")
+                    avant = instantane(commande)
+                    corriger_commande_par_directeur(
+                        commande, request.user, form.cleaned_data["date_commande"], lignes
+                    )
+                    commande.refresh_from_db()
+                    enregistrer_correction(
+                        utilisateur=request.user,
+                        gerant=gerant,
+                        operation=commande,
+                        type_operation="COMMANDE",
+                        motif=form.cleaned_data["motif_correction"],
+                        avant=avant,
+                        lien=reverse("liste_commandes"),
+                    )
+                messages.success(request, f"Commande {commande.numero} corrigée.")
+                return redirect(next_url)
+            except Exception as erreur:
+                form.add_error(None, str(erreur))
 
     else:
 
@@ -1645,11 +1680,6 @@ def corriger_commande_directeur_view(
             }
 
         )
-
-    preparer_affichage_commande(
-        commande,
-        produits
-    )
 
     return render(
 
@@ -1668,6 +1698,14 @@ def corriger_commande_directeur_view(
             "titre": "Correction d'une commande du Gérant",
 
             "next_url": next_url,
+            "afficher_montant_initial": True,
+            "fond_gerant": gerant.fond,
+            "fond_gerant_js": str(gerant.fond),
+            "total_montants_initiaux": commande.montant_initial,
+            "total_montants_initiaux_js": str(commande.montant_initial),
+            "total_montants_initiaux_net": commande.montant_net_initial,
+            "total_montants_initiaux_net_js": str(commande.montant_net_initial),
+            "commandes_validees_jour": {},
 
         }
 

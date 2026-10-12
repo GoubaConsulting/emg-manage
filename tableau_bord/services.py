@@ -23,8 +23,11 @@ from commandes.models import (
     Commande,
     LigneCommande,
 )
-from commandes.permissions import (
-    commande_gerant_modifiable_par_directeur,
+from comptes.corrections_apercu import (
+    commande_corrigeable,
+    distribution_corrigeable,
+    situation_corrigeable,
+    reglement_corrigeable,
 )
 from commandes.presentation import preparer_affichage_commande
 from comptes.utils import (
@@ -1701,47 +1704,21 @@ def _preparer_details_situation_apercu(situation):
 
     for ligne in situation.lignes.all():
 
-        prix_unitaire = _decimal(
-            ligne.prix_unitaire
-        )
-
-        ligne.montant_brut_distribue = (
-            _decimal(
-                ligne.quantite_distribuee
-            )
-            *
-            prix_unitaire
-        )
+        ligne.montant_brut_distribue = ligne.brut_distribue_effectif
 
         ligne.montant_brut_vendu = (
-            _decimal(
-                ligne.quantite_vendue
-            )
-            *
-            prix_unitaire
+            ligne.brut_distribue_effectif - ligne.brut_restant_effectif
         )
 
-        ligne.montant_brut_restant = (
-            _decimal(
-                ligne.quantite_restante
-            )
-            *
-            prix_unitaire
-        )
+        ligne.montant_brut_restant = ligne.brut_restant_effectif
 
-        ligne.montant_vendu = calculer_valeur_nette_quantite(
-            ligne.quantite_vendue,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
+        ligne.montant_vendu = (
+            ligne.net_distribue_effectif - ligne.net_restant_effectif
         )
 
         ligne.montant_net_vendu = ligne.montant_vendu
 
-        ligne.montant_restant = calculer_valeur_nette_quantite(
-            ligne.quantite_restante,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
-        )
+        ligne.montant_restant = ligne.net_restant_effectif
 
         total_vendu += ligne.montant_vendu
 
@@ -1822,8 +1799,10 @@ def _preparer_reglements_manquant(manquant):
 
 def _annoter_modification_directeur(
     utilisateur,
+    commandes=None,
     distributions=None,
     situations=None,
+    manquants=None,
     reglements=None,
 ):
     """
@@ -1831,11 +1810,19 @@ def _annoter_modification_directeur(
     affichees dans les pages de suivi Directeur.
     """
 
+    for commande in commandes or []:
+        commande.modification_directeur_autorisee = commande_corrigeable(
+            utilisateur, commande
+        )
+
     for distribution in distributions or []:
 
         distribution.peut_modifier = peut_modifier_distribution(
             utilisateur,
             distribution
+        )
+        distribution.correction_apercu_autorisee = distribution_corrigeable(
+            utilisateur, distribution
         )
 
     for situation in situations or []:
@@ -1844,12 +1831,23 @@ def _annoter_modification_directeur(
             utilisateur,
             situation
         )
+        situation.correction_apercu_autorisee = situation_corrigeable(
+            utilisateur, situation
+        )
 
     for reglement in reglements or []:
 
         reglement.peut_modifier = peut_modifier_reglement_manquant(
             utilisateur,
             reglement
+        )
+        reglement.correction_apercu_autorisee = reglement_corrigeable(
+            utilisateur, reglement
+        )
+
+    for manquant in manquants or []:
+        manquant.correction_source_autorisee = situation_corrigeable(
+            utilisateur, manquant.situation
         )
 
 
@@ -1905,11 +1903,6 @@ def _apercu_commandes_gerant(gerant, date_debut, date_fin):
 
         commande.groupes_compagnies = preparer_affichage_commande(
             commande
-        )
-        commande.modification_directeur_autorisee = (
-            commande_gerant_modifiable_par_directeur(
-                commande
-            )
         )
 
     return {
@@ -2735,12 +2728,14 @@ def donnees_apercu_directeur(
 
     _annoter_modification_directeur(
         utilisateur,
+        commandes=commandes["lignes"],
         distributions=(
             distributions["sous"]
             +
             distributions["clients"]
         ),
         situations=situations["lignes"],
+        manquants=manquants["lignes"],
         reglements=reglements["lignes"],
     )
 

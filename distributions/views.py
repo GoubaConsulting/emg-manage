@@ -52,6 +52,14 @@ from django.http import HttpResponseForbidden
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from comptes.models import ProfilUtilisateur
+from comptes.corrections_apercu import (
+    distribution_corrigeable,
+    enregistrer_correction,
+    gerant_du_point_vente,
+    instantane,
+    retour_apercu,
+)
+from django.urls import reverse
 
 from stocks.models import (
     Stock,
@@ -375,6 +383,49 @@ def produits_formulaire_modification_distribution(
     return produits
 
 
+def figer_initiaux_correction(distribution, lignes):
+    anciennes = {
+        ligne.produit_id: ligne
+        for ligne in distribution.lignes.select_related("produit")
+    }
+    nouveaux_ids = set()
+    for ligne in lignes:
+        produit_id = ligne["produit"].pk
+        nouveaux_ids.add(produit_id)
+        ancienne = anciennes.get(produit_id)
+        ligne["montant_initial"] = (
+            ancienne.montant_initial if ancienne else Decimal("0")
+        )
+        ligne["montant_net_initial"] = (
+            ancienne.montant_net_initial if ancienne else Decimal("0")
+        )
+        if ligne["montant_initial"] > 0:
+            ligne["taux_initial"] = (
+                100 - 100 * ligne["montant_net_initial"] / ligne["montant_initial"]
+            )
+        if ligne["montant"] <= 0 and ligne["montant_initial"] > 0:
+            ligne["taux"] = ligne["taux_initial"]
+    for produit_id, ancienne in anciennes.items():
+        if ancienne.montant_initial > 0 and produit_id not in nouveaux_ids:
+            taux_initial = (
+                100 - 100 * ancienne.montant_net_initial / ancienne.montant_initial
+            )
+            lignes.append({
+                "produit": ancienne.produit,
+                "prix_unitaire": ancienne.prix_unitaire,
+                "montant": Decimal("0"),
+                "quantite": Decimal("0"),
+                "taux": taux_initial,
+                "taux_initial": taux_initial,
+                "montant_initial": ancienne.montant_initial,
+                "montant_net_initial": ancienne.montant_net_initial,
+            })
+    return [
+        ligne for ligne in lignes
+        if ligne["montant"] > 0 or ligne["montant_initial"] > 0
+    ]
+
+
 def configurer_form_destinataire(
     form,
     point_vente,
@@ -485,7 +536,7 @@ def montants_initiaux_destinataire(
     produits_ids = [
         ligne.produit_id
         for ligne in lignes_situation
-        if ligne.quantite_restante > 0
+        if ligne.brut_restant_effectif > 0
     ]
 
     taux_par_produit = taux_derniere_distribution_destinataire(
@@ -498,7 +549,7 @@ def montants_initiaux_destinataire(
 
     for ligne in lignes_situation:
 
-        if ligne.quantite_restante <= 0:
+        if ligne.brut_restant_effectif <= 0:
 
             continue
 
@@ -515,12 +566,10 @@ def montants_initiaux_destinataire(
         precedent = montants.setdefault(
             produit_id, {"brut": 0.0, "net": 0.0, "taux": float(taux_initial)}
         )
-        precedent["brut"] += float(
-            ligne.quantite_restante * ligne.prix_unitaire
+        precedent["brut"] += float(ligne.brut_restant_effectif)
+        precedent["net"] += float(
+            ligne.brut_restant_effectif * (100 - taux_initial) / 100
         )
-        precedent["net"] += float(calculer_valeur_nette_quantite(
-            ligne.quantite_restante, ligne.prix_unitaire, taux_initial
-        ))
 
     return montants
 
@@ -1190,7 +1239,7 @@ def ajouter_distribution_directeur_client(request):
 
 
 @login_required
-def modifier_distribution_view(request, pk):
+def modifier_distribution_view(request, pk, correction_apercu=False):
     """
     Correction d'une distribution par le Directeur.
     """
@@ -1217,9 +1266,13 @@ def modifier_distribution_view(request, pk):
         pk=pk,
     )
 
-    next_url = url_retour_securisee(
-        request
+    next_url = (
+        retour_apercu(request, "distributions")
+        if correction_apercu else url_retour_securisee(request)
     )
+
+    if correction_apercu and not distribution_corrigeable(request.user, distribution):
+        return HttpResponseForbidden("Cette distribution ne peut pas être corrigée.")
 
     if not peut_modifier_distribution(
         request.user,
@@ -1261,21 +1314,38 @@ def modifier_distribution_view(request, pk):
 
                 try:
 
+                    motif = request.POST.get("motif_correction", "").strip()
+                    if correction_apercu and not motif:
+                        raise ValueError("Le motif de correction est obligatoire.")
+
                     lignes = construire_lignes_depuis_formulaire(
                         request.POST
                     )
 
-                    modifier_distribution(
-                        distribution=distribution,
-                        date_distribution=(
-                            form.cleaned_data[
-                                "date_distribution"
-                            ]
-                        ),
-                        distributeur=distribution.distributeur,
-                        lignes=lignes,
-                        utilisateur=request.user,
-                    )
+                    with transaction.atomic():
+                        if correction_apercu:
+                            distribution = Distribution.objects.select_for_update().get(pk=pk)
+                            if not distribution_corrigeable(request.user, distribution):
+                                raise ValueError("Cette vente directe ne peut plus être corrigée.")
+                            lignes = figer_initiaux_correction(distribution, lignes)
+                        avant = instantane(distribution) if correction_apercu else None
+                        modifier_distribution(
+                            distribution=distribution,
+                            date_distribution=form.cleaned_data["date_distribution"],
+                            distributeur=distribution.distributeur,
+                            lignes=lignes,
+                            utilisateur=request.user,
+                        )
+                        if correction_apercu:
+                            enregistrer_correction(
+                                utilisateur=request.user,
+                                gerant=gerant_du_point_vente(distribution.point_vente_source),
+                                operation=distribution,
+                                type_operation="VENTE_DIRECTE",
+                                motif=motif,
+                                avant=avant,
+                                lien=reverse("distributions:liste_distributions"),
+                            )
 
                     messages.success(
                         request,
@@ -1321,6 +1391,7 @@ def modifier_distribution_view(request, pk):
                 "mode_modification": True,
                 "next_url": next_url,
                 "url_retour_direct": next_url,
+                "correction_apercu": correction_apercu,
             }
         )
 
@@ -1342,23 +1413,38 @@ def modifier_distribution_view(request, pk):
 
             try:
 
+                motif = request.POST.get("motif_correction", "").strip()
+                if correction_apercu and not motif:
+                    raise ValueError("Le motif de correction est obligatoire.")
+
                 lignes = construire_lignes_depuis_formulaire(
                     request.POST
                 )
 
-                modifier_distribution(
-                    distribution=distribution,
-                    date_distribution=(
-                        form.cleaned_data[
-                            "date_distribution"
-                        ]
-                    ),
-                    distributeur=form.cleaned_data[
-                        "distributeur"
-                    ],
-                    lignes=lignes,
-                    utilisateur=request.user,
-                )
+                with transaction.atomic():
+                    if correction_apercu:
+                        distribution = Distribution.objects.select_for_update().get(pk=pk)
+                        if not distribution_corrigeable(request.user, distribution):
+                            raise ValueError("Cette distribution ne peut plus être corrigée.")
+                        lignes = figer_initiaux_correction(distribution, lignes)
+                    avant = instantane(distribution) if correction_apercu else None
+                    modifier_distribution(
+                        distribution=distribution,
+                        date_distribution=form.cleaned_data["date_distribution"],
+                        distributeur=form.cleaned_data["distributeur"],
+                        lignes=lignes,
+                        utilisateur=request.user,
+                    )
+                    if correction_apercu:
+                        enregistrer_correction(
+                            utilisateur=request.user,
+                            gerant=gerant_du_point_vente(distribution.point_vente_source),
+                            operation=distribution,
+                            type_operation="DISTRIBUTION",
+                            motif=motif,
+                            avant=avant,
+                            lien=reverse("distributions:liste_distributions"),
+                        )
 
                 messages.success(
                     request,
@@ -1426,6 +1512,7 @@ def modifier_distribution_view(request, pk):
             "mode_modification": True,
             "next_url": next_url,
             "url_retour_direct": next_url,
+            "correction_apercu": correction_apercu,
         }
     )
 

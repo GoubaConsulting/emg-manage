@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% load static %}
+{% load static l10n %}
 
 {% block title %}
     {{ titre }}
@@ -254,11 +254,11 @@
 
                                 <tr
                                     class="ligne-produit"
-                                    data-prix="{{ produit.prix }}"
+                                    data-prix="{{ produit.prix|unlocalize }}"
                                     data-compagnie="{{ produit.compagnie.idcompagnie }}"
                                     data-montant-initial="{{ produit.montant_initial_commande_js|default:'0' }}"
                                     data-montant-net-initial="{{ produit.montant_net_initial_commande_js|default:'0' }}"
-                                    data-taux-initial="{{ produit.taux_initial_commande|default:'0' }}"
+                                    data-taux-initial="{{ produit.taux_initial_commande|default:'0'|unlocalize }}"
                                 >
 
                                     <td class="text-center">
@@ -321,21 +321,21 @@
                                                 type="hidden"
                                                 class="montant-initial"
                                                 name="montant_initial_{{ produit.idproduit }}"
-                                                value="{{ produit.montant_initial_commande|default:0 }}"
+                                                value="{{ produit.montant_initial_commande|default:0|unlocalize }}"
                                             >
 
                                             <input
                                                 type="hidden"
                                                 class="net-initial"
                                                 name="montant_net_initial_{{ produit.idproduit }}"
-                                                value="{{ produit.montant_net_initial_commande|default:0 }}"
+                                                value="{{ produit.montant_net_initial_commande|default:0|unlocalize }}"
                                             >
 
                                             <input
                                                 type="hidden"
                                                 class="taux-initial"
                                                 name="taux_initial_{{ produit.idproduit }}"
-                                                value="{{ produit.taux_initial_commande|default:0 }}"
+                                                value="{{ produit.taux_initial_commande|default:0|unlocalize }}"
                                             >
 
                                             <input
@@ -382,7 +382,7 @@
                                                 disabled
                                             {% endif %}
 
-                                            value="{{ produit.montant_commande|default:0 }}"
+                                            value="{{ produit.montant_commande|default:0|unlocalize }}"
                                         >
 
                                     </td>
@@ -414,7 +414,7 @@
                                                 disabled
                                             {% endif %}
 
-                                            value="{{ produit.taux_commande|default:0 }}"
+                                            value="{{ produit.taux_commande|default:0|unlocalize }}"
                                         >
 
                                     </td>

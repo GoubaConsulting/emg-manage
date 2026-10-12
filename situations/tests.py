@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from comptes.models import ProfilUtilisateur
 from distributions.models import Distribution, LigneDistribution
+from distributions.views import montants_initiaux_destinataire
 from referentiel.models import Compagnie, Distributeur, PointVente, Produit
 
 from .models import SituationJournaliere
@@ -145,6 +146,60 @@ class VersementsMultiplesMemeJourTests(TestCase):
             montant_total_verse=situation.montant_total_distribue,
             coupures={},
             utilisateur=utilisateur,
+        )
+
+    def test_versement_direct_accepte_un_montant_restant_non_multiple(self):
+        self.creer_distribution("DIS-TEST-LIBRE-1", Decimal("2"))
+        situation = creer_situation_journaliere(
+            self.gerant, self.date_situation, self.directeur
+        )
+        ligne = situation.lignes.get()
+
+        cloturer_situation(
+            situation=situation,
+            donnees_lignes={str(ligne.pk): {"montant_restant": "501"}},
+            montant_total_verse="499",
+            coupures={},
+            utilisateur=self.directeur,
+        )
+
+        ligne.refresh_from_db()
+        self.assertEqual(ligne.montant_restant_brut, Decimal("501"))
+        self.assertEqual(ligne.brut_restant_effectif, Decimal("501"))
+        self.assertEqual(situation.montant_manquant, 0)
+        self.assertEqual(
+            montants_initiaux_commande_gerant(self.utilisateur_gerant)[self.produit.pk],
+            Decimal("501"),
+        )
+        initiaux_distribution = montants_initiaux_destinataire(
+            self.gerant, date(2026, 10, 2)
+        )
+        self.assertEqual(
+            initiaux_distribution[str(self.produit.pk)]["brut"], 501.0
+        )
+
+    def test_versement_gerant_accepte_un_montant_restant_non_multiple(self):
+        self.creer_distribution("DIS-TEST-LIBRE-2", Decimal("2"))
+        situation = creer_situation_journaliere(
+            self.gerant, self.date_situation, self.utilisateur_gerant
+        )
+        ligne = situation.lignes.get()
+
+        soumettre_versement_gerant(
+            situation=situation,
+            donnees_lignes={str(ligne.pk): {"montant_restant": "501"}},
+            montant_total_verse="499",
+            coupures={},
+            utilisateur=self.utilisateur_gerant,
+        )
+
+        ligne.refresh_from_db()
+        self.assertEqual(ligne.montant_restant_brut, Decimal("501"))
+        self.assertEqual(situation.montant_manquant, 0)
+        valider_versement_gerant(situation, self.directeur)
+        self.assertEqual(
+            montants_initiaux_commande_gerant(self.utilisateur_gerant)[self.produit.pk],
+            Decimal("501"),
         )
 
     def test_deux_versements_en_attente_ont_des_distributions_distinctes(self):

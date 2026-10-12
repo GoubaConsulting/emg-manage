@@ -10,7 +10,7 @@ Services métier du module Situations.
 ==========================================================
 """
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from types import SimpleNamespace
 
 from django.db import transaction
@@ -278,9 +278,7 @@ def _montants_retours_distributeurs_par_produit(
             montants,
             ligne.produit_id,
             (
-                _montant(ligne.quantite_restante)
-                *
-                _montant(ligne.prix_unitaire)
+                ligne.brut_restant_effectif
             ),
         )
 
@@ -711,12 +709,10 @@ def montants_initiaux_commande_gerant(utilisateur):
         .prefetch_related("lignes")
     ):
         for ligne in situation.lignes.all():
-            if ligne.quantite_restante > 0:
+            if ligne.brut_restant_effectif > 0:
                 montants[ligne.produit_id] = (
                     montants.get(ligne.produit_id, Decimal("0.00"))
-                    + calculer_valeur_brute_quantite(
-                        ligne.quantite_restante, ligne.prix_unitaire
-                    )
+                    + ligne.brut_restant_effectif
                 )
 
     return montants
@@ -973,7 +969,7 @@ def calculer_valeur_reliquat_precedent(
         for ligne in precedente.lignes.all()
     ):
 
-        if ligne.quantite_restante <= 0:
+        if ligne.brut_restant_effectif <= 0:
 
             continue
 
@@ -981,10 +977,7 @@ def calculer_valeur_reliquat_precedent(
 
             continue
 
-        total += calculer_valeur_brute_quantite(
-            ligne.quantite_restante,
-            ligne.prix_unitaire,
-        )
+        total += ligne.brut_restant_effectif
 
     return total
 
@@ -1225,7 +1218,7 @@ def construire_donnees_lignes_situation(
 
         for ligne in lignes_precedentes:
 
-            if ligne.quantite_restante <= 0:
+            if ligne.brut_restant_effectif <= 0:
 
                 continue
 
@@ -1250,16 +1243,8 @@ def construire_donnees_lignes_situation(
 
             produits[produit_id]["quantite_initiale"] += ligne.quantite_restante
             produits[produit_id]["quantite_distribuee"] += ligne.quantite_restante
-            produits[produit_id]["montant_distribue"] += (
-                calculer_valeur_brute_quantite(
-                    ligne.quantite_restante, ligne.prix_unitaire
-                )
-            )
-            produits[produit_id]["montant_net_distribue"] += (
-                calculer_valeur_nette_quantite(
-                    ligne.quantite_restante, ligne.prix_unitaire, ligne.taux_remise
-                )
-            )
+            produits[produit_id]["montant_distribue"] += ligne.brut_restant_effectif
+            produits[produit_id]["montant_net_distribue"] += ligne.net_restant_effectif
 
     for distribution in distributions:
 
@@ -1614,6 +1599,12 @@ def creer_lignes_situation(
                     ]
                 ),
 
+                montant_distribue_brut=donnees["montant_distribue"],
+
+                montant_distribue_net=donnees["montant_net_distribue"],
+
+                montant_restant_brut=donnees["montant_distribue"],
+
             )
 
         )
@@ -1922,11 +1913,7 @@ def calculer_valeur_produits_restants(
 
     for ligne in situation.lignes.all():
 
-        total += calculer_valeur_nette_quantite(
-            ligne.quantite_restante,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
-        )
+        total += ligne.net_restant_effectif
 
     return total
 
@@ -1975,17 +1962,9 @@ def calculer_manquant_situation(
 
     for ligne in situation.lignes.all():
 
-        montant_total_distribue_net += calculer_valeur_nette_quantite(
-            ligne.quantite_distribuee,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
-        )
+        montant_total_distribue_net += ligne.net_distribue_effectif
 
-        montant_restant_net += calculer_valeur_nette_quantite(
-            ligne.quantite_restante,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
-        )
+        montant_restant_net += ligne.net_restant_effectif
 
     return ventiler_versement(
         situation.montant_total_verse,
@@ -2160,39 +2139,23 @@ def soumettre_versement_gerant(
                 f"est invalide."
             )
 
-        if montant_restant % prix != 0:
+        if montant_restant > ligne.brut_distribue_effectif:
 
             raise ValueError(
                 f"Le montant restant du produit "
                 f"'{ligne.produit.designation}' "
-                f"doit etre un multiple de {prix} FCFA."
+                f"depasse le montant distribue."
             )
 
-        quantite_restante = (
-            montant_restant
-            /
-            prix
+        quantite_restante = (montant_restant / prix).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
-        if quantite_restante > ligne.quantite_distribuee:
-
-            raise ValueError(
-                f"La quantite restante du produit "
-                f"'{ligne.produit.designation}' "
-                f"depasse la quantite distribuee."
-            )
-
-        montant_total_restant_net += calculer_valeur_nette_quantite(
-            quantite_restante,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
+        montant_total_restant_net += (
+            montant_restant * (100 - ligne.taux_remise) / 100
         )
 
-        montant_total_distribue_net += calculer_valeur_nette_quantite(
-            ligne.quantite_distribuee,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
-        )
+        montant_total_distribue_net += ligne.net_distribue_effectif
 
         ligne.quantite_vendue = (
             ligne.quantite_distribuee
@@ -2201,11 +2164,13 @@ def soumettre_versement_gerant(
         )
 
         ligne.quantite_restante = quantite_restante
+        ligne.montant_restant_brut = montant_restant
 
         ligne.save(
             update_fields=[
                 "quantite_vendue",
                 "quantite_restante",
+                "montant_restant_brut",
             ]
         )
 
@@ -2409,7 +2374,7 @@ def cloturer_situation(
     Le montant restant saisi pour chaque produit
     correspond au montant brut restant.
 
-    La quantité restante est calculée automatiquement :
+    La quantité restante indicative est calculée automatiquement :
 
         montant brut restant / prix unitaire
 
@@ -2517,57 +2482,30 @@ def cloturer_situation(
             )
 
         # --------------------------------------------------
-        # VERIFICATION DU MULTIPLE
+        # VERIFICATION DU MONTANT DISTRIBUE
         # --------------------------------------------------
 
-        if montant_restant % prix != 0:
+        if montant_restant > ligne.brut_distribue_effectif:
 
             raise ValueError(
                 f"Le montant restant du produit "
                 f"« {ligne.produit.designation} » "
-                f"doit être un multiple de "
-                f"{prix} FCFA."
+                f"dépasse le montant distribué."
             )
 
         # --------------------------------------------------
-        # CALCUL DE LA QUANTITE RESTANTE
+        # CALCUL DES MONTANTS ET DE LA QUANTITE INDICATIVE
         # --------------------------------------------------
 
-        quantite_restante = (
-            montant_restant / prix
+        quantite_restante = (montant_restant / prix).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
-        # --------------------------------------------------
-        # VERIFICATION DE LA QUANTITE
-        # --------------------------------------------------
-
-        if (
-            quantite_restante
-            >
-            ligne.quantite_distribuee
-        ):
-
-            raise ValueError(
-                f"La quantité restante du produit "
-                f"« {ligne.produit.designation} » "
-                f"dépasse la quantité distribuée."
-            )
-
-        # --------------------------------------------------
-        # CALCUL DE LA QUANTITE VENDUE
-        # --------------------------------------------------
-
-        montant_total_restant_net += calculer_valeur_nette_quantite(
-            quantite_restante,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
+        montant_total_restant_net += (
+            montant_restant * (100 - ligne.taux_remise) / 100
         )
 
-        montant_total_distribue_net += calculer_valeur_nette_quantite(
-            ligne.quantite_distribuee,
-            ligne.prix_unitaire,
-            ligne.taux_remise,
-        )
+        montant_total_distribue_net += ligne.net_distribue_effectif
 
         quantite_vendue = (
             ligne.quantite_distribuee
@@ -2586,11 +2524,13 @@ def cloturer_situation(
         ligne.quantite_restante = (
             quantite_restante
         )
+        ligne.montant_restant_brut = montant_restant
 
         ligne.save(
             update_fields=[
                 "quantite_vendue",
                 "quantite_restante",
+                "montant_restant_brut",
             ]
         )
 

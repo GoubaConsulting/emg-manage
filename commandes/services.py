@@ -73,6 +73,7 @@ from .permissions import (
 
 from distributions.models import Distribution
 from distributions.numerotation import generer_numero_distribution
+from comptes.corrections_apercu import commande_corrigeable
 
 # ==========================================================
 # CONSTRUCTION DES LIGNES
@@ -1969,93 +1970,45 @@ def corriger_commande_par_directeur(
     commande,
     directeur,
     date_commande,
-    lignes
+    lignes,
 ):
-    """
-    Corrige une commande d'un Gérant
-    à la demande de celui-ci.
-    """
+    commande = Commande.objects.select_for_update().get(pk=commande.pk)
+    if not commande_corrigeable(directeur, commande):
+        raise ValueError("Cette commande ne peut plus être corrigée.")
 
-    if not peut_corriger_par_directeur(
-        directeur,
-        commande
+    anciennes = {
+        ligne.produit_id: ligne
+        for ligne in commande.lignes.select_related("produit")
+    }
+    if any(ligne.montant_initial > 0 for ligne in anciennes.values()):
+        if date_commande != commande.date_commande:
+            raise ValueError(
+                "La date d'une commande avec montant initial ne peut pas changer."
+            )
+
+    for ligne in lignes:
+        produit = ligne["produit"]
+        ancienne = anciennes.get(produit.pk)
+        initial_attendu = ancienne.montant_initial if ancienne else Decimal("0")
+        if Decimal(str(ligne.get("montant_initial", 0))) != initial_attendu:
+            raise ValueError("Les montants initiaux ne peuvent pas être corrigés ici.")
+        if ancienne and ancienne.prix_unitaire != produit.prix:
+            raise ValueError(
+                f"Le prix du produit {produit.designation} a changé. "
+                "Cette commande doit être examinée manuellement."
+            )
+
+    produits_presents = {ligne["produit"].pk for ligne in lignes}
+    if any(
+        ligne.montant_initial > 0 and produit_id not in produits_presents
+        for produit_id, ligne in anciennes.items()
     ):
-        raise Exception(
-            "Vous n'êtes pas autorisé à corriger cette commande."
-        )
+        raise ValueError("Un produit avec montant initial ne peut pas être retiré.")
 
-    verifier_presence_ligne(
-        lignes
-    )
-
-    # ------------------------------------------------------
-    # Si la commande est déjà validée,
-    # on retire d'abord son impact actuel.
-    # ------------------------------------------------------
-
-    commande_deja_validee = (
-        commande.etat == Commande.VALIDEE
-    )
-
-    if commande_deja_validee:
-
-        mettre_a_jour_objectifs(
-            commande,
-            suppression=True
-        )
-
-        annuler_stock_commande_directeur(
-            commande
-        )
-
-    # ------------------------------------------------------
-    # Modification de l'en-tête
-    # ------------------------------------------------------
-
+    verifier_presence_ligne(lignes)
     commande.date_commande = date_commande
-
-    commande.save(
-        update_fields=[
-            "date_commande",
-            "date_modification"
-        ]
-    )
-
-    # ------------------------------------------------------
-    # Suppression des anciennes lignes
-    # ------------------------------------------------------
-
+    commande.save(update_fields=["date_commande", "date_modification"])
     commande.lignes.all().delete()
-
-    # ------------------------------------------------------
-    # Création des nouvelles lignes
-    # ------------------------------------------------------
-
-    creer_lignes_commande(
-        commande,
-        lignes
-    )
-
-    # ------------------------------------------------------
-    # Recalcul des totaux
-    # ------------------------------------------------------
-
-    recalculer_totaux_commande(
-        commande
-    )
-
-    # ------------------------------------------------------
-    # Réapplication des traitements si validée
-    # ------------------------------------------------------
-
-    if commande_deja_validee:
-
-        mettre_a_jour_objectifs(
-            commande
-        )
-
-        alimenter_stock_commande_directeur(
-            commande
-        )
-
+    creer_lignes_commande(commande, lignes)
+    recalculer_totaux_commande(commande)
     return commande

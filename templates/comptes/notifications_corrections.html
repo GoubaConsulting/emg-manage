@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications de correction{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-4">Notifications de correction</h1>
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            <tr><th>Date</th><th>Opération</th><th>Directeur</th><th>Motif</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for notification in notifications %}
+                <tr class="{% if not notification.date_lecture %}table-warning{% endif %}">
+                    <td>{{ notification.correction.date_creation|date:"d/m/Y H:i" }}</td>
+                    <td>{{ notification.correction.operation_type }} {{ notification.correction.operation_numero }}</td>
+                    <td>{{ notification.correction.directeur.get_full_name|default:notification.correction.directeur.username }}</td>
+                    <td>{{ notification.correction.motif }}</td>
+                    <td class="text-end">
+                        <form method="post" action="{% url 'ouvrir_notification_correction' notification.pk %}">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-primary" type="submit">Consulter</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="text-center text-muted">Aucune notification.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

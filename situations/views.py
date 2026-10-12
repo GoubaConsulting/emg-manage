@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from django.contrib import messages
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Sum
 from django.http import HttpResponseForbidden
 from django.urls import reverse
@@ -28,6 +29,14 @@ from django.shortcuts import (
     get_object_or_404,
 )
 from referentiel.models import Distributeur
+from comptes.corrections_apercu import (
+    enregistrer_correction,
+    gerant_du_point_vente as gerant_apercu,
+    instantane,
+    reglement_corrigeable,
+    retour_apercu,
+    situation_corrigeable,
+)
 
 from .forms import (
     SelectionSituationForm,
@@ -586,11 +595,7 @@ def _annoter_montants_existants_situation(lignes):
 
     for ligne in lignes:
 
-        ligne.montant_restant_brut = (
-            ligne.quantite_restante
-            *
-            ligne.prix_unitaire
-        )
+        ligne.montant_restant_brut = ligne.brut_restant_effectif
 
     return lignes
 
@@ -655,20 +660,10 @@ def _preparer_details_situations(
         for ligne in situation.lignes.all():
 
             ligne.montant_vendu = (
-                calculer_valeur_nette_quantite(
-                    ligne.quantite_vendue,
-                    ligne.prix_unitaire,
-                    ligne.taux_remise,
-                )
+                ligne.net_distribue_effectif - ligne.net_restant_effectif
             )
 
-            ligne.montant_restant = (
-                calculer_valeur_nette_quantite(
-                    ligne.quantite_restante,
-                    ligne.prix_unitaire,
-                    ligne.taux_remise,
-                )
-            )
+            ligne.montant_restant = ligne.net_restant_effectif
 
             total_vendu += ligne.montant_vendu
 
@@ -1422,7 +1417,7 @@ def regler_manquant_view(request, pk):
 # ==========================================================
 
 @login_required
-def modifier_reglement_manquant_view(request, pk):
+def modifier_reglement_manquant_view(request, pk, correction_apercu=False):
     """
     Corrige un reglement de manquant.
     """
@@ -1432,15 +1427,18 @@ def modifier_reglement_manquant_view(request, pk):
         return HttpResponseForbidden()
 
     reglement = get_object_or_404(
-        reglements_manquants_visibles(
-            request.user
-        ),
-        pk=pk
+        ReglementManquant.objects.select_related("manquant__situation")
+        if correction_apercu else reglements_manquants_visibles(request.user),
+        pk=pk,
     )
 
-    next_url = _url_retour_securisee(
-        request
+    next_url = (
+        retour_apercu(request, "reglements")
+        if correction_apercu else _url_retour_securisee(request)
     )
+
+    if correction_apercu and not reglement_corrigeable(request.user, reglement):
+        return HttpResponseForbidden("Ce règlement ne peut pas être corrigé.")
 
     if not peut_modifier_reglement_manquant(
         request.user,
@@ -1473,18 +1471,33 @@ def modifier_reglement_manquant_view(request, pk):
 
             try:
 
-                modifier_reglement_manquant(
-                    reglement=reglement,
-                    date_reglement=(
-                        form.cleaned_data[
-                            "date_reglement"
-                        ]
-                    ),
-                    montant=form.cleaned_data[
-                        "montant"
-                    ],
-                    utilisateur=request.user,
-                )
+                motif = request.POST.get("motif_correction", "").strip()
+                if correction_apercu and not motif:
+                    raise ValueError("Le motif de correction est obligatoire.")
+
+                with transaction.atomic():
+                    if correction_apercu:
+                        reglement = ReglementManquant.objects.select_for_update().get(pk=pk)
+                        if not reglement_corrigeable(request.user, reglement):
+                            raise ValueError("Ce règlement ne peut plus être corrigé.")
+                    avant = instantane(reglement) if correction_apercu else None
+                    modifier_reglement_manquant(
+                        reglement=reglement,
+                        date_reglement=form.cleaned_data["date_reglement"],
+                        montant=form.cleaned_data["montant"],
+                        utilisateur=request.user,
+                    )
+                    if correction_apercu:
+                        reglement.refresh_from_db()
+                        enregistrer_correction(
+                            utilisateur=request.user,
+                            gerant=gerant_apercu(reglement.manquant.situation.point_vente),
+                            operation=reglement,
+                            type_operation="REGLEMENT_MANQUANT",
+                            motif=motif,
+                            avant=avant,
+                            lien=reverse("situations:liste_reglements_manquants"),
+                        )
 
                 messages.success(
                     request,
@@ -1530,6 +1543,7 @@ def modifier_reglement_manquant_view(request, pk):
             "bouton_enregistrer": "Modifier le reglement",
             "next_url": next_url,
             "url_retour_direct": next_url,
+            "correction_apercu": correction_apercu,
         }
     )
 
@@ -1539,7 +1553,7 @@ def modifier_reglement_manquant_view(request, pk):
 # ==========================================================
 
 @login_required
-def modifier_situation_view(request, pk):
+def modifier_situation_view(request, pk, correction_apercu=False):
     """
     Corrige une situation journaliere cloturee.
     """
@@ -1549,16 +1563,19 @@ def modifier_situation_view(request, pk):
         return HttpResponseForbidden()
 
     situation = get_object_or_404(
-        situations_visibles(
-            request.user
-        ),
+        SituationJournaliere.objects if correction_apercu
+        else situations_visibles(request.user),
         pk=pk,
         actif=True,
     )
 
-    next_url = _url_retour_securisee(
-        request
+    next_url = (
+        retour_apercu(request, "versements")
+        if correction_apercu else _url_retour_securisee(request)
     )
+
+    if correction_apercu and not situation_corrigeable(request.user, situation):
+        return HttpResponseForbidden("Ce versement ne peut pas être corrigé.")
 
     if not peut_modifier_situation(
         request.user,
@@ -1585,21 +1602,34 @@ def modifier_situation_view(request, pk):
 
         try:
 
-            modifier_situation_cloturee(
-                situation=situation,
-                donnees_lignes=_donnees_lignes_depuis_post(
-                    situation,
-                    request
-                ),
-                montant_total_verse=request.POST.get(
-                    "montant_total_verse",
-                    "0"
-                ),
-                coupures=_coupures_depuis_post(
-                    request
-                ),
-                utilisateur=request.user,
-            )
+            motif = request.POST.get("motif_correction", "").strip()
+            if correction_apercu and not motif:
+                raise ValueError("Le motif de correction est obligatoire.")
+
+            with transaction.atomic():
+                if correction_apercu:
+                    situation = SituationJournaliere.objects.select_for_update().get(pk=pk)
+                    if not situation_corrigeable(request.user, situation):
+                        raise ValueError("Ce versement ne peut plus être corrigé.")
+                avant = instantane(situation) if correction_apercu else None
+                modifier_situation_cloturee(
+                    situation=situation,
+                    donnees_lignes=_donnees_lignes_depuis_post(situation, request),
+                    montant_total_verse=request.POST.get("montant_total_verse", "0"),
+                    coupures=_coupures_depuis_post(request),
+                    utilisateur=request.user,
+                )
+                if correction_apercu:
+                    situation.refresh_from_db()
+                    enregistrer_correction(
+                        utilisateur=request.user,
+                        gerant=gerant_apercu(situation.point_vente),
+                        operation=situation,
+                        type_operation="VERSEMENT",
+                        motif=motif,
+                        avant=avant,
+                        lien=reverse("situations:liste_situations"),
+                    )
 
             messages.success(
                 request,
@@ -1687,6 +1717,7 @@ def modifier_situation_view(request, pk):
             "coupure_500": coupures["500"],
             "next_url": next_url,
             "url_retour_direct": next_url,
+            "correction_apercu": correction_apercu,
         }
     )
 

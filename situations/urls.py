@@ -87,6 +87,8 @@ urlpatterns = [
         name="modifier_situation"
 
     ),
+    path("correction-apercu/<int:pk>/", views.modifier_situation_view,
+         {"correction_apercu": True}, name="corriger_situation_apercu"),
 
     path(
 
@@ -117,6 +119,9 @@ urlpatterns = [
         name="modifier_reglement_manquant"
 
     ),
+    path("manquants/reglements/<int:pk>/correction-apercu/",
+         views.modifier_reglement_manquant_view,
+         {"correction_apercu": True}, name="corriger_reglement_apercu"),
 
     path(
 
